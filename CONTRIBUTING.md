@@ -1,6 +1,6 @@
 # Contributor & Agent Instructions
 
-This repository is built for fast iteration with Codex. Follow these rules to keep changes safe, reviewable, and demo-ready.
+This repository is built for fast iteration with agents. Follow these rules to keep changes safe, reviewable, and demo-ready.
 
 ## Goals (what “done” means)
 1. GrantSmith can ingest an RFP + nonprofit docs.
