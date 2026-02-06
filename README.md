@@ -1,3 +1,5 @@
+![GrantSmith Logo](LOGO.png)
+
 # Evidence-Backed Grant Writing
 
 GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit’s source documents into a compliant draft with **traceable citations** for every claim. It generates structured sections, a requirements coverage matrix, and flags missing evidence before you submit.
@@ -60,7 +62,7 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 ├── datasets/                # sample RFP + sample nonprofit docs (sanitized)
 ├── docker-compose.yml
 ├── README.md
-└── CODEX.md                 # instructions for Codex / contributors
+└── CONTRIBUTING.md          # instructions for contributors
 
 ```
 
@@ -166,9 +168,3 @@ If a claim cannot be supported, GrantSmith must:
 * Demo video target: ~3 minutes
 * Include: requirements extraction → cited drafting → missing evidence → export
 * Highlight: structured outputs, validation, traceability, and real-world impact
-
----
-
-## License
-
-MIT
