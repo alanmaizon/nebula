@@ -1,4 +1,4 @@
-# GrantSmith — Evidence-Backed Grant Writing (Amazon Nova Hackathon)
+# Evidence-Backed Grant Writing
 
 GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit’s source documents into a compliant draft with **traceable citations** for every claim. It generates structured sections, a requirements coverage matrix, and flags missing evidence before you submit.
 
