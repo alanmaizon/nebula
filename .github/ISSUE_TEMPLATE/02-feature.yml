@@ -1,0 +1,56 @@
+name: Feature request
+description: Propose a new capability aligned to MVP goals.
+title: "[feat] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user or delivery problem are we solving.
+      placeholder: Current gap and impact.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe API, data, and UI changes.
+      placeholder: |
+        - API:
+        - Data model/schema:
+        - UI:
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Objective checks for completion.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Development phase
+      options:
+        - Step 1 Foundation
+        - Step 2 Ingestion
+        - Step 3 Retrieval
+        - Step 4 Requirements extraction
+        - Step 5 Cited drafting
+        - Step 6 Coverage
+        - Step 7 Export and UX
+        - Step 8 Hardening
+        - Step 9 Release
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and dependencies
+      description: Note risks, migrations, or external dependencies.

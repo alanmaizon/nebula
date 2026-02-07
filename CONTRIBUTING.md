@@ -107,7 +107,7 @@ List of requirements with:
 - Run `python scripts/sync_docs.py` after updating status.
 - Generated blocks are maintained in:
   - `README.md`
-  - `DEVELOPMENT.md`
+  - `DEVELOPMENT_PLAN.md`
   - `AWS_ALIGNMENT.md`
 - CI will fail if generated docs are stale (`python scripts/sync_docs.py --check`).
 
@@ -165,4 +165,3 @@ cd frontend && npm test
 ```bash
 python scripts/sync_docs.py
 ```
-

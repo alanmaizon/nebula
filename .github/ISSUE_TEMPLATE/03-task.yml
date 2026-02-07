@@ -1,0 +1,40 @@
+name: Task
+description: Track scoped engineering or documentation work.
+title: "[task] "
+labels:
+  - task
+body:
+  - type: input
+    id: objective
+    attributes:
+      label: Objective
+      placeholder: One sentence on intended outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      placeholder: |
+        - [ ] Code changes
+        - [ ] Tests
+        - [ ] Docs
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Owner
+      placeholder: @username
+    validations:
+      required: true
+  - type: input
+    id: due
+    attributes:
+      label: Target date
+      placeholder: YYYY-MM-DD
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Include links to related issues/PRs.

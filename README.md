@@ -9,7 +9,7 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofitâ€
 
 ## Documentation
 - Architecture: `ARCHITECTURE.md`
-- Development plan: `DEVELOPMENT.md`
+- Development plan: `DEVELOPMENT_PLAN.md`
 - AWS alignment: `AWS_ALIGNMENT.md`
 - Contributor guide: `CONTRIBUTING.md`
 - Status source: `docs/status.yml` (sync with `python scripts/sync_docs.py`)

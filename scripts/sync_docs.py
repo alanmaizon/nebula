@@ -194,7 +194,7 @@ def main() -> int:
     status = _load_status()
     targets = [
         ("README.md", "README_STATUS", render_readme_status),
-        ("DEVELOPMENT.md", "DEVELOPMENT_STATUS", render_development_status),
+        ("DEVELOPMENT_PLAN.md", "DEVELOPMENT_PLAN_STATUS", render_development_status),
         ("AWS_ALIGNMENT.md", "AWS_STATUS", render_aws_status),
     ]
 

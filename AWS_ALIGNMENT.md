@@ -7,7 +7,7 @@ This document maps GrantSmith architecture and delivery plans to:
 
 Reference docs:
 - `ARCHITECTURE.md`
-- `DEVELOPMENT.md`
+- `DEVELOPMENT_PLAN.md`
 - `CONTRIBUTING.md`
 
 ## Scope
@@ -89,7 +89,7 @@ flowchart TB
 - Add budget alarms and per-tenant usage metering.
 
 ## Month-1 Implementation Tie-In
-Link these items to `DEVELOPMENT.md` week plan:
+Link these items to `DEVELOPMENT_PLAN.md` week plan:
 - Week 1: Platform baseline and secure configuration foundations.
 - Week 2: Governance and schema enforcement for requirements extraction.
 - Week 3: Reliability and traceability in cited drafting and coverage.
