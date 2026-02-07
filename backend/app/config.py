@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     vector_store: str = "local"
     database_url: str = "sqlite:///./grantsmith.db"
     storage_root: str = "data/uploads"
+    chunk_size_chars: int = 1200
+    chunk_overlap_chars: int = 200
+    embedding_dim: int = 128
+    retrieval_top_k_default: int = 5
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

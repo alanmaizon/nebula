@@ -17,7 +17,7 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-07`
-- Overall completion: `40%`
+- Overall completion: `52%`
 - Current milestone: `Week 1 - Foundations (In progress)`
 
 ### Done This Week
@@ -29,11 +29,13 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 - Backend and frontend scaffolds created with health endpoints
 - Docker Compose baseline added with service health checks
 - Project creation and document upload metadata endpoints implemented
+- Chunking pipeline added with configurable chunk size and overlap
+- Local embedding and project-scoped retrieval endpoint implemented
 
 ### Next Up
-- Add page-anchored text extraction to ingestion pipeline
-- Add chunking and local vector indexing baseline
 - Create requirements extraction schema scaffold and endpoint skeleton
+- Implement extraction response validation and repair retry
+- Render extracted requirements table in frontend
 
 ### Current Blockers
 - No blockers recorded.
@@ -123,6 +125,10 @@ S3_BUCKET=grantsmith-dev
 VECTOR_STORE=local
 DATABASE_URL=sqlite:///./grantsmith.db
 STORAGE_ROOT=data/uploads
+CHUNK_SIZE_CHARS=1200
+CHUNK_OVERLAP_CHARS=200
+EMBEDDING_DIM=128
+RETRIEVAL_TOP_K_DEFAULT=5
 ```
 
 Frontend example:
@@ -170,6 +176,7 @@ npm run dev
 * `POST /projects` → create a project
 * `POST /projects/{id}/upload` → upload one or more source files
 * `GET /projects/{id}/documents` → list uploaded document metadata
+* `POST /projects/{id}/retrieve` → semantic retrieval over indexed chunks
 
 Planned endpoints in next implementation steps:
 * `POST /projects/{id}/extract-requirements`

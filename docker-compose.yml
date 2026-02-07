@@ -16,6 +16,10 @@ services:
       VECTOR_STORE: ${VECTOR_STORE:-local}
       DATABASE_URL: ${DATABASE_URL:-sqlite:///./grantsmith.db}
       STORAGE_ROOT: ${STORAGE_ROOT:-data/uploads}
+      CHUNK_SIZE_CHARS: ${CHUNK_SIZE_CHARS:-1200}
+      CHUNK_OVERLAP_CHARS: ${CHUNK_OVERLAP_CHARS:-200}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-128}
+      RETRIEVAL_TOP_K_DEFAULT: ${RETRIEVAL_TOP_K_DEFAULT:-5}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test:

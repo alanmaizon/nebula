@@ -12,9 +12,9 @@ This is the execution source of truth for building GrantSmith from zero to a dem
 | Week 4 | Hardening and demo | Not started |
 
 ### Current Week Priorities
-- Add page-anchored text extraction to ingestion pipeline
-- Add chunking and local vector indexing baseline
 - Create requirements extraction schema scaffold and endpoint skeleton
+- Implement extraction response validation and repair retry
+- Render extracted requirements table in frontend
 
 ### Active Risks
 - PDF extraction quality on heterogeneous RFP files -> Constrain demo corpus and capture page anchors early
@@ -241,12 +241,12 @@ Documentation:
 - [x] Implement `POST /projects`.
 - [x] Implement `POST /projects/{id}/upload`.
 - [x] Persist uploaded document metadata and storage paths.
-- [ ] Add page-anchored extracted text persistence.
+- [x] Add page-anchored extracted text persistence.
 
 ### Step 3 Backlog: Retrieval
-- [ ] Implement chunking with configurable chunk size and overlap.
-- [ ] Add embeddings and local vector index pipeline.
-- [ ] Implement project-scoped top-k retrieval API.
+- [x] Implement chunking with configurable chunk size and overlap.
+- [x] Add embeddings and local vector index pipeline.
+- [x] Implement project-scoped top-k retrieval API.
 
 ### Step 4 Backlog: Requirements Extraction
 - [ ] Define `requirements.json` schema.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Iterator
 from uuid import uuid4
@@ -45,6 +46,22 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(project_id) REFERENCES projects(id)
             );
+
+            CREATE TABLE IF NOT EXISTS chunks (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                document_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                page INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                embedding_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id),
+                FOREIGN KEY(document_id) REFERENCES documents(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chunks_project_id ON chunks(project_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_project_document ON chunks(project_id, document_id);
             """
         )
 
@@ -134,3 +151,67 @@ def list_documents(project_id: str) -> list[dict[str, str | int]]:
         ).fetchall()
     return [dict(row) for row in rows]
 
+
+def create_chunks(
+    project_id: str,
+    document_id: str,
+    chunks: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    now = _utc_now_iso()
+    rows: list[dict[str, object]] = []
+    for chunk in chunks:
+        rows.append(
+            {
+                "id": str(uuid4()),
+                "project_id": project_id,
+                "document_id": document_id,
+                "chunk_index": int(chunk["chunk_index"]),
+                "page": int(chunk["page"]),
+                "text": str(chunk["text"]),
+                "embedding_json": json.dumps(chunk["embedding"]),
+                "created_at": now,
+            }
+        )
+
+    if not rows:
+        return []
+
+    with get_conn() as conn:
+        conn.executemany(
+            """
+            INSERT INTO chunks (id, project_id, document_id, chunk_index, page, text, embedding_json, created_at)
+            VALUES (:id, :project_id, :document_id, :chunk_index, :page, :text, :embedding_json, :created_at)
+            """,
+            rows,
+        )
+    return rows
+
+
+def list_chunks(project_id: str) -> list[dict[str, object]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                c.id,
+                c.project_id,
+                c.document_id,
+                d.file_name,
+                c.chunk_index,
+                c.page,
+                c.text,
+                c.embedding_json,
+                c.created_at
+            FROM chunks c
+            JOIN documents d ON d.id = c.document_id
+            WHERE c.project_id = ?
+            ORDER BY c.chunk_index ASC
+            """,
+            (project_id,),
+        ).fetchall()
+
+    parsed: list[dict[str, object]] = []
+    for row in rows:
+        item = dict(row)
+        item["embedding"] = json.loads(item.pop("embedding_json"))
+        parsed.append(item)
+    return parsed
