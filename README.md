@@ -12,6 +12,27 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofitâ€
 - Development plan: `DEVELOPMENT.md`
 - AWS alignment: `AWS_ALIGNMENT.md`
 - Contributor guide: `CONTRIBUTING.md`
+- Status source: `docs/status.yml` (sync with `python scripts/sync_docs.py`)
+
+## Current Delivery Status
+<!-- AUTO-GEN:README_STATUS:START -->
+- Last updated: `2026-02-07`
+- Overall completion: `15%`
+- Current milestone: `Week 1 - Foundations (In progress)`
+
+### Done This Week
+- Repository baseline documentation created
+- Architecture plan with Mermaid diagrams added
+- AWS alignment draft documented
+
+### Next Up
+- Scaffold backend and frontend application directories
+- Implement upload and document metadata pipeline
+- Add chunking and local vector indexing baseline
+
+### Current Blockers
+- No blockers recorded.
+<!-- AUTO-GEN:README_STATUS:END -->
 
 ## Demo in 30 seconds
 1. Upload an RFP PDF + org docs (impact report, budget, program plan).

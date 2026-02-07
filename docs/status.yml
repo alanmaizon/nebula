@@ -1,0 +1,104 @@
+{
+  "project": "GrantSmith",
+  "last_updated": "2026-02-07",
+  "overall_completion_pct": 15,
+  "current_week": 1,
+  "weeks": [
+    {
+      "week": 1,
+      "focus": "Foundations",
+      "status": "in_progress",
+      "done": [
+        "Repository baseline documentation created",
+        "Architecture plan with Mermaid diagrams added",
+        "AWS alignment draft documented"
+      ],
+      "next": [
+        "Scaffold backend and frontend application directories",
+        "Implement upload and document metadata pipeline",
+        "Add chunking and local vector indexing baseline"
+      ],
+      "blockers": []
+    },
+    {
+      "week": 2,
+      "focus": "Requirements extraction",
+      "status": "not_started",
+      "done": [],
+      "next": [
+        "Create requirements extraction schema",
+        "Implement extraction endpoint and validator",
+        "Display extracted requirements in UI"
+      ],
+      "blockers": []
+    },
+    {
+      "week": 3,
+      "focus": "Cited drafting core",
+      "status": "not_started",
+      "done": [],
+      "next": [
+        "Implement evidence retrieval pipeline",
+        "Generate cited draft output",
+        "Compute coverage matrix and missing evidence"
+      ],
+      "blockers": []
+    },
+    {
+      "week": 4,
+      "focus": "Hardening and demo",
+      "status": "not_started",
+      "done": [],
+      "next": [
+        "Implement export endpoints",
+        "Stabilize deterministic settings and retries",
+        "Finalize demo flow and runbook"
+      ],
+      "blockers": []
+    }
+  ],
+  "high_risks": [
+    {
+      "risk": "PDF extraction quality on heterogeneous RFP files",
+      "mitigation": "Constrain demo corpus and capture page anchors early"
+    },
+    {
+      "risk": "Invalid JSON from model output",
+      "mitigation": "Strict schema validation with one repair attempt"
+    }
+  ],
+  "aws": {
+    "well_architected": [
+      {
+        "pillar": "Operational Excellence",
+        "status": "partial",
+        "next_control": "Add CI checks, runbooks, and release checklist"
+      },
+      {
+        "pillar": "Security",
+        "status": "partial",
+        "next_control": "Define IAM model, data classification, and key policy"
+      },
+      {
+        "pillar": "Reliability",
+        "status": "partial",
+        "next_control": "Define backups, restore test, and async job strategy"
+      },
+      {
+        "pillar": "Performance Efficiency",
+        "status": "not_started",
+        "next_control": "Add load profile and scaling plan"
+      },
+      {
+        "pillar": "Cost Optimization",
+        "status": "not_started",
+        "next_control": "Add token budget guardrails and cost visibility"
+      },
+      {
+        "pillar": "Sustainability",
+        "status": "not_started",
+        "next_control": "Define retention and right-sizing practices"
+      }
+    ]
+  }
+}

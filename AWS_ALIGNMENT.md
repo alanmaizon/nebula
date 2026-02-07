@@ -14,6 +14,20 @@ Reference docs:
 - Current state: 1-month MVP, local-first deployment with cloud-ready design.
 - Target state: production deployment on AWS for multi-tenant compliance workloads.
 
+## Live Alignment Status
+<!-- AUTO-GEN:AWS_STATUS:START -->
+- Last updated: `2026-02-07`
+
+| Pillar | Status | Next Control |
+|---|---|---|
+| Operational Excellence | Partial | Add CI checks, runbooks, and release checklist |
+| Security | Partial | Define IAM model, data classification, and key policy |
+| Reliability | Partial | Define backups, restore test, and async job strategy |
+| Performance Efficiency | Not started | Add load profile and scaling plan |
+| Cost Optimization | Not started | Add token budget guardrails and cost visibility |
+| Sustainability | Not started | Define retention and right-sizing practices |
+<!-- AUTO-GEN:AWS_STATUS:END -->
+
 ## Well-Architected Mapping
 
 | Pillar | GrantSmith Design Alignment | Required Controls (Production) | MVP Status |

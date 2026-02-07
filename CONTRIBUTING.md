@@ -100,7 +100,16 @@ List of requirements with:
 - Add lightweight tests for:
   - schema validation
   - requirements parser on sample RFP
-  - section generation produces citations + no empty fields
+- section generation produces citations + no empty fields
+
+## Documentation automation
+- Use `docs/status.yml` as the source of truth for delivery status.
+- Run `python scripts/sync_docs.py` after updating status.
+- Generated blocks are maintained in:
+  - `README.md`
+  - `DEVELOPMENT.md`
+  - `AWS_ALIGNMENT.md`
+- CI will fail if generated docs are stale (`python scripts/sync_docs.py --check`).
 
 ---
 
@@ -153,4 +162,7 @@ cd backend && pytest
 cd frontend && npm test
 ```
 
+```bash
+python scripts/sync_docs.py
+```
 

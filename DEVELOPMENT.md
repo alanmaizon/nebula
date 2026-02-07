@@ -21,6 +21,25 @@
 - Broad PDF edge-case support.
 - Enterprise auth, RBAC, or full observability stack.
 
+## Execution Status
+<!-- AUTO-GEN:DEVELOPMENT_STATUS:START -->
+| Week | Focus | Status |
+|---|---|---|
+| Week 1 | Foundations | In progress |
+| Week 2 | Requirements extraction | Not started |
+| Week 3 | Cited drafting core | Not started |
+| Week 4 | Hardening and demo | Not started |
+
+### Current Week Priorities
+- Scaffold backend and frontend application directories
+- Implement upload and document metadata pipeline
+- Add chunking and local vector indexing baseline
+
+### Active Risks
+- PDF extraction quality on heterogeneous RFP files -> Constrain demo corpus and capture page anchors early
+- Invalid JSON from model output -> Strict schema validation with one repair attempt
+<!-- AUTO-GEN:DEVELOPMENT_STATUS:END -->
+
 ## Week-by-Week Plan
 
 | Week | Focus | Key Work | Exit Criteria |
