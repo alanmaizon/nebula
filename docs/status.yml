@@ -1,7 +1,7 @@
 {
   "project": "GrantSmith",
   "last_updated": "2026-02-07",
-  "overall_completion_pct": 15,
+  "overall_completion_pct": 40,
   "current_week": 1,
   "weeks": [
     {
@@ -11,12 +11,17 @@
       "done": [
         "Repository baseline documentation created",
         "Architecture plan with Mermaid diagrams added",
-        "AWS alignment draft documented"
+        "AWS alignment draft documented",
+        "GitHub governance bootstrap completed (labels, milestones, issues, wiki sync)",
+        "Bootstrap automation hardened (wiki-only mode and project parser compatibility)",
+        "Backend and frontend scaffolds created with health endpoints",
+        "Docker Compose baseline added with service health checks",
+        "Project creation and document upload metadata endpoints implemented"
       ],
       "next": [
-        "Scaffold backend and frontend application directories",
-        "Implement upload and document metadata pipeline",
-        "Add chunking and local vector indexing baseline"
+        "Add page-anchored text extraction to ingestion pipeline",
+        "Add chunking and local vector indexing baseline",
+        "Create requirements extraction schema scaffold and endpoint skeleton"
       ],
       "blockers": []
     },

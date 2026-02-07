@@ -1,0 +1,60 @@
+:root {
+  --background: #f5f7fa;
+  --foreground: #122034;
+  --surface: #ffffff;
+  --border: #d3dce8;
+  --accent: #1864ab;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: radial-gradient(circle at top, #ffffff 0%, var(--background) 70%);
+  color: var(--foreground);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+main {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.stack {
+  display: grid;
+  gap: 16px;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 14px;
+}
+

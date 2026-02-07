@@ -12,9 +12,9 @@ This is the execution source of truth for building GrantSmith from zero to a dem
 | Week 4 | Hardening and demo | Not started |
 
 ### Current Week Priorities
-- Scaffold backend and frontend application directories
-- Implement upload and document metadata pipeline
+- Add page-anchored text extraction to ingestion pipeline
 - Add chunking and local vector indexing baseline
+- Create requirements extraction schema scaffold and endpoint skeleton
 
 ### Active Risks
 - PDF extraction quality on heterogeneous RFP files -> Constrain demo corpus and capture page anchors early
@@ -230,17 +230,18 @@ Documentation:
 - [x] Add governance templates and CODEOWNERS.
 - [x] Add security policy and baseline security workflows.
 - [x] Add GitHub bootstrap script for labels/milestones/issues/project.
-- [ ] Run bootstrap script against GitHub once `gh auth` is valid.
+- [x] Run bootstrap script against GitHub once `gh auth` is valid.
 
 ### Step 1 Backlog: Foundation
-- [ ] Scaffold `backend/` and `frontend/` directories.
-- [ ] Add `.env.example` files and local startup commands.
-- [ ] Add `docker-compose.yml` baseline and health checks.
+- [x] Scaffold `backend/` and `frontend/` directories.
+- [x] Add `.env.example` files and local startup commands.
+- [x] Add `docker-compose.yml` baseline and health checks.
 
 ### Step 2 Backlog: Ingestion
-- [ ] Implement `POST /projects`.
-- [ ] Implement `POST /projects/{id}/upload`.
-- [ ] Persist document metadata and page-anchored extracted text.
+- [x] Implement `POST /projects`.
+- [x] Implement `POST /projects/{id}/upload`.
+- [x] Persist uploaded document metadata and storage paths.
+- [ ] Add page-anchored extracted text persistence.
 
 ### Step 3 Backlog: Retrieval
 - [ ] Implement chunking with configurable chunk size and overlap.

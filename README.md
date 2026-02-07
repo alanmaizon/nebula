@@ -17,18 +17,23 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-07`
-- Overall completion: `15%`
+- Overall completion: `40%`
 - Current milestone: `Week 1 - Foundations (In progress)`
 
 ### Done This Week
 - Repository baseline documentation created
 - Architecture plan with Mermaid diagrams added
 - AWS alignment draft documented
+- GitHub governance bootstrap completed (labels, milestones, issues, wiki sync)
+- Bootstrap automation hardened (wiki-only mode and project parser compatibility)
+- Backend and frontend scaffolds created with health endpoints
+- Docker Compose baseline added with service health checks
+- Project creation and document upload metadata endpoints implemented
 
 ### Next Up
-- Scaffold backend and frontend application directories
-- Implement upload and document metadata pipeline
+- Add page-anchored text extraction to ingestion pipeline
 - Add chunking and local vector indexing baseline
+- Create requirements extraction schema scaffold and endpoint skeleton
 
 ### Current Blockers
 - No blockers recorded.
@@ -81,16 +86,14 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 
 ## Repo layout
 ```
-
 .
-├── frontend/                # Next.js UI
 ├── backend/                 # FastAPI API
+├── frontend/                # Next.js UI
 ├── docs/                    # prompts, JSON schemas, demo assets
-├── datasets/                # sample RFP + sample nonprofit docs (sanitized)
+├── scripts/                 # automation scripts
 ├── docker-compose.yml
 ├── README.md
-└── CONTRIBUTING.md          # instructions for contributors
-
+└── CONTRIBUTING.md
 ```
 
 ---
@@ -103,34 +106,40 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 - AWS credentials configured locally (`aws configure`) or via env vars
 
 ### Environment variables
-Create:
-- `backend/.env`
-- `frontend/.env.local`
+Create local env files from templates:
 
-Backend example:
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
 ```
 
+Backend example:
+```env
+APP_ENV=development
+CORS_ORIGINS=http://localhost:3000
 AWS_REGION=us-east-1
 BEDROCK_MODEL_ID=<your-nova-model-id>
 S3_BUCKET=grantsmith-dev
-VECTOR_STORE=local   # local|opensearch|pgvector
-
+VECTOR_STORE=local
+DATABASE_URL=sqlite:///./grantsmith.db
+STORAGE_ROOT=data/uploads
 ```
 
 Frontend example:
+```env
+NEXT_PUBLIC_API_BASE=http://localhost:8000
 ```
-
-NEXT_PUBLIC_API_BASE=[http://localhost:8000](http://localhost:8000)
-
-````
 
 ### Run with Docker (recommended)
 ```bash
 docker compose up --build
-````
+```
 
-* Frontend: [http://localhost:3000](http://localhost:3000)
-* Backend: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Frontend: http://localhost:3000
+- Frontend health: http://localhost:3000/api/health
+- Backend: http://localhost:8000
+- Backend docs: http://localhost:8000/docs
+- Backend health: http://localhost:8000/health
 
 ### Run without Docker
 
@@ -153,13 +162,19 @@ npm run dev
 
 ---
 
-## Key endpoints (backend)
+## Key endpoints (current baseline)
 
+* `GET /health` → backend health check
+* `GET /ready` → backend readiness check
+* `GET /api/health` → frontend health check
 * `POST /projects` → create a project
-* `POST /projects/{id}/upload` → upload docs (RFP + sources)
-* `POST /projects/{id}/extract-requirements` → build `requirements.json`
-* `POST /projects/{id}/generate-section` → build cited section + update matrix
-* `GET  /projects/{id}/export` → export JSON + markdown
+* `POST /projects/{id}/upload` → upload one or more source files
+* `GET /projects/{id}/documents` → list uploaded document metadata
+
+Planned endpoints in next implementation steps:
+* `POST /projects/{id}/extract-requirements`
+* `POST /projects/{id}/generate-section`
+* `GET /projects/{id}/export`
 
 ---
 

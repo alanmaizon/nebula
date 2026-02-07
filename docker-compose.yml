@@ -1,0 +1,59 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: grantsmith-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
+      S3_BUCKET: ${S3_BUCKET:-grantsmith-dev}
+      VECTOR_STORE: ${VECTOR_STORE:-local}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./grantsmith.db}
+      STORAGE_ROOT: ${STORAGE_ROOT:-data/uploads}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: grantsmith-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
+    command: npm run dev -- --hostname 0.0.0.0 --port 3000
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:3000/api/health',res=>process.exit(res.statusCode===200?0:1)).on('error',()=>process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s

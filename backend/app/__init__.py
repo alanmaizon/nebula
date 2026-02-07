@@ -1,0 +1,2 @@
+"""GrantSmith backend application package."""
+
