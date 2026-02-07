@@ -6,7 +6,7 @@
 - Defaults from `CONTRIBUTING.md`: local FAISS vector store and SQLite metadata store.
 - Stretch goals are out of scope unless core MVP is done early.
 
-## MVP Scope (Must Ship)
+## MVP Scope
 - Upload RFP + nonprofit source docs.
 - Extract `requirements.json` from the RFP.
 - Generate one cited section `draft.json` with sentence-level citations.
@@ -15,7 +15,7 @@
 - Export JSON + Markdown.
 - Basic validation + tests for core contracts.
 
-## Out of Scope (Timebox Guardrails)
+## Out of Scope
 - Portal autofill integrations.
 - Full rich-text editor.
 - Broad PDF edge-case support.
@@ -30,7 +30,7 @@
 | Week 3 | Cited drafting core | Implement retrieval + `POST /projects/{id}/generate-section`; return paragraph text, citations, confidence, and `missing_evidence[]`; compute coverage matrix from extracted requirements + cited draft. | Cited section generation works, citations map to real chunks/pages, coverage matrix appears in UI. |
 | Week 4 | Hardening + demo | Implement export endpoint (`JSON + Markdown`), clickable citation UX, error/loading states, deterministic model settings, lightweight test pass, demo script and documentation cleanup. | Full demo flow completes in one run with no manual data patching. |
 
-## Day-Level Breakdown (20 Working Days)
+## Day-Level Breakdown
 
 | Days | Deliverable |
 |---|---|

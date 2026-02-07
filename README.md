@@ -7,6 +7,12 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofitâ€
 **Hackathon track fit:** Multimodal / Agentic (requirements extraction + evidence-linked drafting)  
 **Core differentiator:** *Cite-first drafting* â€” every paragraph is backed by page/snippet references.
 
+## Documentation
+- Architecture: `ARCHITECTURE.md`
+- Development plan: `DEVELOPMENT.md`
+- AWS alignment: `AWS_ALIGNMENT.md`
+- Contributor guide: `CONTRIBUTING.md`
+
 ## Demo in 30 seconds
 1. Upload an RFP PDF + org docs (impact report, budget, program plan).
 2. GrantSmith extracts requirements (questions, limits, attachments, eligibility).
