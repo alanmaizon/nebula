@@ -3,6 +3,7 @@ set -euo pipefail
 
 DRY_RUN=false
 SYNC_WIKI=false
+WIKI_ONLY=false
 REPO=""
 
 usage() {
@@ -10,12 +11,13 @@ usage() {
 Bootstrap GitHub governance artifacts for this repository.
 
 Usage:
-  scripts/bootstrap_github.sh [--repo owner/repo] [--dry-run] [--sync-wiki]
+  scripts/bootstrap_github.sh [--repo owner/repo] [--dry-run] [--sync-wiki] [--wiki-only]
 
 Options:
   --repo owner/repo  Override repository target (default: inferred from git origin)
   --dry-run          Print actions without executing them
   --sync-wiki        Push docs/wiki/*.md pages to the GitHub wiki repository
+  --wiki-only        Run only wiki sync flow (skip labels/milestones/issues/project)
   --help             Show this message
 USAGE
 }
@@ -31,6 +33,11 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --sync-wiki)
+      SYNC_WIKI=true
+      shift
+      ;;
+    --wiki-only)
+      WIKI_ONLY=true
       SYNC_WIKI=true
       shift
       ;;
@@ -128,7 +135,8 @@ ensure_issue() {
 
 project_number_by_title() {
   local title="$1"
-  gh project list --owner "$OWNER" --limit 100 --format json --jq ".[] | select(.title == \"$title\") | .number"
+  gh project list --owner "$OWNER" --limit 100 --format json --jq \
+    "if type == \"array\" then .[] else .projects[] end | select(.title == \"$title\") | .number"
 }
 
 ensure_project() {
@@ -154,7 +162,21 @@ sync_wiki_pages() {
   wiki_remote="https://github.com/$REPO.wiki.git"
   wiki_repo="$tmp_dir/wiki"
 
-  run git clone "$wiki_remote" "$wiki_repo"
+  if ! run git clone "$wiki_remote" "$wiki_repo"; then
+    cat <<EOF >&2
+Could not clone wiki repository: $wiki_remote
+
+For private repositories, GitHub may require an initial wiki page before the
+wiki git repository is created.
+
+Open:
+  https://github.com/$REPO/wiki
+
+Create a first page (for example "Home"), then rerun:
+  scripts/bootstrap_github.sh --wiki-only
+EOF
+    return 1
+  fi
 
   if ! $DRY_RUN; then
     cp docs/wiki/*.md "$wiki_repo"/
@@ -183,6 +205,13 @@ OWNER="${REPO%%/*}"
 if ! gh auth status >/dev/null 2>&1; then
   echo "GitHub CLI is not authenticated. Run: gh auth login -h github.com" >&2
   exit 1
+fi
+
+if $WIKI_ONLY; then
+  echo "Wiki-only mode for $REPO"
+  sync_wiki_pages
+  echo "Wiki sync complete."
+  exit 0
 fi
 
 echo "Bootstrapping GitHub for $REPO"

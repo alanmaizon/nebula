@@ -44,10 +44,20 @@ This script creates/updates:
 
 Local wiki source pages are in `docs/wiki/`.
 
+If this is the first wiki publish and the wiki appears empty, initialize it once:
+- Open `https://github.com/alanmaizon/grantsmith/wiki`
+- Create a first page (for example `Home`)
+
 To sync them to GitHub wiki:
 
 ```bash
 scripts/bootstrap_github.sh --sync-wiki
+```
+
+If your token does not have project scopes yet, run wiki sync only:
+
+```bash
+scripts/bootstrap_github.sh --wiki-only
 ```
 
 ## 3) Project Operating Model
