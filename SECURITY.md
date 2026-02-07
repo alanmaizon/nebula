@@ -47,3 +47,11 @@ Targets may vary for complex infrastructure dependencies, but status updates wil
 - Validate all model outputs against explicit schemas.
 - Reject citations that cannot be traced to indexed evidence.
 - Keep dependencies up to date and address CI security alerts promptly.
+
+## Logging and Redaction Rules
+
+- Every API response includes a request correlation header (`X-Request-ID` by default).
+- Logs are structured and scoped to request metadata (method, path, status, latency).
+- Do not log request or response bodies containing uploaded document text.
+- Redact sensitive keys before logging: `authorization`, `cookie`, `token`, `password`, `secret`, API keys, email, phone, and SSN fields.
+- Redact sensitive inline patterns in any logged string (email addresses, phone numbers, SSNs, bearer tokens, AWS access keys).

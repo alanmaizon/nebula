@@ -17,7 +17,7 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-07`
-- Overall completion: `92%`
+- Overall completion: `96%`
 - Current milestone: `Week 1 - Foundations (In progress)`
 
 ### Done This Week
@@ -36,10 +36,13 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 - Coverage matrix computation implemented with requirement-to-evidence references and persisted artifacts
 - Export endpoint implemented for JSON and Markdown artifact packages
 - Frontend controls added for extract/generate/coverage/export with loading and error states
+- Request correlation ID middleware and structured API logs implemented
+- Sensitive-data logging redaction rules implemented and documented
+- Backup and restore runbook documented for SQLite metadata and uploaded files
 
 ### Next Up
 - Add citation click-through and missing evidence panel in frontend
-- Implement security hardening controls (correlation IDs, redaction, backup runbook)
+- Run restore drill and capture evidence for backup procedure
 - Prepare release checklist and demo freeze criteria
 
 ### Current Blockers
@@ -124,6 +127,8 @@ Backend example:
 ```env
 APP_ENV=development
 CORS_ORIGINS=http://localhost:3000
+LOG_LEVEL=INFO
+REQUEST_ID_HEADER=X-Request-ID
 AWS_REGION=us-east-1
 BEDROCK_MODEL_ID=<your-nova-model-id>
 S3_BUCKET=nebula-dev
@@ -144,6 +149,11 @@ NEXT_PUBLIC_API_BASE=http://localhost:8000
 ### Run with Docker (recommended)
 ```bash
 docker compose up --build
+```
+
+Production-style local stack:
+```bash
+scripts/run_docker_env.sh restart
 ```
 
 - Frontend: http://localhost:3000
@@ -171,6 +181,24 @@ npm install
 npm run dev
 ```
 
+## CI/CD (Docker-first)
+
+- CI workflow: `.github/workflows/ci.yml`
+  - backend tests (`pytest`)
+  - frontend typecheck/build
+  - dockerized smoke test using `scripts/run_docker_env.sh`
+- CD workflow: `.github/workflows/deploy-cloud-run.yml`
+  - builds backend/frontend images
+  - pushes images to Artifact Registry
+  - deploys both services to Cloud Run
+
+Required GitHub secrets for deploy:
+- `GCP_PROJECT_ID`
+- `GCP_REGION`
+- `GCP_ARTIFACT_REPOSITORY`
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_SERVICE_ACCOUNT`
+
 ---
 
 ## Key endpoints (current baseline)
@@ -189,6 +217,8 @@ npm run dev
 * `POST /projects/{id}/coverage` → compute coverage matrix from latest requirements + draft
 * `GET /projects/{id}/coverage/latest` → fetch latest coverage artifact
 * `GET /projects/{id}/export` → export combined artifacts in `json` or `markdown`
+
+All backend responses include a request correlation header (`X-Request-ID` by default).
 
 ---
 
@@ -216,6 +246,7 @@ If a claim cannot be supported, Nebula must:
 * Only the minimum necessary text is sent to the model.
 * Original files remain in your controlled storage (S3/local).
 * Optional redaction hooks can mask PII before LLM calls.
+* Structured logs include correlation IDs and redact sensitive fields/patterns.
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "project": "Nebula",
   "last_updated": "2026-02-07",
-  "overall_completion_pct": 92,
+  "overall_completion_pct": 96,
   "current_week": 1,
   "weeks": [
     {
@@ -23,11 +23,14 @@
         "Cited section generation endpoint implemented with draft schema validation and missing evidence support",
         "Coverage matrix computation implemented with requirement-to-evidence references and persisted artifacts",
         "Export endpoint implemented for JSON and Markdown artifact packages",
-        "Frontend controls added for extract/generate/coverage/export with loading and error states"
+        "Frontend controls added for extract/generate/coverage/export with loading and error states",
+        "Request correlation ID middleware and structured API logs implemented",
+        "Sensitive-data logging redaction rules implemented and documented",
+        "Backup and restore runbook documented for SQLite metadata and uploaded files"
       ],
       "next": [
         "Add citation click-through and missing evidence panel in frontend",
-        "Implement security hardening controls (correlation IDs, redaction, backup runbook)",
+        "Run restore drill and capture evidence for backup procedure",
         "Prepare release checklist and demo freeze criteria"
       ],
       "blockers": []
@@ -84,7 +87,7 @@
       {
         "pillar": "Operational Excellence",
         "status": "partial",
-        "next_control": "Add CI checks, runbooks, and release checklist"
+        "next_control": "Finalize release checklist and demo freeze evidence"
       },
       {
         "pillar": "Security",
@@ -94,7 +97,7 @@
       {
         "pillar": "Reliability",
         "status": "partial",
-        "next_control": "Define backups, restore test, and async job strategy"
+        "next_control": "Execute restore drill and capture backup evidence"
       },
       {
         "pillar": "Performance Efficiency",

@@ -20,9 +20,9 @@ Reference docs:
 
 | Pillar | Status | Next Control |
 |---|---|---|
-| Operational Excellence | Partial | Add CI checks, runbooks, and release checklist |
+| Operational Excellence | Partial | Finalize release checklist and demo freeze evidence |
 | Security | Partial | Define IAM model, data classification, and key policy |
-| Reliability | Partial | Define backups, restore test, and async job strategy |
+| Reliability | Partial | Execute restore drill and capture backup evidence |
 | Performance Efficiency | Not started | Add load profile and scaling plan |
 | Cost Optimization | Not started | Add token budget guardrails and cost visibility |
 | Sustainability | Not started | Define retention and right-sizing practices |

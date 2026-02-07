@@ -5,10 +5,8 @@ services:
     container_name: nebula-backend
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
     environment:
-      APP_ENV: ${APP_ENV:-development}
+      APP_ENV: ${APP_ENV:-production}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       REQUEST_ID_HEADER: ${REQUEST_ID_HEADER:-X-Request-ID}
@@ -22,7 +20,7 @@ services:
       CHUNK_OVERLAP_CHARS: ${CHUNK_OVERLAP_CHARS:-200}
       EMBEDDING_DIM: ${EMBEDDING_DIM:-128}
       RETRIEVAL_TOP_K_DEFAULT: ${RETRIEVAL_TOP_K_DEFAULT:-5}
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     healthcheck:
       test:
         [
@@ -39,15 +37,14 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
     container_name: nebula-frontend
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     environment:
-      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
-    command: npm run dev -- --hostname 0.0.0.0 --port 3000
+      NODE_ENV: production
+    command: npm run start -- --hostname 0.0.0.0 --port 3000
     depends_on:
       backend:
         condition: service_healthy

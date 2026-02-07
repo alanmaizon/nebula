@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
+import time
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
@@ -25,8 +27,17 @@ from app.db import (
     list_documents,
 )
 from app.drafting import build_draft_payload, validate_with_repair as validate_draft_with_repair
+from app.observability import (
+    configure_logging,
+    normalize_request_id,
+    reset_request_id,
+    sanitize_for_logging,
+    set_request_id,
+)
 from app.requirements import extract_requirements_payload, validate_with_repair as validate_requirements_with_repair
 from app.retrieval import chunk_pages, cosine_similarity, embed_text, extract_text_pages
+
+logger = logging.getLogger("nebula.api")
 
 
 class ProjectCreateRequest(BaseModel):
@@ -49,9 +60,12 @@ class CoverageComputeRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    configure_logging(settings.log_level)
+    logger.info("application_startup", extra={"event": "application_startup", "environment": settings.app_env})
     init_db()
     Path(settings.storage_root).mkdir(parents=True, exist_ok=True)
     yield
+    logger.info("application_shutdown", extra={"event": "application_shutdown"})
 
 
 def create_app() -> FastAPI:
@@ -63,6 +77,57 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def request_context_middleware(request: Request, call_next):
+        request_id = normalize_request_id(request.headers.get(settings.request_id_header))
+        request.state.request_id = request_id
+        token = set_request_id(request_id)
+        started = time.perf_counter()
+
+        logger.info(
+            "request_started",
+            extra={
+                "event": "request_started",
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.url.path,
+                "query": sanitize_for_logging(dict(request.query_params)),
+                "client_ip": request.client.host if request.client else None,
+            },
+        )
+
+        try:
+            response = await call_next(request)
+            elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+            response.headers[settings.request_id_header] = request_id
+            logger.info(
+                "request_completed",
+                extra={
+                    "event": "request_completed",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "duration_ms": elapsed_ms,
+                },
+            )
+            return response
+        except Exception:
+            elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+            logger.exception(
+                "request_failed",
+                extra={
+                    "event": "request_failed",
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.url.path,
+                    "duration_ms": elapsed_ms,
+                },
+            )
+            raise
+        finally:
+            reset_request_id(token)
 
     def rank_chunks_by_query(
         chunks: list[dict[str, object]], query: str, top_k: int

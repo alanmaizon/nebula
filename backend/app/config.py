@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     cors_origins: str = "http://localhost:3000"
+    log_level: str = "INFO"
+    request_id_header: str = "X-Request-ID"
 
     aws_region: str = "us-east-1"
     bedrock_model_id: str = ""
