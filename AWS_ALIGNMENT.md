@@ -1,7 +1,7 @@
-# GrantSmith Alignment to AWS Well-Architected and CAF
+# Nebula Alignment to AWS Well-Architected and CAF
 
 ## Purpose
-This document maps GrantSmith architecture and delivery plans to:
+This document maps Nebula architecture and delivery plans to:
 - AWS Well-Architected Framework (6 pillars)
 - AWS Cloud Adoption Framework (CAF perspectives)
 
@@ -30,7 +30,7 @@ Reference docs:
 
 ## Well-Architected Mapping
 
-| Pillar | GrantSmith Design Alignment | Required Controls (Production) | MVP Status |
+| Pillar | Nebula Design Alignment | Required Controls (Production) | MVP Status |
 |---|---|---|---|
 | Operational Excellence | Orchestrated workflows for ingestion, extraction, drafting, validation, export. | Runbooks, deployment pipelines, change tracking, SLOs, incident playbooks. | Partial |
 | Security | Tenant scoping, citation-grounded prompts, minimal payload to model, no secrets in repo. | IAM least privilege, KMS encryption, WAF, secrets manager, audit logging, threat detection. | Partial |
@@ -41,7 +41,7 @@ Reference docs:
 
 ## CAF Perspective Mapping
 
-| CAF Perspective | GrantSmith Focus | Primary Owner | Core Artifacts |
+| CAF Perspective | Nebula Focus | Primary Owner | Core Artifacts |
 |---|---|---|---|
 | Business | Compliance outcomes, trust, faster submission readiness. | Product/Founder | KPI set, value hypothesis, customer success metrics |
 | People | Trustee/admin/reviewer workflows; human-in-the-loop approvals. | Product + Ops | Role definitions, RACI, onboarding guide |

@@ -1,6 +1,6 @@
-# GrantSmith Zero-to-MVP Execution Plan
+# Nebula Zero-to-MVP Execution Plan
 
-This is the execution source of truth for building GrantSmith from zero to a demo-ready MVP with repeatable engineering practices.
+This is the execution source of truth for building Nebula from zero to a demo-ready MVP with repeatable engineering practices.
 
 ## Execution Status
 <!-- AUTO-GEN:DEVELOPMENT_PLAN_STATUS:START -->
@@ -12,9 +12,9 @@ This is the execution source of truth for building GrantSmith from zero to a dem
 | Week 4 | Hardening and demo | Not started |
 
 ### Current Week Priorities
-- Create requirements extraction schema scaffold and endpoint skeleton
-- Implement extraction response validation and repair retry
-- Render extracted requirements table in frontend
+- Add citation click-through and missing evidence panel in frontend
+- Implement security hardening controls (correlation IDs, redaction, backup runbook)
+- Prepare release checklist and demo freeze criteria
 
 ### Active Risks
 - PDF extraction quality on heterogeneous RFP files -> Constrain demo corpus and capture page anchors early
@@ -249,24 +249,24 @@ Documentation:
 - [x] Implement project-scoped top-k retrieval API.
 
 ### Step 4 Backlog: Requirements Extraction
-- [ ] Define `requirements.json` schema.
-- [ ] Implement extraction endpoint with schema validation and repair retry.
-- [ ] Add fixture-based extraction tests.
+- [x] Define `requirements.json` schema.
+- [x] Implement extraction endpoint with schema validation and repair retry.
+- [x] Add fixture-based extraction tests.
 
 ### Step 5 Backlog: Cited Drafting
-- [ ] Implement section generation endpoint.
-- [ ] Enforce citation integrity against retrieval set.
-- [ ] Return and test `missing_evidence[]`.
+- [x] Implement section generation endpoint.
+- [x] Enforce citation integrity against retrieval set.
+- [x] Return and test `missing_evidence[]`.
 
 ### Step 6 Backlog: Coverage
-- [ ] Implement `met | partial | missing` matrix computation.
-- [ ] Link coverage entries to requirement and evidence references.
-- [ ] Add matrix edge-case tests.
+- [x] Implement `met | partial | missing` matrix computation.
+- [x] Link coverage entries to requirement and evidence references.
+- [x] Add matrix edge-case tests.
 
 ### Step 7 Backlog: Export and UX
-- [ ] Implement JSON and Markdown export endpoint.
+- [x] Implement JSON and Markdown export endpoint.
 - [ ] Add citation click-through in UI.
-- [ ] Add loading/error/retry states in UI flow.
+- [x] Add loading/error/retry states in UI flow.
 
 ### Step 8 Backlog: Hardening
 - [ ] Add request correlation IDs and structured logs.

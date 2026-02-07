@@ -3,7 +3,7 @@
 This repository is built for fast iteration with agents. Follow these rules to keep changes safe, reviewable, and demo-ready.
 
 ## Goals (what “done” means)
-1. GrantSmith can ingest an RFP + nonprofit docs.
+1. Nebula can ingest an RFP + nonprofit docs.
 2. It produces:
    - `requirements.json` (structured extraction)
    - a cited draft section (`draft.json`)

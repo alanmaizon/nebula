@@ -305,7 +305,7 @@ ensure_issue \
   "Step 9 - Release" \
   "Run full demo from clean setup, capture release notes, and publish initial MVP tag."
 
-ensure_project "GrantSmith MVP Roadmap"
+ensure_project "Nebula MVP Roadmap"
 
 if $SYNC_WIKI; then
   sync_wiki_pages

@@ -1,7 +1,7 @@
 {
-  "project": "GrantSmith",
+  "project": "Nebula",
   "last_updated": "2026-02-07",
-  "overall_completion_pct": 52,
+  "overall_completion_pct": 92,
   "current_week": 1,
   "weeks": [
     {
@@ -18,12 +18,17 @@
         "Docker Compose baseline added with service health checks",
         "Project creation and document upload metadata endpoints implemented",
         "Chunking pipeline added with configurable chunk size and overlap",
-        "Local embedding and project-scoped retrieval endpoint implemented"
+        "Local embedding and project-scoped retrieval endpoint implemented",
+        "Requirements schema and extraction endpoints implemented with validation and artifact persistence",
+        "Cited section generation endpoint implemented with draft schema validation and missing evidence support",
+        "Coverage matrix computation implemented with requirement-to-evidence references and persisted artifacts",
+        "Export endpoint implemented for JSON and Markdown artifact packages",
+        "Frontend controls added for extract/generate/coverage/export with loading and error states"
       ],
       "next": [
-        "Create requirements extraction schema scaffold and endpoint skeleton",
-        "Implement extraction response validation and repair retry",
-        "Render extracted requirements table in frontend"
+        "Add citation click-through and missing evidence panel in frontend",
+        "Implement security hardening controls (correlation IDs, redaction, backup runbook)",
+        "Prepare release checklist and demo freeze criteria"
       ],
       "blockers": []
     },

@@ -1,2 +1,2 @@
-"""GrantSmith backend application package."""
+"""Nebula backend application package."""
 

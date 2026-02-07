@@ -37,7 +37,7 @@ This script creates/updates:
 - labels
 - milestones (`Step 0` through `Step 9`)
 - starter issues for each step
-- project board titled `GrantSmith MVP Roadmap`
+- project board titled `Nebula MVP Roadmap`
 - repository link to the project
 
 ## 2) Seed GitHub Wiki

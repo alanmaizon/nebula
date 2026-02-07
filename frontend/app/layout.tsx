@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GrantSmith",
-  description: "Evidence-backed grant writing workspace",
+  title: "Nebula",
+  description: "Amazon Nova-powered evidence-backed grant writing workspace",
 };
 
 export default function RootLayout({
@@ -17,4 +17,3 @@ export default function RootLayout({
     </html>
   );
 }
-

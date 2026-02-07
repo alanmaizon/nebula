@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "GrantSmith API"
+    app_name: str = "Nebula API"
     app_env: str = "development"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
@@ -10,9 +10,9 @@ class Settings(BaseSettings):
 
     aws_region: str = "us-east-1"
     bedrock_model_id: str = ""
-    s3_bucket: str = "grantsmith-dev"
+    s3_bucket: str = "nebula-dev"
     vector_store: str = "local"
-    database_url: str = "sqlite:///./grantsmith.db"
+    database_url: str = "sqlite:///./nebula.db"
     storage_root: str = "data/uploads"
     chunk_size_chars: int = 1200
     chunk_overlap_chars: int = 200

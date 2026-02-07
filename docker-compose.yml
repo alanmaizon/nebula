@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: grantsmith-backend
+    container_name: nebula-backend
     ports:
       - "8000:8000"
     volumes:
@@ -12,9 +12,9 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
-      S3_BUCKET: ${S3_BUCKET:-grantsmith-dev}
+      S3_BUCKET: ${S3_BUCKET:-nebula-dev}
       VECTOR_STORE: ${VECTOR_STORE:-local}
-      DATABASE_URL: ${DATABASE_URL:-sqlite:///./grantsmith.db}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./nebula.db}
       STORAGE_ROOT: ${STORAGE_ROOT:-data/uploads}
       CHUNK_SIZE_CHARS: ${CHUNK_SIZE_CHARS:-1200}
       CHUNK_OVERLAP_CHARS: ${CHUNK_OVERLAP_CHARS:-200}
@@ -37,7 +37,7 @@ services:
   frontend:
     build:
       context: ./frontend
-    container_name: grantsmith-frontend
+    container_name: nebula-frontend
     ports:
       - "3000:3000"
     volumes:

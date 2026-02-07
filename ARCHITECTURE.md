@@ -1,7 +1,7 @@
-# GrantSmith Architecture Plan
+# Nebula Architecture Plan
 
 ## 1) Purpose
-GrantSmith is an evidence-backed drafting system that turns an RFP plus nonprofit documents into:
+Nebula is an evidence-backed drafting system that turns an RFP plus nonprofit documents into:
 - `requirements.json`
 - cited section drafts (`draft.json`)
 - coverage matrix (`met | partial | missing`)

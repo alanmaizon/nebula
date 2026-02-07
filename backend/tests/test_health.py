@@ -99,3 +99,214 @@ def test_retrieve_is_project_scoped(tmp_path: Path) -> None:
         assert len(payload["results"]) >= 1
         top = payload["results"][0]
         assert top["file_name"] == "impact.txt"
+
+
+def test_extract_requirements_and_read_latest(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 300
+    settings.chunk_overlap_chars = 50
+    settings.embedding_dim = 64
+
+    rfp_text = b"""
+Funder: City Community Fund
+Deadline: March 30, 2026
+
+Eligibility:
+- Eligible applicants must be registered nonprofits.
+
+Question 1: Describe program outcomes. Limit 250 words.
+Question 2: Provide implementation timeline. Limit 1200 characters.
+
+Required Attachments:
+- Attachment A: Budget Narrative
+- Attachment B: Board List
+
+Rubric:
+- Scoring criteria include impact and feasibility.
+
+Disallowed costs:
+- Alcohol purchases are not allowed costs.
+"""
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "RFP Extraction"}).json()["id"]
+
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("rfp.txt", rfp_text, "text/plain"))],
+        )
+        assert upload.status_code == 200
+
+        extract = client.post(f"/projects/{project_id}/extract-requirements")
+        assert extract.status_code == 200
+        payload = extract.json()
+        requirements = payload["requirements"]
+        assert requirements["funder"] == "City Community Fund"
+        assert requirements["deadline"] == "March 30, 2026"
+        assert len(requirements["questions"]) >= 2
+        assert requirements["questions"][0]["limit"]["type"] in {"words", "none", "chars"}
+        assert len(requirements["required_attachments"]) >= 1
+        assert len(requirements["disallowed_costs"]) >= 1
+
+        latest = client.get(f"/projects/{project_id}/requirements/latest")
+        assert latest.status_code == 200
+        assert latest.json()["artifact"]["source"] == "heuristic-v1"
+
+
+def test_extract_requirements_without_chunks_returns_400(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "No Chunks"}).json()["id"]
+        extract = client.post(f"/projects/{project_id}/extract-requirements")
+        assert extract.status_code == 400
+
+
+def test_generate_section_and_read_latest_draft(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 120
+    settings.chunk_overlap_chars = 20
+    settings.embedding_dim = 64
+
+    source_text = b"""
+Question 1: Describe the organization need statement.
+We served 1240 households with emergency support in 2024.
+Our outcomes improved housing stability for low-income families.
+"""
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Drafting"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("impact.txt", source_text, "text/plain"))],
+        )
+        assert upload.status_code == 200
+
+        generate = client.post(
+            f"/projects/{project_id}/generate-section",
+            json={"section_key": "Need Statement", "top_k": 2},
+        )
+        assert generate.status_code == 200
+        payload = generate.json()
+        assert payload["draft"]["section_key"] == "Need Statement"
+        assert len(payload["draft"]["paragraphs"]) >= 1
+        first = payload["draft"]["paragraphs"][0]
+        assert len(first["citations"]) >= 1
+        assert first["citations"][0]["doc_id"] == "impact.txt"
+
+        latest = client.get(f"/projects/{project_id}/drafts/Need Statement/latest")
+        assert latest.status_code == 200
+        assert latest.json()["draft"]["section_key"] == "Need Statement"
+
+
+def test_compute_coverage_and_read_latest(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 220
+    settings.chunk_overlap_chars = 40
+    settings.embedding_dim = 64
+
+    rfp_text = b"""
+Funder: City Community Fund
+Question 1: Describe program outcomes. Limit 250 words.
+Question 2: Explain implementation timeline. Limit 500 words.
+"""
+    source_text = b"""
+Need Statement: We served 1240 households in 2024 with emergency housing support.
+Our implementation timeline spans four quarters with milestones.
+"""
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Coverage"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[
+                ("files", ("rfp.txt", rfp_text, "text/plain")),
+                ("files", ("impact.txt", source_text, "text/plain")),
+            ],
+        )
+        assert upload.status_code == 200
+
+        extract = client.post(f"/projects/{project_id}/extract-requirements")
+        assert extract.status_code == 200
+
+        generate = client.post(
+            f"/projects/{project_id}/generate-section",
+            json={"section_key": "Need Statement", "top_k": 3},
+        )
+        assert generate.status_code == 200
+
+        coverage = client.post(
+            f"/projects/{project_id}/coverage",
+            json={"section_key": "Need Statement"},
+        )
+        assert coverage.status_code == 200
+        payload = coverage.json()
+        assert payload["project_id"] == project_id
+        assert len(payload["coverage"]["items"]) >= 1
+        assert payload["coverage"]["items"][0]["status"] in {"met", "partial", "missing"}
+
+        latest = client.get(f"/projects/{project_id}/coverage/latest")
+        assert latest.status_code == 200
+        assert len(latest.json()["coverage"]["items"]) >= 1
+
+
+def test_export_json_and_markdown(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 220
+    settings.chunk_overlap_chars = 40
+    settings.embedding_dim = 64
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Export"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[
+                (
+                    "files",
+                    (
+                        "rfp.txt",
+                        b"Funder: City Community Fund\nQuestion 1: Describe outcomes. Limit 200 words.",
+                        "text/plain",
+                    ),
+                ),
+                (
+                    "files",
+                    (
+                        "impact.txt",
+                        b"We served 1240 households and improved housing stability outcomes.",
+                        "text/plain",
+                    ),
+                ),
+            ],
+        )
+        assert upload.status_code == 200
+
+        assert client.post(f"/projects/{project_id}/extract-requirements").status_code == 200
+        assert (
+            client.post(
+                f"/projects/{project_id}/generate-section",
+                json={"section_key": "Need Statement"},
+            ).status_code
+            == 200
+        )
+        assert (
+            client.post(
+                f"/projects/{project_id}/coverage",
+                json={"section_key": "Need Statement"},
+            ).status_code
+            == 200
+        )
+
+        export_json = client.get(f"/projects/{project_id}/export?format=json&section_key=Need Statement")
+        assert export_json.status_code == 200
+        assert export_json.json()["project_id"] == project_id
+        assert export_json.json()["requirements"] is not None
+
+        export_md = client.get(f"/projects/{project_id}/export?format=markdown&section_key=Need Statement")
+        assert export_md.status_code == 200
+        assert "Nebula Export" in export_md.text

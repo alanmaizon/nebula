@@ -1,6 +1,6 @@
-# GrantSmith Wiki
+# Nebula Wiki
 
-Welcome to the GrantSmith engineering wiki. This space tracks delivery execution, architecture decisions, and operational runbooks.
+Welcome to the Nebula engineering wiki. This space tracks delivery execution, architecture decisions, and operational runbooks.
 
 ## Start Here
 - [Roadmap](Roadmap)

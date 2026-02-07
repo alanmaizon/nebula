@@ -43,6 +43,16 @@ p {
   gap: 16px;
 }
 
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
 .badge {
   display: inline-flex;
   padding: 4px 10px;
@@ -58,3 +68,46 @@ p {
   font-size: 14px;
 }
 
+.input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.button {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button.ghost {
+  background: #fff;
+  color: var(--accent);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.code {
+  margin: 0;
+  background: #f3f6fb;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 12px;
+  overflow: auto;
+  min-height: 120px;
+}
+
+.error {
+  color: #b21f35;
+  font-weight: 600;
+}

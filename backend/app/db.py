@@ -62,6 +62,43 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_chunks_project_id ON chunks(project_id);
             CREATE INDEX IF NOT EXISTS idx_chunks_project_document ON chunks(project_id, document_id);
+
+            CREATE TABLE IF NOT EXISTS requirements_artifacts (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_requirements_project_id
+                ON requirements_artifacts(project_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS draft_artifacts (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                section_key TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_draft_project_section
+                ON draft_artifacts(project_id, section_key, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS coverage_artifacts (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_coverage_project_id
+                ON coverage_artifacts(project_id, created_at DESC);
             """
         )
 
@@ -214,4 +251,148 @@ def list_chunks(project_id: str) -> list[dict[str, object]]:
         item = dict(row)
         item["embedding"] = json.loads(item.pop("embedding_json"))
         parsed.append(item)
+    return parsed
+
+
+def create_requirements_artifact(
+    project_id: str,
+    payload: dict[str, object],
+    source: str,
+) -> dict[str, object]:
+    artifact = {
+        "id": str(uuid4()),
+        "project_id": project_id,
+        "payload_json": json.dumps(payload),
+        "source": source,
+        "created_at": _utc_now_iso(),
+    }
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO requirements_artifacts (id, project_id, payload_json, source, created_at)
+            VALUES (:id, :project_id, :payload_json, :source, :created_at)
+            """,
+            artifact,
+        )
+    return {
+        "id": artifact["id"],
+        "project_id": artifact["project_id"],
+        "source": artifact["source"],
+        "created_at": artifact["created_at"],
+    }
+
+
+def get_latest_requirements_artifact(project_id: str) -> dict[str, object] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, payload_json, source, created_at
+            FROM requirements_artifacts
+            WHERE project_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (project_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    parsed = dict(row)
+    parsed["payload"] = json.loads(parsed.pop("payload_json"))
+    return parsed
+
+
+def create_draft_artifact(
+    project_id: str,
+    section_key: str,
+    payload: dict[str, object],
+    source: str,
+) -> dict[str, object]:
+    artifact = {
+        "id": str(uuid4()),
+        "project_id": project_id,
+        "section_key": section_key,
+        "payload_json": json.dumps(payload),
+        "source": source,
+        "created_at": _utc_now_iso(),
+    }
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO draft_artifacts (id, project_id, section_key, payload_json, source, created_at)
+            VALUES (:id, :project_id, :section_key, :payload_json, :source, :created_at)
+            """,
+            artifact,
+        )
+    return {
+        "id": artifact["id"],
+        "project_id": artifact["project_id"],
+        "section_key": artifact["section_key"],
+        "source": artifact["source"],
+        "created_at": artifact["created_at"],
+    }
+
+
+def get_latest_draft_artifact(project_id: str, section_key: str) -> dict[str, object] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, section_key, payload_json, source, created_at
+            FROM draft_artifacts
+            WHERE project_id = ? AND section_key = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (project_id, section_key),
+        ).fetchone()
+    if row is None:
+        return None
+    parsed = dict(row)
+    parsed["payload"] = json.loads(parsed.pop("payload_json"))
+    return parsed
+
+
+def create_coverage_artifact(
+    project_id: str,
+    payload: dict[str, object],
+    source: str,
+) -> dict[str, object]:
+    artifact = {
+        "id": str(uuid4()),
+        "project_id": project_id,
+        "payload_json": json.dumps(payload),
+        "source": source,
+        "created_at": _utc_now_iso(),
+    }
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO coverage_artifacts (id, project_id, payload_json, source, created_at)
+            VALUES (:id, :project_id, :payload_json, :source, :created_at)
+            """,
+            artifact,
+        )
+    return {
+        "id": artifact["id"],
+        "project_id": artifact["project_id"],
+        "source": artifact["source"],
+        "created_at": artifact["created_at"],
+    }
+
+
+def get_latest_coverage_artifact(project_id: str) -> dict[str, object] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, payload_json, source, created_at
+            FROM coverage_artifacts
+            WHERE project_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (project_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    parsed = dict(row)
+    parsed["payload"] = json.loads(parsed.pop("payload_json"))
     return parsed

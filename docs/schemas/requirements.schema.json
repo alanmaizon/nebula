@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nebula.local/schemas/requirements.schema.json",
+  "title": "Nebula Requirements Artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "funder",
+    "deadline",
+    "eligibility",
+    "questions",
+    "required_attachments",
+    "rubric",
+    "disallowed_costs"
+  ],
+  "properties": {
+    "funder": {
+      "type": ["string", "null"]
+    },
+    "deadline": {
+      "type": ["string", "null"]
+    },
+    "eligibility": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "prompt", "limit"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["words", "chars", "none"]
+              },
+              "value": {
+                "type": ["integer", "null"],
+                "minimum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "required_attachments": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "rubric": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "disallowed_costs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

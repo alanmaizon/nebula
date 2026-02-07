@@ -1,8 +1,8 @@
-![GrantSmith Logo](LOGO.png)
+![Nebula Logo](LOGO.png)
 
-# Evidence-Backed Grant Writing
+# Nebula
 
-GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit’s source documents into a compliant draft with **traceable citations** for every claim. It generates structured sections, a requirements coverage matrix, and flags missing evidence before you submit.
+Nebula is an Amazon Nova-powered grant-application workspace that turns an RFP plus a nonprofit’s source documents into a compliant draft with **traceable citations** for every claim. It generates structured sections, a requirements coverage matrix, and flags missing evidence before you submit.
 
 **Hackathon track fit:** Multimodal / Agentic (requirements extraction + evidence-linked drafting)  
 **Core differentiator:** *Cite-first drafting* — every paragraph is backed by page/snippet references.
@@ -17,7 +17,7 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-07`
-- Overall completion: `52%`
+- Overall completion: `92%`
 - Current milestone: `Week 1 - Foundations (In progress)`
 
 ### Done This Week
@@ -31,11 +31,16 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 - Project creation and document upload metadata endpoints implemented
 - Chunking pipeline added with configurable chunk size and overlap
 - Local embedding and project-scoped retrieval endpoint implemented
+- Requirements schema and extraction endpoints implemented with validation and artifact persistence
+- Cited section generation endpoint implemented with draft schema validation and missing evidence support
+- Coverage matrix computation implemented with requirement-to-evidence references and persisted artifacts
+- Export endpoint implemented for JSON and Markdown artifact packages
+- Frontend controls added for extract/generate/coverage/export with loading and error states
 
 ### Next Up
-- Create requirements extraction schema scaffold and endpoint skeleton
-- Implement extraction response validation and repair retry
-- Render extracted requirements table in frontend
+- Add citation click-through and missing evidence panel in frontend
+- Implement security hardening controls (correlation IDs, redaction, backup runbook)
+- Prepare release checklist and demo freeze criteria
 
 ### Current Blockers
 - No blockers recorded.
@@ -43,7 +48,7 @@ GrantSmith is a grant-application workspace that turns an RFP plus a nonprofit�
 
 ## Demo in 30 seconds
 1. Upload an RFP PDF + org docs (impact report, budget, program plan).
-2. GrantSmith extracts requirements (questions, limits, attachments, eligibility).
+2. Nebula extracts requirements (questions, limits, attachments, eligibility).
 3. Generate a section (e.g., Need Statement) with sentence-level citations.
 4. Review missing evidence flags + coverage matrix.
 5. Export JSON + Markdown/Docx draft.
@@ -121,9 +126,9 @@ APP_ENV=development
 CORS_ORIGINS=http://localhost:3000
 AWS_REGION=us-east-1
 BEDROCK_MODEL_ID=<your-nova-model-id>
-S3_BUCKET=grantsmith-dev
+S3_BUCKET=nebula-dev
 VECTOR_STORE=local
-DATABASE_URL=sqlite:///./grantsmith.db
+DATABASE_URL=sqlite:///./nebula.db
 STORAGE_ROOT=data/uploads
 CHUNK_SIZE_CHARS=1200
 CHUNK_OVERLAP_CHARS=200
@@ -177,11 +182,13 @@ npm run dev
 * `POST /projects/{id}/upload` → upload one or more source files
 * `GET /projects/{id}/documents` → list uploaded document metadata
 * `POST /projects/{id}/retrieve` → semantic retrieval over indexed chunks
-
-Planned endpoints in next implementation steps:
-* `POST /projects/{id}/extract-requirements`
-* `POST /projects/{id}/generate-section`
-* `GET /projects/{id}/export`
+* `POST /projects/{id}/extract-requirements` → generate validated `requirements` artifact
+* `GET /projects/{id}/requirements/latest` → fetch latest requirements artifact
+* `POST /projects/{id}/generate-section` → generate cited section draft artifact
+* `GET /projects/{id}/drafts/{section_key}/latest` → fetch latest section draft artifact
+* `POST /projects/{id}/coverage` → compute coverage matrix from latest requirements + draft
+* `GET /projects/{id}/coverage/latest` → fetch latest coverage artifact
+* `GET /projects/{id}/export` → export combined artifacts in `json` or `markdown`
 
 ---
 
@@ -197,7 +204,7 @@ A “citation” references *exactly where a claim comes from*:
 }
 ```
 
-If a claim cannot be supported, GrantSmith must:
+If a claim cannot be supported, Nebula must:
 
 * mark it as **unsupported**
 * add an item to `missing_evidence[]` with suggested uploads
