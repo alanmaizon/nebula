@@ -189,15 +189,21 @@ npm run dev
   - dockerized smoke test using `scripts/run_docker_env.sh`
 - CD workflow: `.github/workflows/deploy-cloud-run.yml`
   - builds backend/frontend images
-  - pushes images to Artifact Registry
-  - deploys both services to Cloud Run
+  - pushes images to Amazon ECR
+  - rolls out backend/frontend ECS services
 
 Required GitHub secrets for deploy:
-- `GCP_PROJECT_ID`
-- `GCP_REGION`
-- `GCP_ARTIFACT_REPOSITORY`
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`
-- `GCP_SERVICE_ACCOUNT`
+- `AWS_ROLE_TO_ASSUME`
+- `AWS_REGION`
+- `ECR_BACKEND_REPOSITORY`
+- `ECR_FRONTEND_REPOSITORY`
+- `ECS_CLUSTER`
+- `ECS_BACKEND_SERVICE`
+- `ECS_FRONTEND_SERVICE`
+- `NEXT_PUBLIC_API_BASE`
+
+Deployment note:
+- Current ECS rollout uses `--force-new-deployment` after pushing `:latest`; task definitions should reference `:latest` for both services.
 
 ---
 

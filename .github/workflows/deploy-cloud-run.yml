@@ -1,4 +1,4 @@
-name: Deploy Cloud Run
+name: Deploy AWS
 
 on:
   workflow_dispatch:
@@ -11,11 +11,12 @@ permissions:
   id-token: write
 
 env:
-  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GCP_REGION: ${{ secrets.GCP_REGION }}
-  ARTIFACT_REPOSITORY: ${{ secrets.GCP_ARTIFACT_REPOSITORY }}
-  BACKEND_SERVICE: nebula-backend
-  FRONTEND_SERVICE: nebula-frontend
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_BACKEND_REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
+  ECR_FRONTEND_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
+  ECS_FRONTEND_SERVICE: ${{ secrets.ECS_FRONTEND_SERVICE }}
 
 jobs:
   deploy:
@@ -27,80 +28,81 @@ jobs:
       - name: Check deploy configuration
         id: config
         run: |
-          if [ -z "${{ secrets.GCP_PROJECT_ID }}" ] || \
-             [ -z "${{ secrets.GCP_REGION }}" ] || \
-             [ -z "${{ secrets.GCP_ARTIFACT_REPOSITORY }}" ] || \
-             [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] || \
-             [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
+          if [ -z "${{ secrets.AWS_REGION }}" ] || \
+             [ -z "${{ secrets.AWS_ROLE_TO_ASSUME }}" ] || \
+             [ -z "${{ secrets.ECR_BACKEND_REPOSITORY }}" ] || \
+             [ -z "${{ secrets.ECR_FRONTEND_REPOSITORY }}" ] || \
+             [ -z "${{ secrets.ECS_CLUSTER }}" ] || \
+             [ -z "${{ secrets.ECS_BACKEND_SERVICE }}" ] || \
+             [ -z "${{ secrets.ECS_FRONTEND_SERVICE }}" ]; then
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
-            echo "Skipping deploy because required GCP secrets are not configured."
+            echo "Skipping deploy because required AWS secrets are not configured."
           else
             echo "enabled=true" >> "${GITHUB_OUTPUT}"
           fi
 
-      - name: Authenticate to Google Cloud
+      - name: Configure AWS credentials
         if: ${{ steps.config.outputs.enabled == 'true' }}
-        uses: google-github-actions/auth@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
 
-      - name: Setup gcloud
+      - name: Login to Amazon ECR
         if: ${{ steps.config.outputs.enabled == 'true' }}
-        uses: google-github-actions/setup-gcloud@v2
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Configure docker auth for Artifact Registry
+      - name: Resolve image names
         if: ${{ steps.config.outputs.enabled == 'true' }}
-        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+        run: |
+          REGISTRY="${{ steps.ecr.outputs.registry }}"
+          BACKEND_IMAGE="${REGISTRY}/${ECR_BACKEND_REPOSITORY}:${GITHUB_SHA}"
+          BACKEND_IMAGE_LATEST="${REGISTRY}/${ECR_BACKEND_REPOSITORY}:latest"
+          FRONTEND_IMAGE="${REGISTRY}/${ECR_FRONTEND_REPOSITORY}:${GITHUB_SHA}"
+          FRONTEND_IMAGE_LATEST="${REGISTRY}/${ECR_FRONTEND_REPOSITORY}:latest"
+          echo "BACKEND_IMAGE=${BACKEND_IMAGE}" >> "${GITHUB_ENV}"
+          echo "BACKEND_IMAGE_LATEST=${BACKEND_IMAGE_LATEST}" >> "${GITHUB_ENV}"
+          echo "FRONTEND_IMAGE=${FRONTEND_IMAGE}" >> "${GITHUB_ENV}"
+          echo "FRONTEND_IMAGE_LATEST=${FRONTEND_IMAGE_LATEST}" >> "${GITHUB_ENV}"
 
       - name: Build and push backend image
         if: ${{ steps.config.outputs.enabled == 'true' }}
         run: |
-          BACKEND_IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}/nebula-backend:${GITHUB_SHA}"
           docker build -t "${BACKEND_IMAGE}" backend
+          docker tag "${BACKEND_IMAGE}" "${BACKEND_IMAGE_LATEST}"
           docker push "${BACKEND_IMAGE}"
-          echo "BACKEND_IMAGE=${BACKEND_IMAGE}" >> "${GITHUB_ENV}"
-
-      - name: Deploy backend to Cloud Run
-        if: ${{ steps.config.outputs.enabled == 'true' }}
-        run: |
-          gcloud run deploy "${BACKEND_SERVICE}" \
-            --project "${GCP_PROJECT_ID}" \
-            --region "${GCP_REGION}" \
-            --platform managed \
-            --image "${BACKEND_IMAGE}" \
-            --allow-unauthenticated \
-            --set-env-vars "APP_ENV=production,CORS_ORIGINS=*" \
-            --quiet
-
-          BACKEND_URL="$(gcloud run services describe "${BACKEND_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --format 'value(status.url)')"
-          echo "BACKEND_URL=${BACKEND_URL}" >> "${GITHUB_ENV}"
+          docker push "${BACKEND_IMAGE_LATEST}"
 
       - name: Build and push frontend image
         if: ${{ steps.config.outputs.enabled == 'true' }}
         run: |
-          FRONTEND_IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}/nebula-frontend:${GITHUB_SHA}"
           docker build \
-            --build-arg NEXT_PUBLIC_API_BASE="${BACKEND_URL}" \
+            --build-arg NEXT_PUBLIC_API_BASE="${{ secrets.NEXT_PUBLIC_API_BASE }}" \
             -t "${FRONTEND_IMAGE}" \
             frontend
+          docker tag "${FRONTEND_IMAGE}" "${FRONTEND_IMAGE_LATEST}"
           docker push "${FRONTEND_IMAGE}"
-          echo "FRONTEND_IMAGE=${FRONTEND_IMAGE}" >> "${GITHUB_ENV}"
+          docker push "${FRONTEND_IMAGE_LATEST}"
 
-      - name: Deploy frontend to Cloud Run
+      - name: Roll out ECS services
         if: ${{ steps.config.outputs.enabled == 'true' }}
         run: |
-          gcloud run deploy "${FRONTEND_SERVICE}" \
-            --project "${GCP_PROJECT_ID}" \
-            --region "${GCP_REGION}" \
-            --platform managed \
-            --image "${FRONTEND_IMAGE}" \
-            --allow-unauthenticated \
-            --quiet
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_BACKEND_SERVICE}" \
+            --force-new-deployment
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_FRONTEND_SERVICE}" \
+            --force-new-deployment
 
-      - name: Output deployment URLs
+      - name: Wait for ECS services stability
         if: ${{ steps.config.outputs.enabled == 'true' }}
         run: |
-          FRONTEND_URL="$(gcloud run services describe "${FRONTEND_SERVICE}" --project "${GCP_PROJECT_ID}" --region "${GCP_REGION}" --format 'value(status.url)')"
-          echo "Backend URL: ${BACKEND_URL}"
-          echo "Frontend URL: ${FRONTEND_URL}"
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_BACKEND_SERVICE}" "${ECS_FRONTEND_SERVICE}"
+          echo "Deployment completed for ECS services:"
+          echo "- ${ECS_BACKEND_SERVICE}"
+          echo "- ${ECS_FRONTEND_SERVICE}"
