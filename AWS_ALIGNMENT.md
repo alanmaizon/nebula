@@ -16,7 +16,7 @@ Reference docs:
 
 ## Live Alignment Status
 <!-- AUTO-GEN:AWS_STATUS:START -->
-- Last updated: `2026-02-07`
+- Last updated: `2026-02-08`
 
 | Pillar | Status | Next Control |
 |---|---|---|

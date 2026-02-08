@@ -16,9 +16,9 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
-- Last updated: `2026-02-07`
+- Last updated: `2026-02-08`
 - Overall completion: `100%`
-- Current milestone: `Week 1 - Foundations (In progress)`
+- Current milestone: `Week 1 - Foundations (Done)`
 
 ### Done This Week
 - Repository baseline documentation created
@@ -42,10 +42,13 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 - Backup and restore drill executed with checksum and retrieval evidence
 - Demo freeze executed twice from clean startup with end-to-end pipeline success
 - Release notes drafted and v0.1.0 release artifacts prepared
+- Dependabot PR wave triaged and backend dependency upgrades merged
+- Workflow naming normalized and repository references updated to nebula
+- Dependency Review workflow registration stabilized and project PR column added
 
 ### Next Up
 - Add citation click-through and missing evidence panel in frontend
-- Upgrade core dependencies from open Dependabot PRs
+- Restore full dependency review action execution for pull requests
 
 ### Current Blockers
 - No blockers recorded.

@@ -1,13 +1,13 @@
 {
   "project": "Nebula",
-  "last_updated": "2026-02-07",
+  "last_updated": "2026-02-08",
   "overall_completion_pct": 100,
   "current_week": 1,
   "weeks": [
     {
       "week": 1,
       "focus": "Foundations",
-      "status": "in_progress",
+      "status": "done",
       "done": [
         "Repository baseline documentation created",
         "Architecture plan with Mermaid diagrams added",
@@ -29,11 +29,14 @@
         "Backup and restore runbook documented for SQLite metadata and uploaded files",
         "Backup and restore drill executed with checksum and retrieval evidence",
         "Demo freeze executed twice from clean startup with end-to-end pipeline success",
-        "Release notes drafted and v0.1.0 release artifacts prepared"
+        "Release notes drafted and v0.1.0 release artifacts prepared",
+        "Dependabot PR wave triaged and backend dependency upgrades merged",
+        "Workflow naming normalized and repository references updated to nebula",
+        "Dependency Review workflow registration stabilized and project PR column added"
       ],
       "next": [
         "Add citation click-through and missing evidence panel in frontend",
-        "Upgrade core dependencies from open Dependabot PRs"
+        "Restore full dependency review action execution for pull requests"
       ],
       "blockers": []
     },

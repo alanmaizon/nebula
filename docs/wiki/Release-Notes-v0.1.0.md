@@ -22,7 +22,7 @@ Nebula `v0.1.0` is the first demo-ready MVP release for RFP ingestion, requireme
 
 ## Known Limitations (Deferred)
 - Frontend citation click-through and dedicated missing-evidence panel are not yet implemented.
-- Dependency upgrade backlog remains open via Dependabot PRs.
+- Initial dependency upgrade wave has been processed; future updates are handled via Dependabot PRs.
 - ECS deployment currently assumes task definitions use `:latest` image tags for force redeploy.
 
 ## Upgrade / Operational Notes

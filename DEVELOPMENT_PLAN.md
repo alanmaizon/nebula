@@ -6,14 +6,14 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 <!-- AUTO-GEN:DEVELOPMENT_PLAN_STATUS:START -->
 | Week | Focus | Status |
 |---|---|---|
-| Week 1 | Foundations | In progress |
+| Week 1 | Foundations | Done |
 | Week 2 | Requirements extraction | Not started |
 | Week 3 | Cited drafting core | Not started |
 | Week 4 | Hardening and demo | Not started |
 
 ### Current Week Priorities
 - Add citation click-through and missing evidence panel in frontend
-- Upgrade core dependencies from open Dependabot PRs
+- Restore full dependency review action execution for pull requests
 
 ### Active Risks
 - PDF extraction quality on heterogeneous RFP files -> Constrain demo corpus and capture page anchors early
