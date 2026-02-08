@@ -24,3 +24,4 @@ Use this checklist before final Devpost submission to verify Nova compliance, de
 - Public demo video (~3 minutes) with functional flow and `#AmazonNova`.
 - Runnable project access for judges through a public URL, functioning demo build, or test instructions.
 - Repository access confirmation (public, or private sharing to required judge addresses).
+- Reliability evidence summary: `docs/wiki/CI-Reliability-2026-02-08.md`.

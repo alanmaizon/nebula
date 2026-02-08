@@ -176,8 +176,12 @@ npm run dev
 
 - CI workflow: `.github/workflows/ci.yml`
   - backend tests (`pytest`)
+  - deterministic submission-critical backend gate (`backend-deterministic-reliability`, 3-run matrix)
   - frontend typecheck/build
   - dockerized smoke test using `scripts/run_docker_env.sh`
+
+Reliability evidence:
+- `docs/wiki/CI-Reliability-2026-02-08.md`
 - CD workflow: `.github/workflows/deploy-aws.yml`
   - builds backend/frontend images
   - pushes images to Amazon ECR

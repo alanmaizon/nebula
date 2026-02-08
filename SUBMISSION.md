@@ -36,6 +36,7 @@ Current migration path upgrades the intelligence layer from heuristic logic to a
   - Devpost narrative bullets: `docs/wiki/Category-Strategy.md`
   - Demo script outline: `docs/wiki/Category-Strategy.md`
   - Submission compliance checklist: `docs/wiki/Nova-Submission-Checklist.md`
+  - CI reliability summary: `docs/wiki/CI-Reliability-2026-02-08.md`
 
 ## Challenges we ran into
 - Balancing determinism and flexibility: we needed predictable demo behavior while still improving semantic quality.
