@@ -186,6 +186,7 @@ Reliability evidence:
 - `docs/wiki/CI-Reliability-2026-02-08.md`
 - `docs/wiki/Impact-Metrics-Baseline-2026-02-08.md`
 - `docs/wiki/Agentic-Orchestration-Pilot-2026-02-08.md`
+- `docs/wiki/Devpost-Narrative-Draft-2026-02-08.md`
 - CD workflow: `.github/workflows/deploy-aws.yml`
   - builds backend/frontend images
   - pushes images to Amazon ECR

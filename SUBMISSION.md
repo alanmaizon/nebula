@@ -34,6 +34,7 @@ Current migration path upgrades the intelligence layer from heuristic logic to a
   - multimodal/document understanding is the supporting capability that improves evidence quality
 - Reusable submission assets:
   - Devpost narrative bullets: `docs/wiki/Category-Strategy.md`
+  - Devpost narrative full draft: `docs/wiki/Devpost-Narrative-Draft-2026-02-08.md`
   - Demo script outline: `docs/wiki/Category-Strategy.md`
   - Submission compliance checklist: `docs/wiki/Nova-Submission-Checklist.md`
   - CI reliability summary: `docs/wiki/CI-Reliability-2026-02-08.md`
