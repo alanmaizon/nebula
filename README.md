@@ -189,7 +189,7 @@ npm run dev
   - backend tests (`pytest`)
   - frontend typecheck/build
   - dockerized smoke test using `scripts/run_docker_env.sh`
-- CD workflow: `.github/workflows/deploy-cloud-run.yml`
+- CD workflow: `.github/workflows/deploy-aws.yml`
   - builds backend/frontend images
   - pushes images to Amazon ECR
   - rolls out backend/frontend ECS services

@@ -28,4 +28,4 @@ Nebula `v0.1.0` is the first demo-ready MVP release for RFP ingestion, requireme
 ## Upgrade / Operational Notes
 - Run local production-style stack: `scripts/run_docker_env.sh restart`
 - CI workflow: `.github/workflows/ci.yml`
-- Deploy workflow: `.github/workflows/deploy-cloud-run.yml` (AWS ECS deployment despite filename)
+- Deploy workflow: `.github/workflows/deploy-aws.yml` (AWS ECS deployment)

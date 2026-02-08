@@ -45,7 +45,7 @@ This script creates/updates:
 Local wiki source pages are in `docs/wiki/`.
 
 If this is the first wiki publish and the wiki appears empty, initialize it once:
-- Open `https://github.com/alanmaizon/grantsmith/wiki`
+- Open `https://github.com/alanmaizon/nebula/wiki`
 - Create a first page (for example `Home`)
 
 To sync them to GitHub wiki:
