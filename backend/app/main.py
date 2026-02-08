@@ -10,7 +10,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.coverage import build_coverage_payload, validate_with_repair as validate_coverage_with_repair
+from app.coverage import validate_with_repair as validate_coverage_with_repair
 from app.db import (
     create_chunks,
     create_coverage_artifact,
@@ -34,7 +34,8 @@ from app.observability import (
     sanitize_for_logging,
     set_request_id,
 )
-from app.requirements import extract_requirements_payload, validate_with_repair as validate_requirements_with_repair
+from app.nova_runtime import BedrockNovaOrchestrator, NovaRuntimeError
+from app.requirements import validate_with_repair as validate_requirements_with_repair
 from app.retrieval import chunk_pages, cosine_similarity, embed_text, extract_text_pages
 
 logger = logging.getLogger("nebula.api")
@@ -56,6 +57,10 @@ class GenerateSectionRequest(BaseModel):
 
 class CoverageComputeRequest(BaseModel):
     section_key: str = Field(default="Need Statement", min_length=1, max_length=120)
+
+
+def get_nova_orchestrator() -> BedrockNovaOrchestrator:
+    return BedrockNovaOrchestrator(settings=settings)
 
 
 @asynccontextmanager
@@ -300,7 +305,13 @@ def create_app() -> FastAPI:
                 detail="No indexed chunks found. Upload text documents before extracting requirements.",
             )
 
-        extracted_payload = extract_requirements_payload(chunks)
+        try:
+            extracted_payload = get_nova_orchestrator().extract_requirements(chunks)
+        except NovaRuntimeError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={"message": "Nova requirements extraction failed.", "error": str(exc)},
+            ) from exc
         validated, repaired, validation_errors = validate_requirements_with_repair(extracted_payload)
         if validated is None:
             raise HTTPException(
@@ -314,7 +325,7 @@ def create_app() -> FastAPI:
         artifact_meta = create_requirements_artifact(
             project_id=project_id,
             payload=validated.model_dump(),
-            source="heuristic-v1",
+            source="nova-agents-v1",
         )
         return {
             "project_id": project_id,
@@ -335,7 +346,16 @@ def create_app() -> FastAPI:
         chunks = list_chunks(project_id)
         top_k = payload.top_k or settings.retrieval_top_k_default
         ranked_chunks = rank_chunks_by_query(chunks, payload.section_key, top_k) if chunks else []
-        draft_payload = build_draft_payload(payload.section_key, ranked_chunks)
+        if ranked_chunks:
+            try:
+                draft_payload = get_nova_orchestrator().generate_section(payload.section_key, ranked_chunks)
+            except NovaRuntimeError as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail={"message": "Nova draft generation failed.", "error": str(exc)},
+                ) from exc
+        else:
+            draft_payload = build_draft_payload(payload.section_key, ranked_chunks)
         validated, repaired, validation_errors = validate_draft_with_repair(draft_payload)
         if validated is None:
             raise HTTPException(
@@ -350,7 +370,7 @@ def create_app() -> FastAPI:
             project_id=project_id,
             section_key=payload.section_key,
             payload=validated.model_dump(),
-            source="heuristic-v1",
+            source="nova-agents-v1",
         )
         return {
             "project_id": project_id,
@@ -397,10 +417,16 @@ def create_app() -> FastAPI:
         if draft_artifact is None:
             raise HTTPException(status_code=404, detail="No draft artifact found for project/section")
 
-        coverage_payload = build_coverage_payload(
-            requirements=requirements_artifact["payload"],
-            draft=draft_artifact["payload"],
-        )
+        try:
+            coverage_payload = get_nova_orchestrator().compute_coverage(
+                requirements=requirements_artifact["payload"],
+                draft=draft_artifact["payload"],
+            )
+        except NovaRuntimeError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={"message": "Nova coverage computation failed.", "error": str(exc)},
+            ) from exc
         validated, repaired, validation_errors = validate_coverage_with_repair(coverage_payload)
         if validated is None:
             raise HTTPException(
@@ -414,7 +440,7 @@ def create_app() -> FastAPI:
         artifact_meta = create_coverage_artifact(
             project_id=project_id,
             payload=validated.model_dump(),
-            source="heuristic-v1",
+            source="nova-agents-v1",
         )
         return {
             "project_id": project_id,

@@ -199,6 +199,29 @@ erDiagram
 
 Contracts for `requirements.json`, `draft.json`, and coverage matrix follow `CONTRIBUTING.md`.
 
+## 7.1) Runtime Intelligence Call Path (Current Submission Path)
+
+Current backend runtime path (Nova on Bedrock):
+- `POST /projects/{project_id}/extract-requirements`
+  - endpoint: `backend/app/main.py` (`extract_requirements`)
+  - orchestrator: `backend/app/nova_runtime.py` (`BedrockNovaOrchestrator.extract_requirements`)
+  - model ID: `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
+  - artifact source tag: `nova-agents-v1`
+- `POST /projects/{project_id}/generate-section`
+  - endpoint: `backend/app/main.py` (`generate_section`)
+  - orchestrator: `backend/app/nova_runtime.py` (`BedrockNovaOrchestrator.generate_section`)
+  - model ID: `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
+  - artifact source tag: `nova-agents-v1`
+- `POST /projects/{project_id}/coverage`
+  - endpoint: `backend/app/main.py` (`compute_coverage`)
+  - orchestrator: `backend/app/nova_runtime.py` (`BedrockNovaOrchestrator.compute_coverage`)
+  - model ID: `BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0`
+  - artifact source tag: `nova-agents-v1`
+
+Execution flow:
+- FastAPI endpoint -> Nova orchestrator stage -> Bedrock `converse` -> schema validation/repair -> artifact persistence
+- If Nova invocation fails, endpoint returns `502` with explicit runtime failure details.
+
 ## 8) Validation and Error Strategy
 - Every model response is schema-validated before persistence.
 - On validation failure: one structured repair attempt, then explicit error.

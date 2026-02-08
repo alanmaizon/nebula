@@ -1,9 +1,32 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import settings
+from app.coverage import build_coverage_payload
+from app.drafting import build_draft_payload
 from app.main import app
+from app.requirements import extract_requirements_payload
+
+
+@pytest.fixture(autouse=True)
+def mock_nova_orchestrator(monkeypatch: pytest.MonkeyPatch):
+    class FakeNovaOrchestrator:
+        def extract_requirements(self, chunks: list[dict[str, object]]) -> dict[str, object]:
+            return extract_requirements_payload(chunks)
+
+        def generate_section(
+            self, section_key: str, ranked_chunks: list[dict[str, object]]
+        ) -> dict[str, object]:
+            return build_draft_payload(section_key, ranked_chunks)
+
+        def compute_coverage(
+            self, requirements: dict[str, object], draft: dict[str, object]
+        ) -> dict[str, object]:
+            return build_coverage_payload(requirements, draft)
+
+    monkeypatch.setattr("app.main.get_nova_orchestrator", lambda: FakeNovaOrchestrator())
 
 
 def test_health_endpoint() -> None:
@@ -151,7 +174,7 @@ Disallowed costs:
 
         latest = client.get(f"/projects/{project_id}/requirements/latest")
         assert latest.status_code == 200
-        assert latest.json()["artifact"]["source"] == "heuristic-v1"
+        assert latest.json()["artifact"]["source"] == "nova-agents-v1"
 
 
 def test_extract_requirements_without_chunks_returns_400(tmp_path: Path) -> None:
@@ -200,6 +223,7 @@ Our outcomes improved housing stability for low-income families.
         latest = client.get(f"/projects/{project_id}/drafts/Need Statement/latest")
         assert latest.status_code == 200
         assert latest.json()["draft"]["section_key"] == "Need Statement"
+        assert latest.json()["artifact"]["source"] == "nova-agents-v1"
 
 
 def test_compute_coverage_and_read_latest(tmp_path: Path) -> None:
@@ -252,6 +276,7 @@ Our implementation timeline spans four quarters with milestones.
         latest = client.get(f"/projects/{project_id}/coverage/latest")
         assert latest.status_code == 200
         assert len(latest.json()["coverage"]["items"]) >= 1
+        assert latest.json()["artifact"]["source"] == "nova-agents-v1"
 
 
 def test_export_json_and_markdown(tmp_path: Path) -> None:

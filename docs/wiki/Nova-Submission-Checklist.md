@@ -1,0 +1,26 @@
+# Nova Submission Checklist
+
+Use this checklist before final Devpost submission to verify Nova compliance, deployability, and judge testing readiness.
+
+## Checklist
+| ID | Requirement | Verification evidence | Status (dry run) | Follow-up issue |
+|---|---|---|---|---|
+| NOVA-C01 | Production path calls Amazon Nova on AWS (not docs-only claims). | Architecture call path + backend invocation references + run evidence (`docs/wiki/Nova-Evidence-Run-2026-02-08.md`). | PARTIAL | [#24](https://github.com/alanmaizon/nebula/issues/24) |
+| NOVA-C02 | Submission model IDs are explicit. | `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`, `BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0` in docs/config guidance. | PASS | N/A |
+| NOVA-C03 | Deploy/run consistency is proven. | Two clean startup demo runs in `docs/wiki/Demo-Freeze-2026-02-08.md`. | PASS | N/A |
+| NOVA-C04 | Judges have working test access path. | Public test URL or repo-based test instructions with credentials path if private. | PASS | N/A |
+| NOVA-C05 | Demo video is approximately 3 minutes and shows real functionality. | Draft video checklist + runtime proof aligned to demo script. | PENDING | N/A |
+| NOVA-C06 | Video includes hashtag `#AmazonNova` and is publicly visible (YouTube/Vimeo/Youku). | Published video link captured in submission notes. | PENDING | N/A |
+| NOVA-C07 | Repository access is valid for judges. | Public repo or private share to `testing@devpost.com` and `Amazon-Nova-hackathon@amazon.com`. | PASS | N/A |
+| NOVA-C08 | Submission materials are consistent with deployed behavior. | Devpost text, screenshots, and video match current runtime outputs. | PENDING | N/A |
+
+## Dry-Run Record
+| Date (PT) | Owner | Result | Notes |
+|---|---|---|---|
+| `2026-02-08` | `@alanmaizon` | Partial (`4 PASS / 1 PARTIAL / 3 PENDING`) | NOVA-C01 has implemented runtime path + test evidence; pending live Bedrock-credential validation tracked in issue [#24](https://github.com/alanmaizon/nebula/issues/24). |
+
+## Required Submission Assets
+- Devpost narrative aligned to `Agentic AI` primary and `Multimodal Understanding` secondary positioning.
+- Public demo video (~3 minutes) with functional flow and `#AmazonNova`.
+- Runnable project access for judges through a public URL, functioning demo build, or test instructions.
+- Repository access confirmation (public, or private sharing to required judge addresses).

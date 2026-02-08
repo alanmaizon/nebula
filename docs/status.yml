@@ -1,7 +1,7 @@
 {
   "project": "Nebula",
   "last_updated": "2026-02-08",
-  "overall_completion_pct": 78,
+  "overall_completion_pct": 80,
   "current_week": 2,
   "weeks": [
     {
@@ -44,14 +44,16 @@
       "week": 2,
       "focus": "Nova Compliance and Category Positioning",
       "status": "in_progress",
-      "done": [],
+      "done": [
+        "Finalized submission category strategy with Agentic AI primary and Multimodal Understanding secondary",
+        "Published Nova submission checklist with dated dry-run record and follow-up issue linkage"
+      ],
       "next": [
         "Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order",
         "Replace heuristic extraction, drafting, and coverage path with Strands-orchestrated Nova agents",
         "Keep API request and response contracts stable while preserving schema-repair safeguards",
         "Add mock-driven test coverage for each agent plus orchestrator success and failure paths",
-        "Capture explicit Nova-on-AWS proof (model IDs, source tags, runtime call path, demo trace)",
-        "Finalize submission strategy with Agentic AI primary and Multimodal Understanding secondary"
+        "Capture explicit Nova-on-AWS proof (model IDs, source tags, runtime call path, demo trace)"
       ],
       "blockers": []
     },

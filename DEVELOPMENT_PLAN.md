@@ -14,12 +14,11 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 | Week 6 | Feedback Bonus and Judging Readiness | Not started |
 
 ### Current Week Priorities
-- Execute Nova migration issue chain (`NOVA-01` to `NOVA-12`) in dependency order.
-- Replace heuristic extraction/drafting/coverage runtime path with Strands-orchestrated Nova agents.
-- Keep existing request/response contracts and schema repair wrappers unchanged at API boundary.
-- Add mock-driven tests for each agent plus orchestrator error propagation and schema-failure branches.
-- Collect explicit Nova-on-AWS evidence (model IDs, call path, artifact source tags, demo trace).
-- Finalize category and narrative strategy (Agentic AI primary, Multimodal Understanding secondary).
+- Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order
+- Replace heuristic extraction, drafting, and coverage path with Strands-orchestrated Nova agents
+- Keep API request and response contracts stable while preserving schema-repair safeguards
+- Add mock-driven test coverage for each agent plus orchestrator success and failure paths
+- Capture explicit Nova-on-AWS proof (model IDs, source tags, runtime call path, demo trace)
 
 ### Active Risks
 - Submission may under-demonstrate explicit Nova model usage despite working functionality -> Add hard evidence of Nova call paths, model IDs, and end-to-end demo traces

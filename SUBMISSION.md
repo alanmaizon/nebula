@@ -1,5 +1,3 @@
-# Nebula Submission
-
 ## Inspiration
 Grant teams, especially nonprofits and small organizations, lose time and confidence when translating dense RFPs into compliant proposals. The painful part is not just writing, it is proving every claim with evidence and ensuring nothing in the requirements is missed. We built Nebula to reduce that risk: a workspace that turns source documents into a citation-backed, compliance-aware draft you can trust.
 
@@ -27,6 +25,17 @@ Current migration path upgrades the intelligence layer from heuristic logic to a
 - Grant Writer (Nova Pro)
 - Compliance Reviewer (Nova Lite)
 - deterministic Orchestrator coordinating all stages
+
+## Category strategy
+- Primary category: `Agentic AI`
+- Secondary category: `Multimodal Understanding`
+- Rationale:
+  - agent specialization + orchestration is the core product behavior and architecture focus
+  - multimodal/document understanding is the supporting capability that improves evidence quality
+- Reusable submission assets:
+  - Devpost narrative bullets: `docs/wiki/Category-Strategy.md`
+  - Demo script outline: `docs/wiki/Category-Strategy.md`
+  - Submission compliance checklist: `docs/wiki/Nova-Submission-Checklist.md`
 
 ## Challenges we ran into
 - Balancing determinism and flexibility: we needed predictable demo behavior while still improving semantic quality.

@@ -1,76 +1,63 @@
-# Nebula: Turning Grant Chaos Into Community Impact with #Amazon-Nova
+# Nebula: A Build Log on Designing Trust-First AI for Grants
 
-## From Compliance Burden to Community Capacity: How To Help Nonprofits Win More Grants
+This post is our engineering reflection for the Amazon Nova Hackathon, not a repeat of our submission form.
+Tag: `Amazon-Nova`
 
-Grant writing is high stakes, but many nonprofits do it with small teams, limited time, and scattered documents.
+## The creative question we started with
 
-We built **Nebula** to help.
+Most grant-writing tools optimize for speed of text generation.
+We chose a different question: **how do we reduce decision risk for nonprofit teams under deadline pressure?**
 
-Nebula is an Amazon Nova-powered workflow that takes an RFP plus supporting docs and turns them into:
-- clear requirements
-- citation-backed draft sections
-- a coverage matrix (`met`, `partial`, `missing`)
-- missing evidence flags before submission
+That changed everything about the design.
 
-## Why this matters
+## Creative process: design from failure modes, not feature lists
 
-Great organizations lose funding opportunities for preventable reasons: missed requirements, unsupported claims, and last-minute compliance surprises.
+Before writing product copy, we mapped the three ways grant drafts fail in practice:
+- a requirement is missed
+- a claim is unsupported
+- a mismatch is found too late in review
 
-Nebula helps reduce that risk by making evidence and compliance visible from the start, not at the end.
+From there, we built Nebula backward from those failure points.
+Each major component exists to make one of those failures visible earlier.
 
-## How it works
+## Three design bets that shaped the system
 
-1. Upload RFP + program docs.
-2. Extract requirements into a structured artifact.
-3. Generate sections with traceable citations (`doc_id`, `page`, `snippet`).
-4. Run coverage checks to find gaps early.
-5. Export results for review and submission.
+1. Citation-first drafting over fluent drafting  
+   We treated unsupported prose as a bug, not a style issue. Outputs need `doc_id`, `page`, and snippet references so a reviewer can challenge claims quickly.
 
-## How we built it on AWS
+2. Schema-first artifacts over free-form output  
+   We forced requirements, drafts, and coverage into structured contracts. This made validation and repair deterministic, and reduced silent formatting drift.
 
-- **Frontend:** Next.js
-- **Backend:** FastAPI
-- **Retrieval:** chunking + embeddings + scoped search
-- **Validation:** schema-first outputs
-- **Models:** Amazon Nova on Bedrock, orchestrated with agent roles
+3. Specialized roles over one large prompt  
+   The planned Nova path uses role boundaries (analyst, researcher, writer, reviewer) with deterministic orchestration, because bounded responsibilities are easier to test and audit.
 
-We use a practical multi-agent pattern:
-- RFP Analyst
-- Evidence Researcher
-- Grant Writer
-- Compliance Reviewer
+## What we intentionally did not build
 
-This keeps the flow reliable while improving semantic quality.
+Creativity also meant saying no:
+- no broad autonomous behavior that cannot be inspected
+- no hidden scoring logic without traceable evidence
+- no UI complexity that hides missing information from operators
 
-## Benefits for the target community
+That restraint gave us a clearer reliability surface and a simpler debugging loop.
 
-For nonprofits and community teams, Nebula can:
-- improve proposal quality with grounded writing
-- lower compliance risk
-- save time in review cycles
-- preserve institutional knowledge in structured artifacts
+## Potential influence beyond this project
 
-The bigger goal is simple: help mission-driven teams spend less time fighting process and more time delivering outcomes.
+If this pattern works at scale, the impact is bigger than grant writing:
+- smaller nonprofits can compete with better-resourced organizations using evidence-backed workflows
+- reviewers and leadership teams can audit claims faster with less back-and-forth
+- compliance-heavy writing domains (public sector, healthcare, education funding) can reuse the same trust-first architecture
 
-## Real-world adoption plan
+The important shift is cultural as much as technical: move AI from "draft generator" to "decision support with evidence accountability."
 
-- keep trust-first defaults (citations + schema validation)
-- provide low-friction onboarding (Docker + clear docs)
-- pilot with nonprofits and iterate from feedback
-- publish reproducible examples and implementation notes
+## What we are testing next
 
-Nebula is not just about generating text. It is about making grant workflows explainable, auditable, and usable for teams that need funding to serve their communities.
+- quantify quality with reproducible metrics (coverage completeness, unsupported-claim rate, iteration time)
+- complete Nova runtime proof in the production path with explicit model-call evidence
+- compare baseline deterministic RAG vs staged agent orchestration for measurable operator benefit
 
-## Join the conversation
+## Closing
 
-If you work in nonprofit grants, review workflows, or funding operations, I’d love your feedback.
+The project goal is not more words per minute.
+It is fewer bad decisions per submission.
 
-- Where does your team lose the most time today?
-- What would make an AI grant workflow trustworthy enough for real submissions?
-- Which output matters most for your process: requirements clarity, citation quality, or coverage visibility?
-
-Share your thoughts in the comments and let’s shape this with the community.
-
----
-
-`#Amazon-Nova`, `#AgenticAI`, `#GenerativeAI`, `#AmazonBedrock`, `#NonprofitTech`
+`#Amazon-Nova` `#AgenticAI` `#AmazonBedrock` `#NonprofitTech`

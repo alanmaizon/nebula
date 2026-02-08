@@ -4,29 +4,34 @@
 
 Nebula is an Amazon Nova-powered agentic grant development and governance workspace that turns an RFP plus a nonprofit's source documents into a compliant draft with **traceable citations** for every claim. It generates structured sections, a requirements coverage matrix, and flags missing evidence before you submit.
 
-**Hackathon track fit:** Multimodal / Agentic (requirements extraction + evidence-linked drafting)  
+**Hackathon track fit:** Primary `Agentic AI`; Secondary `Multimodal Understanding`  
 **Core differentiator:** *Cite-first drafting* — every paragraph is backed by page/snippet references.
 
 ## Documentation
 - Architecture: `ARCHITECTURE.md`
 - Development plan: `DEVELOPMENT_PLAN.md`
 - AWS alignment: `AWS_ALIGNMENT.md`
+- Category strategy: `docs/wiki/Category-Strategy.md`
+- Submission checklist: `docs/wiki/Nova-Submission-Checklist.md`
 - Contributor guide: `CONTRIBUTING.md`
 - Status source: `docs/status.yml` (sync with `python scripts/sync_docs.py`)
 
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-08`
-- Overall completion: `78%`
+- Overall completion: `80%`
 - Current milestone: `Week 2 - Nova Compliance and Category Positioning (In progress)`
 
 ### Done This Week
-- No completed items recorded yet.
+- Finalized submission category strategy with Agentic AI primary and Multimodal Understanding secondary
+- Published Nova submission checklist with dated dry-run record and follow-up issue linkage
 
 ### Next Up
-- Make Bedrock Nova usage explicit in docs and architecture with concrete model IDs and call paths
-- Finalize submission category strategy (Agentic AI primary, Multimodal Understanding secondary)
-- Add a Nova compliance checklist covering model usage, deployability, and test access expectations
+- Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order
+- Replace heuristic extraction, drafting, and coverage path with Strands-orchestrated Nova agents
+- Keep API request and response contracts stable while preserving schema-repair safeguards
+- Add mock-driven test coverage for each agent plus orchestrator success and failure paths
+- Capture explicit Nova-on-AWS proof (model IDs, source tags, runtime call path, demo trace)
 
 ### Current Blockers
 - No blockers recorded.
@@ -113,7 +118,10 @@ CORS_ORIGINS=http://localhost:3000
 LOG_LEVEL=INFO
 REQUEST_ID_HEADER=X-Request-ID
 AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=<your-nova-model-id>
+BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0
+BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0
+AGENT_TEMPERATURE=0.1
+AGENT_MAX_TOKENS=2048
 S3_BUCKET=nebula-dev
 VECTOR_STORE=local
 DATABASE_URL=sqlite:///./nebula.db

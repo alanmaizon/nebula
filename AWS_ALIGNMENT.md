@@ -14,6 +14,12 @@ Reference docs:
 - Current state: 1-month MVP, local-first deployment with cloud-ready design.
 - Target state: production deployment on AWS for multi-tenant compliance workloads.
 
+## Submission Model Baseline (Nova)
+- Primary generation model ID: `us.amazon.nova-pro-v1:0` (`BEDROCK_MODEL_ID`)
+- Supporting model ID: `us.amazon.nova-lite-v1:0` (`BEDROCK_LITE_MODEL_ID`)
+- Runtime path implementation: `backend/app/nova_runtime.py` and `backend/app/main.py`
+- Evidence note: `docs/wiki/Nova-Evidence-Run-2026-02-08.md`
+
 ## Live Alignment Status
 <!-- AUTO-GEN:AWS_STATUS:START -->
 - Last updated: `2026-02-08`

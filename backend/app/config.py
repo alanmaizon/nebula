@@ -11,7 +11,10 @@ class Settings(BaseSettings):
     request_id_header: str = "X-Request-ID"
 
     aws_region: str = "us-east-1"
-    bedrock_model_id: str = ""
+    bedrock_model_id: str = "us.amazon.nova-pro-v1:0"
+    bedrock_lite_model_id: str = "us.amazon.nova-lite-v1:0"
+    agent_temperature: float = 0.1
+    agent_max_tokens: int = 2048
     s3_bucket: str = "nebula-dev"
     vector_store: str = "local"
     database_url: str = "sqlite:///./nebula.db"
