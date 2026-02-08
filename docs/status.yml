@@ -1,7 +1,7 @@
 {
   "project": "Nebula",
   "last_updated": "2026-02-07",
-  "overall_completion_pct": 97,
+  "overall_completion_pct": 100,
   "current_week": 1,
   "weeks": [
     {
@@ -27,11 +27,13 @@
         "Request correlation ID middleware and structured API logs implemented",
         "Sensitive-data logging redaction rules implemented and documented",
         "Backup and restore runbook documented for SQLite metadata and uploaded files",
-        "Backup and restore drill executed with checksum and retrieval evidence"
+        "Backup and restore drill executed with checksum and retrieval evidence",
+        "Demo freeze executed twice from clean startup with end-to-end pipeline success",
+        "Release notes drafted and v0.1.0 release artifacts prepared"
       ],
       "next": [
         "Add citation click-through and missing evidence panel in frontend",
-        "Prepare release checklist and demo freeze criteria"
+        "Upgrade core dependencies from open Dependabot PRs"
       ],
       "blockers": []
     },
@@ -87,7 +89,7 @@
       {
         "pillar": "Operational Excellence",
         "status": "partial",
-        "next_control": "Finalize release checklist and demo freeze evidence"
+        "next_control": "Track post-release roadmap and backlog hygiene"
       },
       {
         "pillar": "Security",
@@ -97,7 +99,7 @@
       {
         "pillar": "Reliability",
         "status": "partial",
-        "next_control": "Finalize release checklist and demo freeze evidence"
+        "next_control": "Move from SQLite demo storage to production HA architecture"
       },
       {
         "pillar": "Performance Efficiency",

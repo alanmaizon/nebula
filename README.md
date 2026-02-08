@@ -17,7 +17,7 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-07`
-- Overall completion: `97%`
+- Overall completion: `100%`
 - Current milestone: `Week 1 - Foundations (In progress)`
 
 ### Done This Week
@@ -40,10 +40,12 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 - Sensitive-data logging redaction rules implemented and documented
 - Backup and restore runbook documented for SQLite metadata and uploaded files
 - Backup and restore drill executed with checksum and retrieval evidence
+- Demo freeze executed twice from clean startup with end-to-end pipeline success
+- Release notes drafted and v0.1.0 release artifacts prepared
 
 ### Next Up
 - Add citation click-through and missing evidence panel in frontend
-- Prepare release checklist and demo freeze criteria
+- Upgrade core dependencies from open Dependabot PRs
 
 ### Current Blockers
 - No blockers recorded.

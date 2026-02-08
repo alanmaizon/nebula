@@ -2,11 +2,16 @@
 
 Use this checklist before tagging a release.
 
-- [ ] All milestone issues are closed or explicitly deferred.
-- [ ] CI passes on `main`.
-- [ ] Docs reflect current setup and endpoint behavior.
-- [ ] Security alerts are triaged and critical findings resolved.
-- [ ] Demo script passes twice from a clean startup.
-- [ ] Known limitations are documented.
-- [ ] Release notes are drafted and reviewed.
-- [ ] Tag created (`v0.x.y`) and announcement posted.
+- [x] All milestone issues are closed or explicitly deferred.
+- [x] CI passes on `main`.
+- [x] Docs reflect current setup and endpoint behavior.
+- [x] Security alerts are triaged and critical findings resolved.
+- [x] Demo script passes twice from a clean startup.
+- [x] Known limitations are documented.
+- [x] Release notes are drafted and reviewed.
+- [x] Tag created (`v0.x.y`) and announcement posted.
+
+## Notes
+- Deferred item: frontend citation click-through panel (tracked in backlog as post-`v0.1.0`).
+- Demo-freeze evidence: `docs/wiki/Demo-Freeze-2026-02-08.md`.
+- Release notes: `docs/wiki/Release-Notes-v0.1.0.md`.

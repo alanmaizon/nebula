@@ -20,9 +20,9 @@ Reference docs:
 
 | Pillar | Status | Next Control |
 |---|---|---|
-| Operational Excellence | Partial | Finalize release checklist and demo freeze evidence |
+| Operational Excellence | Partial | Track post-release roadmap and backlog hygiene |
 | Security | Partial | Define IAM model, data classification, and key policy |
-| Reliability | Partial | Finalize release checklist and demo freeze evidence |
+| Reliability | Partial | Move from SQLite demo storage to production HA architecture |
 | Performance Efficiency | Not started | Add load profile and scaling plan |
 | Cost Optimization | Not started | Add token budget guardrails and cost visibility |
 | Sustainability | Not started | Define retention and right-sizing practices |

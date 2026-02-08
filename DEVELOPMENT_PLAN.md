@@ -13,7 +13,7 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 
 ### Current Week Priorities
 - Add citation click-through and missing evidence panel in frontend
-- Prepare release checklist and demo freeze criteria
+- Upgrade core dependencies from open Dependabot PRs
 
 ### Active Risks
 - PDF extraction quality on heterogeneous RFP files -> Constrain demo corpus and capture page anchors early
@@ -274,6 +274,6 @@ Documentation:
 - [x] Execute restore drill and capture evidence.
 
 ### Step 9 Backlog: Release
-- [ ] Run demo script twice from clean setup.
-- [ ] Freeze non-critical changes and resolve blockers.
-- [ ] Tag MVP release and publish notes.
+- [x] Run demo script twice from clean setup.
+- [x] Freeze non-critical changes and resolve blockers.
+- [x] Tag MVP release and publish notes.
