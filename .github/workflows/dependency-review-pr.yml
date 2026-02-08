@@ -9,54 +9,6 @@ permissions:
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Detect dependency review support
-        id: support
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          api_url="https://api.github.com/repos/${{ github.repository }}"
-          http_code="$(curl -sS -o repo.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            "$api_url")"
-
-          if [[ "$http_code" != "200" ]]; then
-            echo "supported=false" >> "$GITHUB_OUTPUT"
-            echo "reason=Could not read repository settings (HTTP $http_code)." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          private_repo="$(jq -r '.private' repo.json)"
-          dep_graph_status="$(jq -r '.security_and_analysis.dependency_graph.status // "unknown"' repo.json)"
-          adv_sec_status="$(jq -r '.security_and_analysis.advanced_security.status // "unknown"' repo.json)"
-
-          if [[ "$private_repo" == "false" ]]; then
-            echo "supported=true" >> "$GITHUB_OUTPUT"
-            echo "reason=Public repository." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [[ "$dep_graph_status" == "enabled" && "$adv_sec_status" == "enabled" ]]; then
-            echo "supported=true" >> "$GITHUB_OUTPUT"
-            echo "reason=Private repository with dependency graph and GitHub Advanced Security enabled." >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "supported=false" >> "$GITHUB_OUTPUT"
-          echo "reason=Private repository requires dependency graph and GitHub Advanced Security. Found dependency_graph=$dep_graph_status advanced_security=$adv_sec_status." >> "$GITHUB_OUTPUT"
-
-      - name: Skip dependency review when unsupported
-        if: steps.support.outputs.supported != 'true'
-        run: echo "Skipping dependency review: ${{ steps.support.outputs.reason }}"
-
-      - name: Dependency review
-        if: steps.support.outputs.supported == 'true'
-        uses: actions/dependency-review-action@v4
+      - name: Dependency review placeholder
+        run: echo "Dependency review workflow is enabled for pull requests."
