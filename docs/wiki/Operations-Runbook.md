@@ -53,3 +53,6 @@
 ### Restore Test Cadence
 - Run one restore drill per milestone.
 - Treat failed restore drill as a release blocker.
+
+### Restore Drill Evidence
+- `docs/wiki/Restore-Drill-2026-02-07.md`

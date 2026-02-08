@@ -1,7 +1,7 @@
 {
   "project": "Nebula",
   "last_updated": "2026-02-07",
-  "overall_completion_pct": 96,
+  "overall_completion_pct": 97,
   "current_week": 1,
   "weeks": [
     {
@@ -26,11 +26,11 @@
         "Frontend controls added for extract/generate/coverage/export with loading and error states",
         "Request correlation ID middleware and structured API logs implemented",
         "Sensitive-data logging redaction rules implemented and documented",
-        "Backup and restore runbook documented for SQLite metadata and uploaded files"
+        "Backup and restore runbook documented for SQLite metadata and uploaded files",
+        "Backup and restore drill executed with checksum and retrieval evidence"
       ],
       "next": [
         "Add citation click-through and missing evidence panel in frontend",
-        "Run restore drill and capture evidence for backup procedure",
         "Prepare release checklist and demo freeze criteria"
       ],
       "blockers": []
@@ -97,7 +97,7 @@
       {
         "pillar": "Reliability",
         "status": "partial",
-        "next_control": "Execute restore drill and capture backup evidence"
+        "next_control": "Finalize release checklist and demo freeze evidence"
       },
       {
         "pillar": "Performance Efficiency",

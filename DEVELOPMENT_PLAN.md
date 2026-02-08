@@ -13,7 +13,6 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 
 ### Current Week Priorities
 - Add citation click-through and missing evidence panel in frontend
-- Run restore drill and capture evidence for backup procedure
 - Prepare release checklist and demo freeze criteria
 
 ### Active Risks
@@ -272,7 +271,7 @@ Documentation:
 - [x] Add request correlation IDs and structured logs.
 - [x] Add sensitive-data redaction rules.
 - [x] Document backup/restore procedure.
-- [ ] Execute restore drill and capture evidence.
+- [x] Execute restore drill and capture evidence.
 
 ### Step 9 Backlog: Release
 - [ ] Run demo script twice from clean setup.

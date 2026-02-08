@@ -22,7 +22,7 @@ Reference docs:
 |---|---|---|
 | Operational Excellence | Partial | Finalize release checklist and demo freeze evidence |
 | Security | Partial | Define IAM model, data classification, and key policy |
-| Reliability | Partial | Execute restore drill and capture backup evidence |
+| Reliability | Partial | Finalize release checklist and demo freeze evidence |
 | Performance Efficiency | Not started | Add load profile and scaling plan |
 | Cost Optimization | Not started | Add token budget guardrails and cost visibility |
 | Sustainability | Not started | Define retention and right-sizing practices |
