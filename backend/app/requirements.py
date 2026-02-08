@@ -67,7 +67,10 @@ def _extract_question_limit(text: str) -> QuestionLimit:
 
 
 def _extract_questions(lines: list[str]) -> list[dict[str, object]]:
-    pattern = re.compile(r"^(?:q(?:uestion)?\s*(\d+)|(\d+)[\).:])\s+(.+)$", flags=re.IGNORECASE)
+    pattern = re.compile(
+        r"^(?:q(?:uestion)?\s*(\d+)\s*[:\).-]?\s*|(\d+)[\).:]\s+)(.+)$",
+        flags=re.IGNORECASE,
+    )
     questions: list[dict[str, object]] = []
     for line in lines:
         match = pattern.match(line.strip(" -*\t"))
