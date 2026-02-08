@@ -19,12 +19,11 @@ Nebula is built with a practical, modular architecture:
 - artifact contracts: strict Pydantic schema validation with repair safeguards
 - operations baseline: structured logs, request correlation IDs, redaction rules, Docker-first local environment
 
-Current migration path upgrades the intelligence layer from heuristic logic to a multi-agent system on AWS Strands + Amazon Nova:
-- RFP Analyst (Nova Pro)
-- Evidence Researcher (Nova Lite)
-- Grant Writer (Nova Pro)
-- Compliance Reviewer (Nova Lite)
-- deterministic Orchestrator coordinating all stages
+Current intelligence path uses Amazon Nova via Bedrock through a deterministic orchestrator:
+- Requirements extraction stage (Nova Pro)
+- Section generation stage (Nova Pro)
+- Coverage evaluation stage (Nova Lite)
+- feature-flagged planning/refinement pilot for section generation to reduce manual reruns
 
 ## Category strategy
 - Primary category: `Agentic AI`
@@ -52,7 +51,7 @@ Current migration path upgrades the intelligence layer from heuristic logic to a
 - Implemented citation-first drafting and explicit missing-evidence signaling.
 - Enforced schema contracts for requirements, drafts, and coverage outputs.
 - Built an execution backbone with health checks, reproducible local startup, and operational logging safeguards.
-- Defined and sequenced a concrete `NOVA-01` to `NOVA-12` migration roadmap to reach full agentic compliance.
+- Implemented Nova runtime integration with `nova-agents-v1` artifact provenance and reproducible evidence notes.
 
 ## What we learned
 - Trust beats verbosity: grounded outputs with citations are more valuable than fluent but unsupported text.
@@ -63,10 +62,10 @@ Current migration path upgrades the intelligence layer from heuristic logic to a
 
 ## What's next for Nebula
 Near term:
-- execute `NOVA-01` to `NOVA-12` to replace heuristics with Strands-orchestrated Nova agents
-- preserve API/UI contracts while upgrading internal intelligence
-- harden tests, error handling, and observability for agent runtime
-- publish explicit Nova-on-AWS compliance evidence for submission
+- publish and validate the final ~3 minute demo video with required hashtag and functional footage
+- finalize external judge testing access instructions and fallback credential path
+- capture one credentialed Bedrock run artifact to complement deterministic mocked evidence
+- lock submission package links and final narrative consistency across Devpost assets
 
 Post-submission:
 - add richer reviewer-mode scoring and feedback loops

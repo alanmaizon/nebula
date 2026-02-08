@@ -7,21 +7,18 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 | Week | Focus | Status |
 |---|---|---|
 | Week 1 | Foundations | Done |
-| Week 2 | Nova Compliance and Category Positioning | In progress |
-| Week 3 | Judging Optimization (60/20/20) | Not started |
-| Week 4 | Submission Asset Packaging | Not started |
+| Week 2 | Nova Compliance and Category Positioning | Done |
+| Week 3 | Judging Optimization (60/20/20) | Done |
+| Week 4 | Submission Asset Packaging | In progress |
 | Week 5 | Final QA and Deadline Buffer | Not started |
 | Week 6 | Feedback Bonus and Judging Readiness | Not started |
 
 ### Current Week Priorities
-- Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order
-- Replace heuristic extraction, drafting, and coverage path with Strands-orchestrated Nova agents
-- Keep API request and response contracts stable while preserving schema-repair safeguards
-- Add mock-driven test coverage for each agent plus orchestrator success and failure paths
-- Capture explicit Nova-on-AWS proof (model IDs, source tags, runtime call path, demo trace)
+- Produce and publish the 3-minute demo video with #AmazonNova and functional footage
+- Prepare public demo/test access instructions and fallback credentials path
 
 ### Active Risks
-- Submission may under-demonstrate explicit Nova model usage despite working functionality -> Add hard evidence of Nova call paths, model IDs, and end-to-end demo traces
+- Submission may still under-demonstrate live credentialed Bedrock execution despite code-path evidence -> Capture one credentialed environment run artifact in addition to mocked deterministic evidence
 - Demo/video and deployed runtime behavior may diverge near deadline -> Run repeatable clean-environment rehearsals and freeze non-critical changes
 - Judging score may underperform if impact and innovation narrative is weak -> Map backlog items directly to 60/20/20 criteria and publish measurable outcomes
 <!-- AUTO-GEN:DEVELOPMENT_PLAN_STATUS:END -->
@@ -235,25 +232,21 @@ Documentation:
 - submission checklist and evidence notes in wiki
 
 ### Step 10: Nova Multi-Agent Migration (Hackathon Compliance Path)
-Objective: migrate intelligence path from heuristics to AWS Strands + Amazon Nova while preserving API and UX contracts.
+Objective: complete and harden the Nova runtime path while preserving API and UX contracts.
 
 Tasks:
-- Add Nova runtime dependencies and model/config env plumbing.
-- Implement Bedrock model factory for Nova Pro and Nova Lite.
-- Implement shared tools for chunk reading/search, evidence formatting/citations, and artifact reading.
-- Implement RFP Analyst, Evidence Researcher, Grant Writer, and Compliance Reviewer agents.
-- Implement orchestrator stage functions with deterministic sequencing and per-request agent instantiation.
-- Rewire extract/generate/coverage endpoints from heuristic functions to orchestrator calls.
-- Keep validation and repair wrappers as schema safety net on agent outputs.
-- Add unit/integration tests with mocked Bedrock responses for success and failure branches.
-- Add runtime safeguards (bounds, retries, failure mapping, correlation-ID logs).
-- Produce submission evidence proving Nova use in deployed workflow.
+- Keep Nova model/config plumbing and endpoint wiring stable in production path.
+- Maintain `nova-agents-v1` provenance across extraction/drafting/coverage artifacts.
+- Preserve schema validation and repair wrappers as safety boundaries.
+- Maintain integration and end-to-end tests for the Nova invocation path.
+- Keep feature-flagged agentic orchestration pilot bounded and deterministic.
+- Expand evidence package with one credentialed Bedrock runtime artifact.
 
 Exit criteria:
 - End-to-end flow uses `nova-agents-v1` artifact source on extraction, drafting, and coverage outputs.
 - All migrated endpoints preserve existing payload shape and pass regression tests.
-- Agent and orchestrator tests cover schema failures, empty evidence paths, and provider failures.
-- Demo rehearsal from clean startup completes in under 10 minutes with reproducible commands.
+- Nova path tests cover schema failures, empty evidence paths, and provider failures.
+- Evidence pack includes deterministic test evidence plus at least one credentialed Bedrock runtime run.
 
 Documentation:
 - `NEBULA.md` issue-level migration checklist and verification plan
@@ -334,22 +327,18 @@ Documentation:
 - [x] Run demo script twice from clean setup.
 - [x] Freeze non-critical changes and resolve blockers.
 - [x] Tag MVP release and publish notes.
-- [ ] Add explicit Nova-on-AWS compliance evidence for submission package.
-- [ ] Finalize Devpost category/story with Agentic AI primary and Multimodal secondary.
+- [x] Add explicit Nova-on-AWS compliance evidence for submission package.
+- [x] Finalize Devpost category/story with Agentic AI primary and Multimodal secondary.
 - [ ] Publish and validate final 3-minute demo video.
 - [ ] Finalize test access instructions and verify from clean external perspective.
 - [ ] Submit actionable feedback package before deadline.
 
 ### Step 10 Backlog: Nova Multi-Agent Migration
-- [ ] `NOVA-01` Add `strands-agents` and `boto3`, plus Nova model/config environment plumbing.
-- [ ] `NOVA-02` Add agents package scaffold and centralized Bedrock model factory.
-- [ ] `NOVA-03` Add shared Strands tools (`chunk_tools`, `evidence_tools`, `artifact_tools`).
-- [ ] `NOVA-04` Implement RFP Analyst agent with `RequirementsArtifact` structured output.
-- [ ] `NOVA-05` Implement Evidence Researcher agent with retrieval + semantic reranking.
-- [ ] `NOVA-06` Implement Grant Writer agent with citation-first `DraftArtifact` output.
-- [ ] `NOVA-07` Implement Compliance Reviewer agent with semantic `CoverageArtifact` output.
-- [ ] `NOVA-08` Implement deterministic orchestrator functions for extract/generate/coverage.
-- [ ] `NOVA-09` Rewire `main.py` endpoints and change source tags to `nova-agents-v1`.
-- [ ] `NOVA-10` Add test suite under `backend/tests/test_agents/` plus integration mock pipeline test.
-- [ ] `NOVA-11` Add observability/safeguards for agent stages and Bedrock failure mapping.
-- [ ] `NOVA-12` Capture Nova compliance evidence pack and execute clean-start demo rehearsal.
+- [x] Add Nova runtime dependencies (`boto3`) and model/config environment plumbing.
+- [x] Implement `BedrockNovaOrchestrator` for extraction, drafting, and coverage.
+- [x] Rewire `main.py` endpoints and artifact sources to `nova-agents-v1`.
+- [x] Add deterministic tests for Nova runtime model routing and API contracts.
+- [x] Add API-level end-to-end Nova-path test with mocked Bedrock `converse`.
+- [x] Add feature-flagged agentic orchestration pilot for section-generation planning/verification.
+- [x] Publish architecture and evidence documentation for Nova call path and reliability.
+- [ ] Capture one credentialed Bedrock runtime artifact in a live AWS environment.

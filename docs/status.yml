@@ -1,8 +1,8 @@
 {
   "project": "Nebula",
   "last_updated": "2026-02-08",
-  "overall_completion_pct": 80,
-  "current_week": 2,
+  "overall_completion_pct": 88,
+  "current_week": 4,
   "weeks": [
     {
       "week": 1,
@@ -43,40 +43,41 @@
     {
       "week": 2,
       "focus": "Nova Compliance and Category Positioning",
-      "status": "in_progress",
+      "status": "done",
       "done": [
         "Finalized submission category strategy with Agentic AI primary and Multimodal Understanding secondary",
         "Published Nova submission checklist with dated dry-run record and follow-up issue linkage",
-        "Defined reproducible impact KPIs and captured baseline metrics from demo-freeze artifacts"
+        "Documented explicit Bedrock Nova call path, concrete model IDs, and submission evidence references",
+        "Implemented Nova runtime call path in backend endpoints with nova-agents-v1 artifact provenance",
+        "Added API-level Nova end-to-end evidence test and runtime evidence note"
       ],
       "next": [
-        "Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order",
-        "Replace heuristic extraction, drafting, and coverage path with Strands-orchestrated Nova agents",
-        "Keep API request and response contracts stable while preserving schema-repair safeguards",
-        "Add mock-driven test coverage for each agent plus orchestrator success and failure paths",
-        "Capture explicit Nova-on-AWS proof (model IDs, source tags, runtime call path, demo trace)"
+        "No open Week 2 actions"
       ],
       "blockers": []
     },
     {
       "week": 3,
       "focus": "Judging Optimization (60/20/20)",
-      "status": "not_started",
-      "done": [],
+      "status": "done",
+      "done": [
+        "Added deterministic submission-critical backend test set and CI reliability gate",
+        "Defined reproducible impact KPIs and generated baseline metrics artifact",
+        "Implemented feature-flagged agentic orchestration pilot over section generation"
+      ],
       "next": [
-        "Increase technical implementation evidence with deterministic tests and CI reliability",
-        "Define enterprise/community impact metrics and capture baseline outcomes",
-        "Show creativity with agentic orchestration (Strands pattern) over existing RAG pipeline"
+        "No open Week 3 actions"
       ],
       "blockers": []
     },
     {
       "week": 4,
       "focus": "Submission Asset Packaging",
-      "status": "not_started",
-      "done": [],
+      "status": "in_progress",
+      "done": [
+        "Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices"
+      ],
       "next": [
-        "Prepare Devpost narrative emphasizing Nova and AWS architecture choices",
         "Produce and publish the 3-minute demo video with #AmazonNova and functional footage",
         "Prepare public demo/test access instructions and fallback credentials path"
       ],
@@ -109,8 +110,8 @@
   ],
   "high_risks": [
     {
-      "risk": "Submission may under-demonstrate explicit Nova model usage despite working functionality",
-      "mitigation": "Add hard evidence of Nova call paths, model IDs, and end-to-end demo traces"
+      "risk": "Submission may still under-demonstrate live credentialed Bedrock execution despite code-path evidence",
+      "mitigation": "Capture one credentialed environment run artifact in addition to mocked deterministic evidence"
     },
     {
       "risk": "Demo/video and deployed runtime behavior may diverge near deadline",

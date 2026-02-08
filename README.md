@@ -19,20 +19,15 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-08`
-- Overall completion: `80%`
-- Current milestone: `Week 2 - Nova Compliance and Category Positioning (In progress)`
+- Overall completion: `88%`
+- Current milestone: `Week 4 - Submission Asset Packaging (In progress)`
 
 ### Done This Week
-- Finalized submission category strategy with Agentic AI primary and Multimodal Understanding secondary
-- Published Nova submission checklist with dated dry-run record and follow-up issue linkage
-- Defined reproducible impact KPIs and captured baseline metrics from demo-freeze artifacts
+- Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices
 
 ### Next Up
-- Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order
-- Replace heuristic extraction, drafting, and coverage path with Strands-orchestrated Nova agents
-- Keep API request and response contracts stable while preserving schema-repair safeguards
-- Add mock-driven test coverage for each agent plus orchestrator success and failure paths
-- Capture explicit Nova-on-AWS proof (model IDs, source tags, runtime call path, demo trace)
+- Produce and publish the 3-minute demo video with #AmazonNova and functional footage
+- Prepare public demo/test access instructions and fallback credentials path
 
 ### Current Blockers
 - No blockers recorded.
@@ -187,6 +182,7 @@ Reliability evidence:
 - `docs/wiki/Impact-Metrics-Baseline-2026-02-08.md`
 - `docs/wiki/Agentic-Orchestration-Pilot-2026-02-08.md`
 - `docs/wiki/Devpost-Narrative-Draft-2026-02-08.md`
+
 - CD workflow: `.github/workflows/deploy-aws.yml`
   - builds backend/frontend images
   - pushes images to Amazon ECR
