@@ -107,6 +107,15 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
 ```
 
+If you use AWS SSO, refresh credentials and export temporary env vars before
+starting Docker:
+
+```bash
+aws sso login --profile <your_profile>
+eval "$(aws configure export-credentials --profile <your_profile> --format env)"
+aws sts get-caller-identity
+```
+
 Backend example:
 ```env
 APP_ENV=development
@@ -182,6 +191,7 @@ Reliability evidence:
 - `docs/wiki/Impact-Metrics-Baseline-2026-02-08.md`
 - `docs/wiki/Agentic-Orchestration-Pilot-2026-02-08.md`
 - `docs/wiki/Devpost-Narrative-Draft-2026-02-08.md`
+- `docs/wiki/Devpost-Testing-Instructions-2026-02-08.md`
 
 - CD workflow: `.github/workflows/deploy-aws.yml`
   - builds backend/frontend images

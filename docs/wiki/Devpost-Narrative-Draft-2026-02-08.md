@@ -45,5 +45,9 @@ Nebula provides a trust-first workflow:
 - The repository includes deterministic Nova-path evidence via integration and end-to-end tests.
 - Live Bedrock runtime use in a deployed environment depends on valid AWS credentials and Bedrock model access in the configured region.
 
+## Testing Instructions For Application (Devpost)
+Paste-ready testing instructions are maintained in:
+- `docs/wiki/Devpost-Testing-Instructions-2026-02-08.md`
+
 ## Suggested Devpost Closing Paragraph
 Nebula combines deterministic engineering controls with agentic orchestration so nonprofit teams can move from document chaos to submission readiness with evidence-linked outputs they can review and defend.
