@@ -13,6 +13,16 @@ from app.requirements import extract_requirements_payload
 @pytest.fixture(autouse=True)
 def mock_nova_orchestrator(monkeypatch: pytest.MonkeyPatch):
     class FakeNovaOrchestrator:
+        def plan_section_generation(
+            self, section_key: str, requested_top_k: int, available_chunk_count: int
+        ) -> dict[str, object]:
+            bounded = max(1, min(requested_top_k, available_chunk_count))
+            return {
+                "retrieval_top_k": bounded,
+                "retry_on_missing_evidence": True,
+                "rationale": "default-plan",
+            }
+
         def extract_requirements(self, chunks: list[dict[str, object]]) -> dict[str, object]:
             return extract_requirements_payload(chunks)
 
@@ -335,3 +345,102 @@ def test_export_json_and_markdown(tmp_path: Path) -> None:
         export_md = client.get(f"/projects/{project_id}/export?format=markdown&section_key=Need Statement")
         assert export_md.status_code == 200
         assert "Nebula Export" in export_md.text
+
+
+def test_agentic_orchestration_pilot_retries_missing_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    class PilotOrchestrator:
+        def plan_section_generation(
+            self, section_key: str, requested_top_k: int, available_chunk_count: int
+        ) -> dict[str, object]:
+            return {
+                "retrieval_top_k": 1,
+                "retry_on_missing_evidence": True,
+                "rationale": "pilot-retry",
+            }
+
+        def extract_requirements(self, chunks: list[dict[str, object]]) -> dict[str, object]:
+            return extract_requirements_payload(chunks)
+
+        def generate_section(
+            self, section_key: str, ranked_chunks: list[dict[str, object]]
+        ) -> dict[str, object]:
+            if len(ranked_chunks) < 2:
+                return {
+                    "section_key": section_key,
+                    "paragraphs": [],
+                    "missing_evidence": [
+                        {
+                            "claim": "Need additional evidence for complete draft.",
+                            "suggested_upload": "Upload impact evidence.",
+                        }
+                    ],
+                }
+            return {
+                "section_key": section_key,
+                "paragraphs": [
+                    {
+                        "text": "Need Statement: Evidence-backed pilot draft.",
+                        "citations": [
+                            {
+                                "doc_id": str(ranked_chunks[0]["file_name"]),
+                                "page": int(ranked_chunks[0]["page"]),
+                                "snippet": str(ranked_chunks[0]["text"])[:120],
+                            }
+                        ],
+                        "confidence": 0.75,
+                    }
+                ],
+                "missing_evidence": [],
+            }
+
+        def compute_coverage(
+            self, requirements: dict[str, object], draft: dict[str, object]
+        ) -> dict[str, object]:
+            return build_coverage_payload(requirements, draft)
+
+    monkeypatch.setattr("app.main.get_nova_orchestrator", lambda: PilotOrchestrator())
+
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 70
+    settings.chunk_overlap_chars = 10
+    settings.embedding_dim = 64
+
+    source_text = (
+        b"Need Statement evidence paragraph one. "
+        b"Need Statement evidence paragraph two with additional support. "
+        b"Need Statement evidence paragraph three for refinement."
+    )
+
+    previous_flag = settings.enable_agentic_orchestration_pilot
+    try:
+        with TestClient(app) as client:
+            project_id = client.post("/projects", json={"name": "Pilot Off"}).json()["id"]
+            upload = client.post(
+                f"/projects/{project_id}/upload",
+                files=[("files", ("impact.txt", source_text, "text/plain"))],
+            )
+            assert upload.status_code == 200
+
+            settings.enable_agentic_orchestration_pilot = False
+            off_resp = client.post(
+                f"/projects/{project_id}/generate-section",
+                json={"section_key": "Need Statement", "top_k": 1},
+            )
+            assert off_resp.status_code == 200
+            off_draft = off_resp.json()["draft"]
+            assert len(off_draft["paragraphs"]) == 0
+            assert len(off_draft["missing_evidence"]) == 1
+
+            settings.enable_agentic_orchestration_pilot = True
+            on_resp = client.post(
+                f"/projects/{project_id}/generate-section",
+                json={"section_key": "Need Statement", "top_k": 1},
+            )
+            assert on_resp.status_code == 200
+            on_draft = on_resp.json()["draft"]
+            assert len(on_draft["paragraphs"]) == 1
+            assert len(on_draft["missing_evidence"]) == 0
+            assert len(on_draft["paragraphs"][0]["citations"]) >= 1
+    finally:
+        settings.enable_agentic_orchestration_pilot = previous_flag

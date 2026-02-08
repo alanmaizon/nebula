@@ -344,8 +344,23 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Project not found")
 
         chunks = list_chunks(project_id)
-        top_k = payload.top_k or settings.retrieval_top_k_default
-        ranked_chunks = rank_chunks_by_query(chunks, payload.section_key, top_k) if chunks else []
+        default_top_k = payload.top_k or settings.retrieval_top_k_default
+        ranked_all = rank_chunks_by_query(chunks, payload.section_key, min(20, len(chunks))) if chunks else []
+        top_k = default_top_k
+        retry_on_missing = False
+        if settings.enable_agentic_orchestration_pilot and ranked_all:
+            try:
+                plan = get_nova_orchestrator().plan_section_generation(
+                    section_key=payload.section_key,
+                    requested_top_k=default_top_k,
+                    available_chunk_count=len(ranked_all),
+                )
+                top_k = int(plan["retrieval_top_k"])
+                retry_on_missing = bool(plan.get("retry_on_missing_evidence", False))
+            except (NovaRuntimeError, KeyError, ValueError):
+                top_k = default_top_k
+        top_k = max(1, min(len(ranked_all), top_k)) if ranked_all else top_k
+        ranked_chunks = ranked_all[:top_k] if ranked_all else []
         if ranked_chunks:
             try:
                 draft_payload = get_nova_orchestrator().generate_section(payload.section_key, ranked_chunks)
@@ -357,6 +372,25 @@ def create_app() -> FastAPI:
         else:
             draft_payload = build_draft_payload(payload.section_key, ranked_chunks)
         validated, repaired, validation_errors = validate_draft_with_repair(draft_payload)
+        if (
+            settings.enable_agentic_orchestration_pilot
+            and retry_on_missing
+            and validated is not None
+            and len(validated.missing_evidence) > 0
+            and len(ranked_all) > top_k
+        ):
+            retry_top_k = min(len(ranked_all), top_k + 2)
+            retry_chunks = ranked_all[:retry_top_k]
+            try:
+                retry_payload = get_nova_orchestrator().generate_section(payload.section_key, retry_chunks)
+            except NovaRuntimeError:
+                retry_payload = None
+            if retry_payload is not None:
+                retry_validated, retry_repaired, retry_errors = validate_draft_with_repair(retry_payload)
+                if retry_validated is not None and len(retry_validated.missing_evidence) < len(validated.missing_evidence):
+                    validated = retry_validated
+                    repaired = retry_repaired
+                    validation_errors = retry_errors
         if validated is None:
             raise HTTPException(
                 status_code=422,

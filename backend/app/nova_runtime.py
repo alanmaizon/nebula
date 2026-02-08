@@ -31,6 +31,45 @@ class BedrockNovaOrchestrator:
         )
         return self._invoke_json_model(self._settings.bedrock_model_id, system_prompt, user_prompt)
 
+    def plan_section_generation(
+        self,
+        section_key: str,
+        requested_top_k: int,
+        available_chunk_count: int,
+    ) -> dict[str, object]:
+        system_prompt = (
+            "You are a planning agent for retrieval-augmented drafting. "
+            "Return strict JSON only."
+        )
+        user_prompt = (
+            "Return a JSON object with keys retrieval_top_k (int), retry_on_missing_evidence (bool), rationale (string). "
+            "Choose retrieval_top_k between 1 and 10. "
+            "Prefer conservative values for deterministic behavior.\n\n"
+            f"Section key: {section_key}\n"
+            f"Requested top_k: {requested_top_k}\n"
+            f"Available chunks: {available_chunk_count}"
+        )
+        payload = self._invoke_json_model(
+            self._settings.bedrock_lite_model_id,
+            system_prompt,
+            user_prompt,
+        )
+        retrieval_top_k = payload.get("retrieval_top_k", requested_top_k)
+        retry_on_missing = payload.get("retry_on_missing_evidence", True)
+        rationale = str(payload.get("rationale", "")).strip()
+
+        try:
+            parsed_top_k = int(retrieval_top_k)
+        except (TypeError, ValueError):
+            parsed_top_k = requested_top_k
+
+        bounded_top_k = max(1, min(10, available_chunk_count, parsed_top_k))
+        return {
+            "retrieval_top_k": bounded_top_k,
+            "retry_on_missing_evidence": bool(retry_on_missing),
+            "rationale": rationale,
+        }
+
     def generate_section(self, section_key: str, ranked_chunks: list[dict[str, object]]) -> dict[str, object]:
         context = self._render_ranked_context(ranked_chunks, max_chunks=8, max_chars_per_chunk=700)
         system_prompt = (

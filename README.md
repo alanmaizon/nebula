@@ -123,6 +123,7 @@ BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0
 BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0
 AGENT_TEMPERATURE=0.1
 AGENT_MAX_TOKENS=2048
+ENABLE_AGENTIC_ORCHESTRATION_PILOT=false
 S3_BUCKET=nebula-dev
 VECTOR_STORE=local
 DATABASE_URL=sqlite:///./nebula.db
@@ -184,6 +185,7 @@ npm run dev
 Reliability evidence:
 - `docs/wiki/CI-Reliability-2026-02-08.md`
 - `docs/wiki/Impact-Metrics-Baseline-2026-02-08.md`
+- `docs/wiki/Agentic-Orchestration-Pilot-2026-02-08.md`
 - CD workflow: `.github/workflows/deploy-aws.yml`
   - builds backend/frontend images
   - pushes images to Amazon ECR

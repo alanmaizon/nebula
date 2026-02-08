@@ -222,6 +222,24 @@ Execution flow:
 - FastAPI endpoint -> Nova orchestrator stage -> Bedrock `converse` -> schema validation/repair -> artifact persistence
 - If Nova invocation fails, endpoint returns `502` with explicit runtime failure details.
 
+## 7.2) Agentic Orchestration Pilot (Feature-Flagged)
+
+Pilot scope:
+- workflow stage: section generation planning + verification refinement
+- endpoint: `POST /projects/{project_id}/generate-section`
+- feature flag: `ENABLE_AGENTIC_ORCHESTRATION_PILOT` (default `false`)
+
+Pilot flow when enabled:
+1. Planner stage (`BedrockNovaOrchestrator.plan_section_generation`) chooses retrieval `top_k` and retry policy.
+2. Writer stage generates draft from planned retrieval set.
+3. Verification stage checks `missing_evidence`; if present, orchestrator expands retrieval window and retries once.
+4. Best validated draft is persisted with unchanged API contract and citation schema requirements.
+
+Tradeoffs:
+- Determinism preserved by default (`false`) and bounded retry policy (single retry, bounded `top_k`).
+- Autonomy introduced only in controlled planning/refinement decisions.
+- Citation grounding requirements are unchanged: draft schema still requires explicit citation objects and validation gate remains mandatory.
+
 ## 8) Validation and Error Strategy
 - Every model response is schema-validated before persistence.
 - On validation failure: one structured repair attempt, then explicit error.
