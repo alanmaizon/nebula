@@ -31,3 +31,7 @@ Roadmap phases align with `DEVELOPMENT_PLAN.md`.
 
 ## Step 9: Release
 - Demo freeze, quality gate, and release tag.
+
+## Step 10: Nova Multi-Agent Migration
+- Replace heuristic intelligence path with AWS Strands + Amazon Nova agent orchestration.
+- Preserve existing API contracts while proving Nova usage in submission evidence.

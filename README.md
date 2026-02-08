@@ -1,6 +1,6 @@
-![Nebula Logo](LOGO.png)
-
 # Nebula
+
+![Nebula Icon](ICON.png)
 
 Nebula is an Amazon Nova-powered agentic grant development and governance workspace that turns an RFP plus a nonprofit's source documents into a compliant draft with **traceable citations** for every claim. It generates structured sections, a requirements coverage matrix, and flags missing evidence before you submit.
 
@@ -244,3 +244,5 @@ If a claim cannot be supported, Nebula must:
 * Demo video target: ~3 minutes
 * Include: requirements extraction → cited drafting → missing evidence → export
 * Highlight: structured outputs, validation, traceability, and real-world impact
+
+![Nebula Logo](LOGO.png)

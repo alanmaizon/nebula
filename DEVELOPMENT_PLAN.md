@@ -14,9 +14,12 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 | Week 6 | Feedback Bonus and Judging Readiness | Not started |
 
 ### Current Week Priorities
-- Make Bedrock Nova usage explicit in docs and architecture with concrete model IDs and call paths
-- Finalize submission category strategy (Agentic AI primary, Multimodal Understanding secondary)
-- Add a Nova compliance checklist covering model usage, deployability, and test access expectations
+- Execute Nova migration issue chain (`NOVA-01` to `NOVA-12`) in dependency order.
+- Replace heuristic extraction/drafting/coverage runtime path with Strands-orchestrated Nova agents.
+- Keep existing request/response contracts and schema repair wrappers unchanged at API boundary.
+- Add mock-driven tests for each agent plus orchestrator error propagation and schema-failure branches.
+- Collect explicit Nova-on-AWS evidence (model IDs, call path, artifact source tags, demo trace).
+- Finalize category and narrative strategy (Agentic AI primary, Multimodal Understanding secondary).
 
 ### Active Risks
 - Submission may under-demonstrate explicit Nova model usage despite working functionality -> Add hard evidence of Nova call paths, model IDs, and end-to-end demo traces
@@ -232,6 +235,33 @@ Documentation:
 - `README.md` final demo instructions
 - submission checklist and evidence notes in wiki
 
+### Step 10: Nova Multi-Agent Migration (Hackathon Compliance Path)
+Objective: migrate intelligence path from heuristics to AWS Strands + Amazon Nova while preserving API and UX contracts.
+
+Tasks:
+- Add Nova runtime dependencies and model/config env plumbing.
+- Implement Bedrock model factory for Nova Pro and Nova Lite.
+- Implement shared tools for chunk reading/search, evidence formatting/citations, and artifact reading.
+- Implement RFP Analyst, Evidence Researcher, Grant Writer, and Compliance Reviewer agents.
+- Implement orchestrator stage functions with deterministic sequencing and per-request agent instantiation.
+- Rewire extract/generate/coverage endpoints from heuristic functions to orchestrator calls.
+- Keep validation and repair wrappers as schema safety net on agent outputs.
+- Add unit/integration tests with mocked Bedrock responses for success and failure branches.
+- Add runtime safeguards (bounds, retries, failure mapping, correlation-ID logs).
+- Produce submission evidence proving Nova use in deployed workflow.
+
+Exit criteria:
+- End-to-end flow uses `nova-agents-v1` artifact source on extraction, drafting, and coverage outputs.
+- All migrated endpoints preserve existing payload shape and pass regression tests.
+- Agent and orchestrator tests cover schema failures, empty evidence paths, and provider failures.
+- Demo rehearsal from clean startup completes in under 10 minutes with reproducible commands.
+
+Documentation:
+- `NEBULA.md` issue-level migration checklist and verification plan
+- `ARCHITECTURE.md` updated agent/orchestrator flow
+- `README.md` runtime config and demo execution updates
+- `AWS_ALIGNMENT.md` Nova compliance evidence references
+
 ## Documentation Cadence
 - Daily: update issue status and project board.
 - Per PR: update docs for any behavior/config/API change.
@@ -310,3 +340,17 @@ Documentation:
 - [ ] Publish and validate final 3-minute demo video.
 - [ ] Finalize test access instructions and verify from clean external perspective.
 - [ ] Submit actionable feedback package before deadline.
+
+### Step 10 Backlog: Nova Multi-Agent Migration
+- [ ] `NOVA-01` Add `strands-agents` and `boto3`, plus Nova model/config environment plumbing.
+- [ ] `NOVA-02` Add agents package scaffold and centralized Bedrock model factory.
+- [ ] `NOVA-03` Add shared Strands tools (`chunk_tools`, `evidence_tools`, `artifact_tools`).
+- [ ] `NOVA-04` Implement RFP Analyst agent with `RequirementsArtifact` structured output.
+- [ ] `NOVA-05` Implement Evidence Researcher agent with retrieval + semantic reranking.
+- [ ] `NOVA-06` Implement Grant Writer agent with citation-first `DraftArtifact` output.
+- [ ] `NOVA-07` Implement Compliance Reviewer agent with semantic `CoverageArtifact` output.
+- [ ] `NOVA-08` Implement deterministic orchestrator functions for extract/generate/coverage.
+- [ ] `NOVA-09` Rewire `main.py` endpoints and change source tags to `nova-agents-v1`.
+- [ ] `NOVA-10` Add test suite under `backend/tests/test_agents/` plus integration mock pipeline test.
+- [ ] `NOVA-11` Add observability/safeguards for agent stages and Bedrock failure mapping.
+- [ ] `NOVA-12` Capture Nova compliance evidence pack and execute clean-start demo rehearsal.
