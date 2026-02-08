@@ -23,3 +23,4 @@ backend/data/uploads/
 .DS_Store
 *.swp
 .vscode
+.claude
