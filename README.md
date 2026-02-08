@@ -17,38 +17,16 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
 - Last updated: `2026-02-08`
-- Overall completion: `100%`
-- Current milestone: `Week 1 - Foundations (Done)`
+- Overall completion: `78%`
+- Current milestone: `Week 2 - Nova Compliance and Category Positioning (In progress)`
 
 ### Done This Week
-- Repository baseline documentation created
-- Architecture plan with Mermaid diagrams added
-- AWS alignment draft documented
-- GitHub governance bootstrap completed (labels, milestones, issues, wiki sync)
-- Bootstrap automation hardened (wiki-only mode and project parser compatibility)
-- Backend and frontend scaffolds created with health endpoints
-- Docker Compose baseline added with service health checks
-- Project creation and document upload metadata endpoints implemented
-- Chunking pipeline added with configurable chunk size and overlap
-- Local embedding and project-scoped retrieval endpoint implemented
-- Requirements schema and extraction endpoints implemented with validation and artifact persistence
-- Cited section generation endpoint implemented with draft schema validation and missing evidence support
-- Coverage matrix computation implemented with requirement-to-evidence references and persisted artifacts
-- Export endpoint implemented for JSON and Markdown artifact packages
-- Frontend controls added for extract/generate/coverage/export with loading and error states
-- Request correlation ID middleware and structured API logs implemented
-- Sensitive-data logging redaction rules implemented and documented
-- Backup and restore runbook documented for SQLite metadata and uploaded files
-- Backup and restore drill executed with checksum and retrieval evidence
-- Demo freeze executed twice from clean startup with end-to-end pipeline success
-- Release notes drafted and v0.1.0 release artifacts prepared
-- Dependabot PR wave triaged and backend dependency upgrades merged
-- Workflow naming normalized and repository references updated to nebula
-- Dependency Review workflow registration stabilized and project PR column added
+- No completed items recorded yet.
 
 ### Next Up
-- Add citation click-through and missing evidence panel in frontend
-- Restore full dependency review action execution for pull requests
+- Make Bedrock Nova usage explicit in docs and architecture with concrete model IDs and call paths
+- Finalize submission category strategy (Agentic AI primary, Multimodal Understanding secondary)
+- Add a Nova compliance checklist covering model usage, deployability, and test access expectations
 
 ### Current Blockers
 - No blockers recorded.

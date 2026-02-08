@@ -7,17 +7,21 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 | Week | Focus | Status |
 |---|---|---|
 | Week 1 | Foundations | Done |
-| Week 2 | Requirements extraction | Not started |
-| Week 3 | Cited drafting core | Not started |
-| Week 4 | Hardening and demo | Not started |
+| Week 2 | Nova Compliance and Category Positioning | In progress |
+| Week 3 | Judging Optimization (60/20/20) | Not started |
+| Week 4 | Submission Asset Packaging | Not started |
+| Week 5 | Final QA and Deadline Buffer | Not started |
+| Week 6 | Feedback Bonus and Judging Readiness | Not started |
 
 ### Current Week Priorities
-- Add citation click-through and missing evidence panel in frontend
-- Restore full dependency review action execution for pull requests
+- Make Bedrock Nova usage explicit in docs and architecture with concrete model IDs and call paths
+- Finalize submission category strategy (Agentic AI primary, Multimodal Understanding secondary)
+- Add a Nova compliance checklist covering model usage, deployability, and test access expectations
 
 ### Active Risks
-- PDF extraction quality on heterogeneous RFP files -> Constrain demo corpus and capture page anchors early
-- Invalid JSON from model output -> Strict schema validation with one repair attempt
+- Submission may under-demonstrate explicit Nova model usage despite working functionality -> Add hard evidence of Nova call paths, model IDs, and end-to-end demo traces
+- Demo/video and deployed runtime behavior may diverge near deadline -> Run repeatable clean-environment rehearsals and freeze non-critical changes
+- Judging score may underperform if impact and innovation narrative is weak -> Map backlog items directly to 60/20/20 criteria and publish measurable outcomes
 <!-- AUTO-GEN:DEVELOPMENT_PLAN_STATUS:END -->
 
 ## Execution Rules
@@ -36,6 +40,25 @@ This is the execution source of truth for building Nebula from zero to a demo-re
   - docs impact note
   - security checklist acknowledgement
 - Release tags: `v0.x.y` for MVP iterations.
+
+## Submission Alignment (Hackathon)
+- Core constraint: the shipped workflow must use Amazon Nova models/services on AWS (`Bedrock Nova` and/or `Nova Act`) in the production submission path.
+- Strategy fit: position Nebula as `Agentic AI` primary, with `Multimodal Understanding` as a secondary differentiator.
+- Architecture stance: keep deterministic RAG as backbone; layer agentic orchestration for planning/verification where it measurably improves quality.
+- Evidence requirement: maintain a submission evidence pack showing model invocation path, deployed runtime behavior, and reproducible demo/test access.
+- Deadline discipline: use internal freeze buffers ahead of external submission and feedback cutoffs.
+
+## Judging Strategy (60/20/20)
+| Criterion | Weight | Planning Response |
+|---|---|---|
+| Technical Implementation | 60% | Prioritize reliability, deterministic behavior, CI health, and clear Nova integration proof. |
+| Enterprise or Community Impact | 20% | Quantify time-to-draft, coverage quality, and compliance-risk reduction outcomes. |
+| Creativity and Innovation | 20% | Demonstrate agentic orchestration and multimodal evidence handling without sacrificing grounding. |
+
+## Date Gates (Pacific Time)
+- `2026-03-06 17:00`: AWS promotional credits request deadline (if needed).
+- `2026-03-16 17:00`: final submission deadline; internal target is at least 2 hours earlier.
+- `2026-03-18 17:00`: feedback submission deadline for bonus eligibility.
 
 ## Step-by-Step Plan
 
@@ -188,21 +211,26 @@ Documentation:
 - `SECURITY.md`
 - operations wiki pages
 
-### Step 9: Demo Freeze and Release
-Objective: freeze a stable MVP branch and package demo assets.
+### Step 9: Demo Freeze, Submission, and Feedback
+Objective: freeze a stable submission build, deliver all required artifacts, and keep judging access reliable.
 
 Tasks:
 - Run full demo script twice from clean startup.
 - Fix blocking defects only; defer stretch work to backlog.
-- Tag release and publish demo checklist.
-- Prepare release notes with known limitations.
+- Prepare and validate Devpost submission content and links.
+- Publish and validate the ~3 minute demo video with required hashtag and functional footage.
+- Confirm repository/demo testing access path for judges until judging period ends.
+- Submit actionable feedback before feedback deadline.
 
 Exit criteria:
 - Demo can be executed reliably in less than 10 minutes.
+- Submission package is complete and validated before external deadline.
+- Judges can access test environment/repository without manual intervention.
 
 Documentation:
 - release notes wiki page
 - `README.md` final demo instructions
+- submission checklist and evidence notes in wiki
 
 ## Documentation Cadence
 - Daily: update issue status and project board.
@@ -277,3 +305,8 @@ Documentation:
 - [x] Run demo script twice from clean setup.
 - [x] Freeze non-critical changes and resolve blockers.
 - [x] Tag MVP release and publish notes.
+- [ ] Add explicit Nova-on-AWS compliance evidence for submission package.
+- [ ] Finalize Devpost category/story with Agentic AI primary and Multimodal secondary.
+- [ ] Publish and validate final 3-minute demo video.
+- [ ] Finalize test access instructions and verify from clean external perspective.
+- [ ] Submit actionable feedback package before deadline.

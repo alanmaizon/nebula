@@ -1,8 +1,8 @@
 {
   "project": "Nebula",
   "last_updated": "2026-02-08",
-  "overall_completion_pct": 100,
-  "current_week": 1,
+  "overall_completion_pct": 78,
+  "current_week": 2,
   "weeks": [
     {
       "week": 1,
@@ -42,49 +42,77 @@
     },
     {
       "week": 2,
-      "focus": "Requirements extraction",
-      "status": "not_started",
+      "focus": "Nova Compliance and Category Positioning",
+      "status": "in_progress",
       "done": [],
       "next": [
-        "Create requirements extraction schema",
-        "Implement extraction endpoint and validator",
-        "Display extracted requirements in UI"
+        "Make Bedrock Nova usage explicit in docs and architecture with concrete model IDs and call paths",
+        "Finalize submission category strategy (Agentic AI primary, Multimodal Understanding secondary)",
+        "Add a Nova compliance checklist covering model usage, deployability, and test access expectations"
       ],
       "blockers": []
     },
     {
       "week": 3,
-      "focus": "Cited drafting core",
+      "focus": "Judging Optimization (60/20/20)",
       "status": "not_started",
       "done": [],
       "next": [
-        "Implement evidence retrieval pipeline",
-        "Generate cited draft output",
-        "Compute coverage matrix and missing evidence"
+        "Increase technical implementation evidence with deterministic tests and CI reliability",
+        "Define enterprise/community impact metrics and capture baseline outcomes",
+        "Show creativity with agentic orchestration (Strands pattern) over existing RAG pipeline"
       ],
       "blockers": []
     },
     {
       "week": 4,
-      "focus": "Hardening and demo",
+      "focus": "Submission Asset Packaging",
       "status": "not_started",
       "done": [],
       "next": [
-        "Implement export endpoints",
-        "Stabilize deterministic settings and retries",
-        "Finalize demo flow and runbook"
+        "Prepare Devpost narrative emphasizing Nova and AWS architecture choices",
+        "Produce and publish the 3-minute demo video with #AmazonNova and functional footage",
+        "Prepare public demo/test access instructions and fallback credentials path"
+      ],
+      "blockers": []
+    },
+    {
+      "week": 5,
+      "focus": "Final QA and Deadline Buffer",
+      "status": "not_started",
+      "done": [],
+      "next": [
+        "Run full clean-environment rehearsals and lock submission build",
+        "Submit final project before 2026-03-16 17:00 PT with internal buffer",
+        "Verify repository/demo access and all required links in Devpost"
+      ],
+      "blockers": []
+    },
+    {
+      "week": 6,
+      "focus": "Feedback Bonus and Judging Readiness",
+      "status": "not_started",
+      "done": [],
+      "next": [
+        "Submit actionable feedback before 2026-03-18 17:00 PT",
+        "Keep demo environment stable and reachable through judging period",
+        "Prepare concise issue-response playbook in case judges request clarification"
       ],
       "blockers": []
     }
   ],
   "high_risks": [
     {
-      "risk": "PDF extraction quality on heterogeneous RFP files",
-      "mitigation": "Constrain demo corpus and capture page anchors early"
+      "risk": "Submission may under-demonstrate explicit Nova model usage despite working functionality",
+      "mitigation": "Add hard evidence of Nova call paths, model IDs, and end-to-end demo traces"
     },
     {
-      "risk": "Invalid JSON from model output",
-      "mitigation": "Strict schema validation with one repair attempt"
+      "risk": "Demo/video and deployed runtime behavior may diverge near deadline",
+      "mitigation": "Run repeatable clean-environment rehearsals and freeze non-critical changes"
+    },
+    {
+      "risk": "Judging score may underperform if impact and innovation narrative is weak",
+      "mitigation": "Map backlog items directly to 60/20/20 criteria and publish measurable outcomes"
     }
   ],
   "aws": {
