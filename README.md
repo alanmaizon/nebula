@@ -25,6 +25,7 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 ### Done This Week
 - Finalized submission category strategy with Agentic AI primary and Multimodal Understanding secondary
 - Published Nova submission checklist with dated dry-run record and follow-up issue linkage
+- Defined reproducible impact KPIs and captured baseline metrics from demo-freeze artifacts
 
 ### Next Up
 - Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order
@@ -182,6 +183,7 @@ npm run dev
 
 Reliability evidence:
 - `docs/wiki/CI-Reliability-2026-02-08.md`
+- `docs/wiki/Impact-Metrics-Baseline-2026-02-08.md`
 - CD workflow: `.github/workflows/deploy-aws.yml`
   - builds backend/frontend images
   - pushes images to Amazon ECR

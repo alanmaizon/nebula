@@ -1,0 +1,50 @@
+{
+  "artifacts_root": "/tmp/nebula-demo-freeze",
+  "run_count": 2,
+  "run_labels": [
+    "run-1",
+    "run-2"
+  ],
+  "metrics": {
+    "pipeline_success_rate_pct": 100.0,
+    "coverage_met_rate_pct": 100.0,
+    "coverage_partial_rate_pct": 0.0,
+    "coverage_missing_rate_pct": 0.0,
+    "citation_density_per_paragraph": 1.0,
+    "unsupported_claim_rate_pct": 0.0,
+    "requirements_per_run_avg": 2.0
+  },
+  "raw_totals": {
+    "requirements": 4,
+    "coverage_met": 4,
+    "coverage_partial": 0,
+    "coverage_missing": 0,
+    "paragraphs": 4,
+    "citations": 4,
+    "missing_evidence_items": 0
+  },
+  "per_run": [
+    {
+      "run_label": "run-1",
+      "pipeline_success_ratio": 1.0,
+      "requirement_count": 2,
+      "met_count": 2,
+      "partial_count": 0,
+      "missing_count": 0,
+      "draft_paragraph_count": 2,
+      "citation_count": 2,
+      "missing_evidence_count": 0
+    },
+    {
+      "run_label": "run-2",
+      "pipeline_success_ratio": 1.0,
+      "requirement_count": 2,
+      "met_count": 2,
+      "partial_count": 0,
+      "missing_count": 0,
+      "draft_paragraph_count": 2,
+      "citation_count": 2,
+      "missing_evidence_count": 0
+    }
+  ]
+}

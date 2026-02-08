@@ -46,7 +46,8 @@
       "status": "in_progress",
       "done": [
         "Finalized submission category strategy with Agentic AI primary and Multimodal Understanding secondary",
-        "Published Nova submission checklist with dated dry-run record and follow-up issue linkage"
+        "Published Nova submission checklist with dated dry-run record and follow-up issue linkage",
+        "Defined reproducible impact KPIs and captured baseline metrics from demo-freeze artifacts"
       ],
       "next": [
         "Execute Nova migration issue chain (NOVA-01 to NOVA-12) in dependency order",
