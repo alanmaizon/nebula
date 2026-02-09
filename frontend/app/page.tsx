@@ -1,10 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import SegmentedToggle from "./components/SegmentedToggle";
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
+type ViewMode = "summary" | "json";
+
+function asRecord(value: JsonValue): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
 
 export default function HomePage() {
   const [projectName, setProjectName] = useState("Nebula Demo Project");
@@ -18,6 +26,12 @@ export default function HomePage() {
   const [draft, setDraft] = useState<JsonValue>(null);
   const [coverage, setCoverage] = useState<JsonValue>(null);
   const [recommendation, setRecommendation] = useState<JsonValue>(null);
+
+  const [recommendationView, setRecommendationView] = useState<ViewMode>("summary");
+  const [requirementsView, setRequirementsView] = useState<ViewMode>("summary");
+  const [draftView, setDraftView] = useState<ViewMode>("summary");
+  const [coverageView, setCoverageView] = useState<ViewMode>("summary");
+
   const [intake, setIntake] = useState({
     country: "Ireland",
     organization_type: "Non-profit",
@@ -33,6 +47,11 @@ export default function HomePage() {
 
   const isBusy = useMemo(() => loadingAction !== null, [loadingAction]);
   const isTemplateLocked = recommendation !== null;
+
+  const recommendationRecord = asRecord(recommendation);
+  const requirementsRecord = asRecord(requirements);
+  const draftRecord = asRecord(draft);
+  const coverageRecord = asRecord(coverage);
 
   async function runAction(actionName: string, fn: () => Promise<void>) {
     setLoadingAction(actionName);
@@ -79,6 +98,7 @@ export default function HomePage() {
     if (!isTemplateLocked) {
       throw new Error("Complete intake and lock a template recommendation before ingest.");
     }
+
     await runAction("Uploading files", async () => {
       const formData = new FormData();
       Array.from(selectedFiles).forEach((file) => formData.append("files", file));
@@ -97,6 +117,7 @@ export default function HomePage() {
     if (!isTemplateLocked) {
       throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
     }
+
     await runAction("Extracting requirements", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/extract-requirements`, {
         method: "POST",
@@ -113,6 +134,7 @@ export default function HomePage() {
     if (!isTemplateLocked) {
       throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
     }
+
     await runAction("Generating section", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/generate-section`, {
         method: "POST",
@@ -131,6 +153,7 @@ export default function HomePage() {
     if (!isTemplateLocked) {
       throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
     }
+
     await runAction("Computing coverage", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/coverage`, {
         method: "POST",
@@ -149,6 +172,7 @@ export default function HomePage() {
     if (!isTemplateLocked) {
       throw new Error("Complete intake and lock a template recommendation before export.");
     }
+
     await runAction(`Exporting ${format}`, async () => {
       const response = await fetch(
         `${apiBase}/projects/${projectId}/export?format=${format}&section_key=${encodeURIComponent(sectionKey)}`
@@ -173,6 +197,7 @@ export default function HomePage() {
     if (!projectId) {
       throw new Error("Create a project first.");
     }
+
     await runAction("Saving intake", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/intake`, {
         method: "POST",
@@ -187,6 +212,7 @@ export default function HomePage() {
     if (!projectId) {
       throw new Error("Create a project first.");
     }
+
     await runAction("Recommending template", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/template-recommendation`, {
         method: "POST",
@@ -202,6 +228,7 @@ export default function HomePage() {
     if (!currentProjectId) {
       return;
     }
+
     const response = await fetch(`${apiBase}/projects/${currentProjectId}/template-recommendation/latest`);
     if (!response.ok) {
       if (response.status === 404) {
@@ -220,10 +247,177 @@ export default function HomePage() {
       setRecommendation(null);
       return;
     }
+
     runAction("Loading template recommendation", async () => {
       await loadLatestTemplateRecommendation(projectId);
     });
   }, [projectId]);
+
+  const recommendationSummary = useMemo(() => {
+    if (!recommendationRecord) {
+      return [];
+    }
+
+    const lines: string[] = [];
+    const templateName = typeof recommendationRecord.template_name === "string" ? recommendationRecord.template_name : null;
+    const templateKey = typeof recommendationRecord.template_key === "string" ? recommendationRecord.template_key : null;
+    const rationale = Array.isArray(recommendationRecord.rationale)
+      ? recommendationRecord.rationale.filter((item): item is string => typeof item === "string")
+      : [];
+    const checklist = Array.isArray(recommendationRecord.required_checklist)
+      ? recommendationRecord.required_checklist.filter((item): item is string => typeof item === "string")
+      : [];
+    const warnings = Array.isArray(recommendationRecord.warnings)
+      ? recommendationRecord.warnings.filter((item): item is string => typeof item === "string")
+      : [];
+
+    if (templateName) {
+      lines.push(`Template: ${templateName}${templateKey ? ` (${templateKey})` : ""}`);
+    }
+    if (rationale.length > 0) {
+      lines.push("Why this template:");
+      rationale.slice(0, 3).forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
+    }
+    if (checklist.length > 0) {
+      lines.push("Required checklist:");
+      checklist.slice(0, 5).forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
+    }
+    if (warnings.length > 0) {
+      lines.push("Warnings:");
+      warnings.slice(0, 3).forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
+    }
+
+    return lines;
+  }, [recommendationRecord]);
+
+  const requirementsSummary = useMemo(() => {
+    if (!requirementsRecord) {
+      return [];
+    }
+
+    const lines: string[] = [];
+    const funder = typeof requirementsRecord.funder === "string" ? requirementsRecord.funder : null;
+    const deadline = typeof requirementsRecord.deadline === "string" ? requirementsRecord.deadline : null;
+    const questions = Array.isArray(requirementsRecord.questions)
+      ? requirementsRecord.questions.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+      : [];
+    const attachments = Array.isArray(requirementsRecord.required_attachments)
+      ? requirementsRecord.required_attachments.filter((item): item is string => typeof item === "string")
+      : [];
+
+    lines.push(`Funder: ${funder || "Unknown"}`);
+    lines.push(`Deadline: ${deadline || "Not specified"}`);
+    lines.push(`Questions extracted: ${questions.length}`);
+    questions.slice(0, 4).forEach((question, index) => {
+      const prompt = typeof question.prompt === "string" ? question.prompt : `Question ${index + 1}`;
+      lines.push(`${index + 1}. ${prompt}`);
+    });
+    lines.push(`Required attachments: ${attachments.length}`);
+    attachments.slice(0, 3).forEach((item, index) => lines.push(`${index + 1}. ${item}`));
+
+    return lines;
+  }, [requirementsRecord]);
+
+  const draftSummary = useMemo(() => {
+    if (!draftRecord) {
+      return [];
+    }
+
+    const lines: string[] = [];
+    const section = typeof draftRecord.section_key === "string" ? draftRecord.section_key : "Unknown";
+    const paragraphs = Array.isArray(draftRecord.paragraphs)
+      ? draftRecord.paragraphs.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+      : [];
+    const missingEvidence = Array.isArray(draftRecord.missing_evidence)
+      ? draftRecord.missing_evidence.filter((item): item is string => typeof item === "string")
+      : [];
+
+    const citationCount = paragraphs.reduce((count, paragraph) => {
+      const citations = paragraph.citations;
+      return count + (Array.isArray(citations) ? citations.length : 0);
+    }, 0);
+
+    lines.push(`Section: ${section}`);
+    lines.push(`Paragraphs: ${paragraphs.length}`);
+    lines.push(`Citations: ${citationCount}`);
+
+    const firstParagraph = paragraphs[0];
+    if (firstParagraph && typeof firstParagraph.text === "string") {
+      const preview = firstParagraph.text.length > 260 ? `${firstParagraph.text.slice(0, 257)}...` : firstParagraph.text;
+      lines.push("Preview:");
+      lines.push(preview);
+    }
+
+    if (missingEvidence.length > 0) {
+      lines.push("Missing evidence:");
+      missingEvidence.slice(0, 3).forEach((item, index) => lines.push(`${index + 1}. ${item}`));
+    }
+
+    return lines;
+  }, [draftRecord]);
+
+  const coverageSummary = useMemo(() => {
+    if (!coverageRecord) {
+      return [];
+    }
+
+    const lines: string[] = [];
+    const items = Array.isArray(coverageRecord.items)
+      ? coverageRecord.items.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+      : [];
+
+    let met = 0;
+    let partial = 0;
+    let missing = 0;
+    for (const item of items) {
+      const status = typeof item.status === "string" ? item.status : "";
+      if (status === "met") met += 1;
+      else if (status === "partial") partial += 1;
+      else if (status === "missing") missing += 1;
+    }
+
+    lines.push(`Coverage items: ${items.length}`);
+    lines.push(`Met: ${met}`);
+    lines.push(`Partial: ${partial}`);
+    lines.push(`Missing: ${missing}`);
+    if (items.length > 0) {
+      lines.push("Top items:");
+      items.slice(0, 4).forEach((item, index) => {
+        const id = typeof item.requirement_id === "string" ? item.requirement_id : `item-${index + 1}`;
+        const status = typeof item.status === "string" ? item.status : "unknown";
+        lines.push(`${id}: ${status}`);
+      });
+    }
+
+    return lines;
+  }, [coverageRecord]);
+
+  const suggestedSectionKeys = useMemo(() => {
+    const defaults = [
+      "Need Statement",
+      "Program Design",
+      "Outcomes and Evaluation",
+      "Sustainability",
+      "Implementation Timeline",
+      "Budget Narrative",
+    ];
+
+    const fromRequirements: string[] = [];
+    const maybeQuestions = requirementsRecord?.questions;
+    if (Array.isArray(maybeQuestions)) {
+      for (const item of maybeQuestions) {
+        if (!item || typeof item !== "object") {
+          continue;
+        }
+        const prompt = (item as Record<string, unknown>).prompt;
+        if (typeof prompt === "string" && prompt.trim()) {
+          fromRequirements.push(prompt.trim());
+        }
+      }
+    }
+
+    return Array.from(new Set([...fromRequirements, ...defaults]));
+  }, [requirementsRecord]);
 
   return (
     <main className="stack">
@@ -231,7 +425,7 @@ export default function HomePage() {
         <div className="hero">
           <div className="arc" aria-hidden="true" />
           <div className="grain" aria-hidden="true" />
-          <img src="/logo.png" alt="Nebula logo" className="hero-logo" />
+          <img src="/icon.png" alt="Nebula icon" className="hero-logo" />
           <h1 className="title">Nebula</h1>
           <button
             type="button"
@@ -247,9 +441,8 @@ export default function HomePage() {
       </section>
 
       <section id="demo-workspace" className="stack">
-        <span className="badge">Step 7 In Progress: Export and UX</span>
-        <h2>Nebula Development Workspace (Amazon Nova)</h2>
-        <p>Run the MVP pipeline end-to-end from project creation through export.</p>
+        <h2>Nebula Demo Workspace</h2>
+        <p>Follow the flow: create project, complete intake, lock template recommendation, then run pipeline actions.</p>
       </section>
 
       <section className="card stack">
@@ -359,16 +552,30 @@ export default function HomePage() {
       </section>
 
       <section className="card stack">
+        <h2>Template Recommendation</h2>
+        {!isTemplateLocked ? <p className="notice">Template not locked yet.</p> : null}
+        <SegmentedToggle
+          label="View mode"
+          value={recommendationView}
+          onChange={(value) => setRecommendationView(value as ViewMode)}
+          options={[
+            { value: "summary", label: "Summary" },
+            { value: "json", label: "JSON" },
+          ]}
+        />
+        {recommendationView === "summary" ? (
+          <pre className="code">{recommendationSummary.join("\n") || "No recommendation yet."}</pre>
+        ) : (
+          <pre className="code">{JSON.stringify(recommendation, null, 2)}</pre>
+        )}
+      </section>
+
+      <section className="card stack">
         <h2>Documents</h2>
         {!isTemplateLocked ? (
-          <p className="notice">Complete intake and click “Recommend Template” before uploading documents.</p>
+          <p className="notice">Complete intake and click "Recommend Template" before uploading documents.</p>
         ) : null}
-        <input
-          type="file"
-          multiple
-          onChange={(e) => setSelectedFiles(e.target.files)}
-          className="input"
-        />
+        <input type="file" multiple onChange={(e) => setSelectedFiles(e.target.files)} className="input" />
         <button type="button" className="button" onClick={uploadFiles} disabled={isBusy || !isTemplateLocked}>
           Upload and Index Files
         </button>
@@ -376,13 +583,41 @@ export default function HomePage() {
 
       <section className="card stack">
         <h2>Pipeline Actions</h2>
-        <div className="row">
+        <p className="notice">
+          Section key means the exact grant answer you want Nebula to draft and score. Default is <strong>Need
+          Statement</strong> because it is usually Question 1 in grant applications.
+        </p>
+        <div className="row stack-on-mobile">
           <input
+            list="section-key-suggestions"
             value={sectionKey}
             onChange={(e) => setSectionKey(e.target.value)}
-            placeholder="Section key"
+            placeholder="Pick or type a section key"
             className="input"
           />
+          <datalist id="section-key-suggestions">
+            {suggestedSectionKeys.map((item) => (
+              <option key={item} value={item} />
+            ))}
+          </datalist>
+        </div>
+        <div className="row wrap">
+          {suggestedSectionKeys.slice(0, 6).map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={`pill ${sectionKey === item ? "active" : ""}`}
+              onClick={() => setSectionKey(item)}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+        <div className="stack help">
+          <p>Extract Requirements: parse funder rules/questions from uploaded files.</p>
+          <p>Generate Section: draft only the section in the section key input above.</p>
+          <p>Compute Coverage: evaluate how well the draft covers extracted requirements.</p>
+          <p>Export JSON/Markdown: download full project artifacts for review/submission.</p>
         </div>
         <div className="row wrap">
           <button type="button" className="button" onClick={extractRequirements} disabled={isBusy || !isTemplateLocked}>
@@ -417,23 +652,56 @@ export default function HomePage() {
 
       <section className="card stack">
         <h2>Requirements</h2>
-        <pre className="code">{JSON.stringify(requirements, null, 2)}</pre>
+        <SegmentedToggle
+          label="View mode"
+          value={requirementsView}
+          onChange={(value) => setRequirementsView(value as ViewMode)}
+          options={[
+            { value: "summary", label: "Summary" },
+            { value: "json", label: "JSON" },
+          ]}
+        />
+        {requirementsView === "summary" ? (
+          <pre className="code">{requirementsSummary.join("\n") || "No requirements yet."}</pre>
+        ) : (
+          <pre className="code">{JSON.stringify(requirements, null, 2)}</pre>
+        )}
       </section>
 
       <section className="card stack">
         <h2>Draft</h2>
-        <pre className="code">{JSON.stringify(draft, null, 2)}</pre>
+        <SegmentedToggle
+          label="View mode"
+          value={draftView}
+          onChange={(value) => setDraftView(value as ViewMode)}
+          options={[
+            { value: "summary", label: "Summary" },
+            { value: "json", label: "JSON" },
+          ]}
+        />
+        {draftView === "summary" ? (
+          <pre className="code">{draftSummary.join("\n") || "No draft yet."}</pre>
+        ) : (
+          <pre className="code">{JSON.stringify(draft, null, 2)}</pre>
+        )}
       </section>
 
       <section className="card stack">
         <h2>Coverage</h2>
-        <pre className="code">{JSON.stringify(coverage, null, 2)}</pre>
-      </section>
-
-      <section className="card stack">
-        <h2>Template Recommendation</h2>
-        {!isTemplateLocked ? <p className="notice">Template not locked yet.</p> : null}
-        <pre className="code">{JSON.stringify(recommendation, null, 2)}</pre>
+        <SegmentedToggle
+          label="View mode"
+          value={coverageView}
+          onChange={(value) => setCoverageView(value as ViewMode)}
+          options={[
+            { value: "summary", label: "Summary" },
+            { value: "json", label: "JSON" },
+          ]}
+        />
+        {coverageView === "summary" ? (
+          <pre className="code">{coverageSummary.join("\n") || "No coverage yet."}</pre>
+        ) : (
+          <pre className="code">{JSON.stringify(coverage, null, 2)}</pre>
+        )}
       </section>
     </main>
   );
