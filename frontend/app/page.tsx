@@ -141,9 +141,30 @@ export default function HomePage() {
 
   return (
     <main className="stack">
-      <span className="badge">Step 7 In Progress: Export and UX</span>
-      <h1>Nebula Development Workspace (Amazon Nova)</h1>
-      <p>Use this page to run the MVP pipeline end-to-end from project creation through export.</p>
+      <section className="hero-wrap">
+        <div className="hero">
+          <div className="arc" aria-hidden="true" />
+          <div className="grain" aria-hidden="true" />
+          <img src="/logo.png" alt="Nebula logo" className="hero-logo" />
+          <h1 className="title">Nebula</h1>
+          <button
+            type="button"
+            className="button hero-cta"
+            onClick={() => {
+              const el = document.getElementById("demo-workspace");
+              el?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            Start Demo
+          </button>
+        </div>
+      </section>
+
+      <section id="demo-workspace" className="stack">
+        <span className="badge">Step 7 In Progress: Export and UX</span>
+        <h2>Nebula Development Workspace (Amazon Nova)</h2>
+        <p>Run the MVP pipeline end-to-end from project creation through export.</p>
+      </section>
 
       <section className="card stack">
         <h2>Project Setup</h2>
