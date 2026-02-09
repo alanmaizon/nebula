@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
+import re
 import time
 from uuid import uuid4
 
@@ -22,19 +23,17 @@ from app.db import (
     create_intake_artifact,
     create_project,
     create_requirements_artifact,
-    create_template_recommendation_artifact,
     get_latest_coverage_artifact,
     get_latest_draft_artifact,
     get_latest_intake_artifact,
     get_latest_requirements_artifact,
-    get_latest_template_recommendation_artifact,
     get_project,
     init_db,
     list_chunks,
     list_documents,
 )
 from app.drafting import build_draft_payload, validate_with_repair as validate_draft_with_repair
-from app.intake import IntakePayload, recommend_template
+from app.intake import IntakePayload, build_intake_context
 from app.observability import (
     configure_logging,
     normalize_request_id,
@@ -44,6 +43,7 @@ from app.observability import (
 )
 from app.nova_runtime import BedrockNovaOrchestrator, NovaRuntimeError
 from app.requirements import validate_with_repair as validate_requirements_with_repair
+from app.requirements import extract_requirements_payload, merge_requirements_payload
 from app.retrieval import chunk_pages, cosine_similarity, embed_text, extract_text_pages
 
 logger = logging.getLogger("nebula.api")
@@ -65,10 +65,6 @@ class GenerateSectionRequest(BaseModel):
 
 class CoverageComputeRequest(BaseModel):
     section_key: str = Field(default="Need Statement", min_length=1, max_length=120)
-
-
-class TemplateRecommendationRequest(BaseModel):
-    intake: IntakePayload | None = None
 
 
 def get_nova_orchestrator() -> BedrockNovaOrchestrator:
@@ -164,6 +160,15 @@ def create_app() -> FastAPI:
             )
         scored_results.sort(key=lambda item: float(item["score"]), reverse=True)
         return scored_results[:top_k]
+
+    def select_requirement_chunks(chunks: list[dict[str, object]]) -> list[dict[str, object]]:
+        pattern = re.compile(r"(rfp|grant|funding|guideline|solicitation|notice)", re.IGNORECASE)
+        preferred: list[dict[str, object]] = []
+        for chunk in chunks:
+            file_name = chunk.get("file_name")
+            if isinstance(file_name, str) and pattern.search(file_name):
+                preferred.append(chunk)
+        return preferred or chunks
 
     def render_markdown_export(
         project_id: str,
@@ -327,60 +332,6 @@ def create_app() -> FastAPI:
             },
         }
 
-    @app.post("/projects/{project_id}/template-recommendation")
-    def create_template_recommendation(project_id: str, payload: TemplateRecommendationRequest) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        if payload.intake is not None:
-            intake = payload.intake
-            create_intake_artifact(
-                project_id=project_id,
-                payload=intake.model_dump(),
-                source="ui-intake-v1",
-            )
-        else:
-            latest_intake = get_latest_intake_artifact(project_id)
-            if latest_intake is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="No intake artifact found for project. Save intake first or provide intake payload.",
-                )
-            intake = IntakePayload.model_validate(latest_intake["payload"])
-
-        recommendation = recommend_template(intake)
-        artifact_meta = create_template_recommendation_artifact(
-            project_id=project_id,
-            payload=recommendation.model_dump(),
-            source="template-reco-v1",
-        )
-        return {
-            "project_id": project_id,
-            "recommendation": recommendation.model_dump(),
-            "artifact": artifact_meta,
-        }
-
-    @app.get("/projects/{project_id}/template-recommendation/latest")
-    def get_latest_template_recommendation(project_id: str) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        latest = get_latest_template_recommendation_artifact(project_id)
-        if latest is None:
-            raise HTTPException(status_code=404, detail="No template recommendation artifact found for project")
-
-        return {
-            "project_id": project_id,
-            "recommendation": latest["payload"],
-            "artifact": {
-                "id": latest["id"],
-                "source": latest["source"],
-                "created_at": latest["created_at"],
-            },
-        }
-
     @app.post("/projects/{project_id}/retrieve")
     def retrieve_project_chunks(project_id: str, payload: RetrievalRequest) -> dict[str, object]:
         project = get_project(project_id)
@@ -408,13 +359,21 @@ def create_app() -> FastAPI:
                 detail="No indexed chunks found. Upload text documents before extracting requirements.",
             )
 
+        requirement_chunks = select_requirement_chunks(chunks)
+        deterministic_payload = extract_requirements_payload(requirement_chunks)
+        extracted_payload = deterministic_payload
+        extraction_mode = "deterministic-only"
+        nova_error: str | None = None
+        nova_question_count = 0
         try:
-            extracted_payload = get_nova_orchestrator().extract_requirements(chunks)
+            nova_payload = get_nova_orchestrator().extract_requirements(requirement_chunks)
+            nova_question_count = len(nova_payload.get("questions", [])) if isinstance(nova_payload, dict) else 0
+            if isinstance(nova_payload, dict):
+                extracted_payload = merge_requirements_payload(deterministic_payload, nova_payload)
+                extraction_mode = "deterministic+nova"
         except NovaRuntimeError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail={"message": "Nova requirements extraction failed.", "error": str(exc)},
-            ) from exc
+            nova_error = str(exc)
+
         validated, repaired, validation_errors = validate_requirements_with_repair(extracted_payload)
         if validated is None:
             raise HTTPException(
@@ -438,6 +397,14 @@ def create_app() -> FastAPI:
                 "repaired": repaired,
                 "errors": validation_errors,
             },
+            "extraction": {
+                "mode": extraction_mode,
+                "chunks_total": len(chunks),
+                "chunks_considered": len(requirement_chunks),
+                "deterministic_question_count": len(deterministic_payload.get("questions", [])),
+                "nova_question_count": nova_question_count,
+                "nova_error": nova_error,
+            },
         }
 
     @app.post("/projects/{project_id}/generate-section")
@@ -447,6 +414,12 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="Project not found")
 
         chunks = list_chunks(project_id)
+        intake_context: dict[str, str] | None = None
+        latest_intake = get_latest_intake_artifact(project_id)
+        if latest_intake is not None and isinstance(latest_intake.get("payload"), dict):
+            intake_payload = IntakePayload.model_validate(latest_intake["payload"])
+            intake_context = build_intake_context(intake_payload)
+
         default_top_k = payload.top_k or settings.retrieval_top_k_default
         ranked_all = rank_chunks_by_query(chunks, payload.section_key, min(20, len(chunks))) if chunks else []
         top_k = default_top_k
@@ -466,7 +439,11 @@ def create_app() -> FastAPI:
         ranked_chunks = ranked_all[:top_k] if ranked_all else []
         if ranked_chunks:
             try:
-                draft_payload = get_nova_orchestrator().generate_section(payload.section_key, ranked_chunks)
+                draft_payload = get_nova_orchestrator().generate_section(
+                    payload.section_key,
+                    ranked_chunks,
+                    intake_context=intake_context,
+                )
             except NovaRuntimeError as exc:
                 raise HTTPException(
                     status_code=502,
@@ -485,7 +462,11 @@ def create_app() -> FastAPI:
             retry_top_k = min(len(ranked_all), top_k + 2)
             retry_chunks = ranked_all[:retry_top_k]
             try:
-                retry_payload = get_nova_orchestrator().generate_section(payload.section_key, retry_chunks)
+                retry_payload = get_nova_orchestrator().generate_section(
+                    payload.section_key,
+                    retry_chunks,
+                    intake_context=intake_context,
+                )
             except NovaRuntimeError:
                 retry_payload = None
             if retry_payload is not None:
@@ -628,21 +609,13 @@ def create_app() -> FastAPI:
         draft_artifact = get_latest_draft_artifact(project_id, section_key)
         coverage_artifact = get_latest_coverage_artifact(project_id)
         intake_artifact = get_latest_intake_artifact(project_id)
-        template_reco_artifact = get_latest_template_recommendation_artifact(project_id)
 
         requirements_payload = requirements_artifact["payload"] if requirements_artifact else None
         draft_payload = draft_artifact["payload"] if draft_artifact else None
         coverage_payload = coverage_artifact["payload"] if coverage_artifact else None
         intake_payload = intake_artifact["payload"] if intake_artifact else None
-        template_reco_payload = template_reco_artifact["payload"] if template_reco_artifact else None
 
         if format == "json":
-            template_metadata = None
-            if template_reco_artifact is not None:
-                template_metadata = {
-                    "template_key": template_reco_payload.get("template_key") if isinstance(template_reco_payload, dict) else None,
-                    "locked_at": template_reco_artifact["created_at"],
-                }
             return {
                 "project_id": project_id,
                 "section_key": section_key,
@@ -650,8 +623,6 @@ def create_app() -> FastAPI:
                 "draft": draft_payload,
                 "coverage": coverage_payload,
                 "intake": intake_payload,
-                "template_recommendation": template_reco_payload,
-                "template_metadata": template_metadata,
             }
 
         markdown = render_markdown_export(

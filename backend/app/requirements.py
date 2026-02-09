@@ -50,6 +50,24 @@ def _dedupe(items: list[str]) -> list[str]:
     return result
 
 
+def _normalize_text_key(value: str) -> str:
+    return " ".join(value.lower().split())
+
+
+def _normalize_question_key(value: str) -> str:
+    stripped = re.sub(r"\([^)]*\)", " ", value.lower())
+    stripped = re.sub(r"[^a-z0-9\s]", " ", stripped)
+    return " ".join(stripped.split())
+
+
+def _normalize_attachment_key(value: str) -> str:
+    lowered = value.lower().strip(" -\t")
+    lowered = re.sub(r"^include\s+", "", lowered)
+    lowered = re.sub(r"^attachment\s+[a-z0-9]+\s*[:\-]\s*", "", lowered)
+    lowered = re.sub(r"[^a-z0-9\s]", " ", lowered)
+    return " ".join(lowered.split())
+
+
 def _extract_question_limit(text: str) -> QuestionLimit:
     words_match = re.search(r"(\d{2,5})\s*words?\b", text, flags=re.IGNORECASE)
     if words_match:
@@ -110,6 +128,30 @@ def extract_requirements_payload(chunks: list[dict[str, object]]) -> dict[str, o
             )
             if funder_match:
                 funder = funder_match.group(1).strip()
+            else:
+                opportunity_match = re.search(
+                    r"(?:funding opportunity|opportunity)\s*[:\-]\s*(.+)",
+                    line,
+                    flags=re.IGNORECASE,
+                )
+                if opportunity_match:
+                    opportunity_text = opportunity_match.group(1).strip()
+                    local_authority_match = re.search(
+                        r"((?:city|county)\s+of\s+.+)",
+                        opportunity_text,
+                        flags=re.IGNORECASE,
+                    )
+                    if local_authority_match:
+                        candidate = local_authority_match.group(1).strip()
+                        candidate = re.split(
+                            r"\b(?:grant|fund|programme|program|initiative|competition|call|youth|workforce|innovation)\b",
+                            candidate,
+                            maxsplit=1,
+                            flags=re.IGNORECASE,
+                        )[0].strip()
+                        funder = candidate or opportunity_text
+                    else:
+                        funder = opportunity_text
 
         if deadline is None:
             deadline_match = re.search(
@@ -124,6 +166,11 @@ def extract_requirements_payload(chunks: list[dict[str, object]]) -> dict[str, o
         if "eligib" in lowered:
             eligibility.append(line)
         if "attachment" in lowered or "appendix" in lowered:
+            required_attachments.append(line)
+        normalized = lowered.lstrip("-* \t")
+        if normalized.startswith("include ") and (
+            "timeline" in normalized or "letter" in normalized or "budget" in normalized
+        ):
             required_attachments.append(line)
         if "rubric" in lowered or "scoring" in lowered or "criteria" in lowered:
             rubric.append(line)
@@ -142,6 +189,52 @@ def extract_requirements_payload(chunks: list[dict[str, object]]) -> dict[str, o
         "disallowed_costs": _dedupe(disallowed_costs),
     }
     return payload
+
+
+def merge_requirements_payload(
+    deterministic_payload: dict[str, object], nova_payload: dict[str, object]
+) -> dict[str, object]:
+    left = repair_requirements_payload(deterministic_payload)
+    right = repair_requirements_payload(nova_payload)
+
+    merged_questions: list[dict[str, object]] = []
+    seen_prompts: set[str] = set()
+    for source in (left, right):
+        for question in source.get("questions", []):
+            if not isinstance(question, dict):
+                continue
+            prompt = str(question.get("prompt", "")).strip()
+            if not prompt:
+                continue
+            key = _normalize_question_key(prompt)
+            if key in seen_prompts:
+                continue
+            seen_prompts.add(key)
+            question_id = str(question.get("id", "")).strip() or f"Q{len(merged_questions) + 1}"
+            limit = question.get("limit", {"type": "none", "value": None})
+            if not isinstance(limit, dict):
+                limit = {"type": "none", "value": None}
+            merged_questions.append({"id": question_id, "prompt": prompt, "limit": limit})
+
+    attachments: list[str] = [*left.get("required_attachments", []), *right.get("required_attachments", [])]
+    merged_attachments: list[str] = []
+    seen_attachment_keys: set[str] = set()
+    for item in attachments:
+        key = _normalize_attachment_key(str(item))
+        if not key or key in seen_attachment_keys:
+            continue
+        seen_attachment_keys.add(key)
+        merged_attachments.append(str(item))
+
+    return {
+        "funder": left.get("funder") or right.get("funder"),
+        "deadline": left.get("deadline") or right.get("deadline"),
+        "eligibility": _dedupe([*left.get("eligibility", []), *right.get("eligibility", [])]),
+        "questions": merged_questions,
+        "required_attachments": _dedupe(merged_attachments),
+        "rubric": _dedupe([*left.get("rubric", []), *right.get("rubric", [])]),
+        "disallowed_costs": _dedupe([*left.get("disallowed_costs", []), *right.get("disallowed_costs", [])]),
+    }
 
 
 def repair_requirements_payload(payload: dict[str, object]) -> dict[str, object]:

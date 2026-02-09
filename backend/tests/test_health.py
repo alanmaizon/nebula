@@ -27,7 +27,11 @@ def mock_nova_orchestrator(monkeypatch: pytest.MonkeyPatch):
             return extract_requirements_payload(chunks)
 
         def generate_section(
-            self, section_key: str, ranked_chunks: list[dict[str, object]]
+            self,
+            section_key: str,
+            ranked_chunks: list[dict[str, object]],
+            *,
+            intake_context: dict[str, str] | None = None,
         ) -> dict[str, object]:
             return build_draft_payload(section_key, ranked_chunks)
 
@@ -175,12 +179,15 @@ Disallowed costs:
         assert extract.status_code == 200
         payload = extract.json()
         requirements = payload["requirements"]
+        extraction = payload["extraction"]
         assert requirements["funder"] == "City Community Fund"
         assert requirements["deadline"] == "March 30, 2026"
         assert len(requirements["questions"]) >= 2
         assert requirements["questions"][0]["limit"]["type"] in {"words", "none", "chars"}
         assert len(requirements["required_attachments"]) >= 1
         assert len(requirements["disallowed_costs"]) >= 1
+        assert extraction["mode"] in {"deterministic+nova", "deterministic-only"}
+        assert extraction["deterministic_question_count"] >= 2
 
         latest = client.get(f"/projects/{project_id}/requirements/latest")
         assert latest.status_code == 200
@@ -362,7 +369,11 @@ def test_agentic_orchestration_pilot_retries_missing_evidence(tmp_path: Path, mo
             return extract_requirements_payload(chunks)
 
         def generate_section(
-            self, section_key: str, ranked_chunks: list[dict[str, object]]
+            self,
+            section_key: str,
+            ranked_chunks: list[dict[str, object]],
+            *,
+            intake_context: dict[str, str] | None = None,
         ) -> dict[str, object]:
             if len(ranked_chunks) < 2:
                 return {

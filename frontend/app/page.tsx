@@ -587,8 +587,10 @@ export default function HomePage() {
         <section className="landing-shell">
           <article className="landing-hero">
             <div className="landing-gradient" aria-hidden="true" />
-            <img src="/icon.png" alt="Nebula icon" className="landing-logo" />
-            <h1 className="brand-wordmark">Nebula</h1>
+            <div className="landing-brand-inline">
+              <img src="/icon.svg" alt="Nebula icon" className="landing-logo" />
+              <h1 className="brand-wordmark">Nebula</h1>
+            </div>
             <p>Automated grant drafting workspace powered by Amazon Nova.</p>
             <button type="button" className="workspace-enter" onClick={() => setShowWorkspace(true)}>
               Enter Workspace
