@@ -43,3 +43,34 @@ Submission Requirements
     assert any("attachment a" in entry for entry in attachments)
     assert any("timeline" in entry for entry in attachments)
     assert merged["funder"] == "City of Dublin"
+
+
+def test_merge_requirements_handles_object_rubric_entries() -> None:
+    deterministic = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [],
+        "required_attachments": [],
+        "rubric": ["Feasibility and readiness"],
+        "disallowed_costs": [],
+    }
+    nova = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [],
+        "required_attachments": [],
+        "rubric": [
+            {"criterion": "Outcomes and evidence quality"},
+            {"text": "Budget reasonableness"},
+            {"criterion": "Feasibility and readiness"},
+        ],
+        "disallowed_costs": [],
+    }
+
+    merged = merge_requirements_payload(deterministic, nova)
+
+    assert "Feasibility and readiness" in merged["rubric"]
+    assert "Outcomes and evidence quality" in merged["rubric"]
+    assert "Budget reasonableness" in merged["rubric"]

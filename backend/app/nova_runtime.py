@@ -137,7 +137,10 @@ class BedrockNovaOrchestrator:
             raise NovaRuntimeError(f"Bedrock invocation failed for model '{model_id}': {exc}") from exc
 
         text = self._extract_text(response)
-        payload = self._parse_json_object(text)
+        try:
+            payload = self._parse_json_object(text)
+        except Exception as exc:
+            raise NovaRuntimeError(f"Nova response parsing failed for model '{model_id}': {exc}") from exc
         if not isinstance(payload, dict):
             raise NovaRuntimeError("Nova response must be a JSON object.")
         return payload
@@ -172,7 +175,10 @@ class BedrockNovaOrchestrator:
         start = candidate.find("{")
         end = candidate.rfind("}")
         if start != -1 and end != -1 and end > start:
-            return json.loads(candidate[start : end + 1])
+            try:
+                return json.loads(candidate[start : end + 1])
+            except json.JSONDecodeError as exc:
+                raise NovaRuntimeError("Nova response contained malformed JSON content.") from exc
 
         raise NovaRuntimeError("Nova response was not valid JSON.")
 

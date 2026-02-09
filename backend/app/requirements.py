@@ -35,11 +35,25 @@ class RequirementsArtifact(BaseModel):
     disallowed_costs: list[str] = Field(default_factory=list)
 
 
-def _dedupe(items: list[str]) -> list[str]:
+def _coerce_text(item: object) -> str:
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        for key in ("text", "label", "name", "criterion", "title"):
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+        return ""
+    if isinstance(item, (int, float)):
+        return str(item)
+    return ""
+
+
+def _dedupe(items: list[object]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []
     for item in items:
-        value = " ".join(item.split()).strip(" -\t")
+        value = " ".join(_coerce_text(item).split()).strip(" -\t")
         if not value:
             continue
         lowered = value.lower()

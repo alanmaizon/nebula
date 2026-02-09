@@ -25,12 +25,23 @@ type IntakeContext = {
   sector_focus: string;
 };
 
+type SectionRunResult = {
+  sectionKey: string;
+  prompt: string;
+  retrieval: JsonValue;
+  draft: JsonValue;
+  coverage: JsonValue;
+  exportJson: JsonValue;
+  exportMarkdown: string;
+};
+
 type PipelineRunResult = {
   projectId: string;
   sectionKey: string;
   documentsIndexed: number;
   requirements: JsonValue;
   extraction: JsonValue | null;
+  sectionRuns: SectionRunResult[];
   retrieval: JsonValue;
   draft: JsonValue;
   coverage: JsonValue;
@@ -102,6 +113,41 @@ function readQuestionPrompts(requirements: JsonValue | null): string[] {
   return Array.from(new Set(prompts));
 }
 
+function deriveSectionKey(questionPrompt: string): string {
+  const trimmed = questionPrompt.trim();
+  if (!trimmed) {
+    return "Need Statement";
+  }
+  const head = trimmed.split(":")[0]?.trim() || trimmed;
+  const withoutTrailingLimit = head.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  const candidate = withoutTrailingLimit || head || trimmed;
+  return candidate.slice(0, 120).trim();
+}
+
+function buildSectionTargets(questionPrompts: string[]): Array<{ prompt: string; sectionKey: string }> {
+  const prompts = questionPrompts.length > 0 ? questionPrompts : ["Need Statement"];
+  const targets: Array<{ prompt: string; sectionKey: string }> = [];
+  const seen: Record<string, number> = {};
+  for (const prompt of prompts) {
+    const normalizedPrompt = prompt.trim();
+    if (!normalizedPrompt) {
+      continue;
+    }
+    const baseKey = deriveSectionKey(normalizedPrompt);
+    const existing = seen[baseKey] ?? 0;
+    seen[baseKey] = existing + 1;
+    const sectionKey =
+      existing === 0 ? baseKey : `${baseKey.slice(0, Math.max(1, 118 - String(existing + 1).length))} ${existing + 1}`;
+    targets.push({ prompt: normalizedPrompt, sectionKey });
+  }
+  return targets;
+}
+
+function fileSafeSectionKey(sectionKey: string): string {
+  const cleaned = sectionKey.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return cleaned || "section";
+}
+
 export default function HomePage() {
   const [showWorkspace, setShowWorkspace] = useState(false);
 
@@ -124,6 +170,7 @@ export default function HomePage() {
   const [, setStages] = useState<Record<StageId, StageInfo>>(emptyPipelineStages());
   const [result, setResult] = useState<PipelineRunResult | null>(null);
   const [activePane, setActivePane] = useState<ResultPane>("requirements");
+  const [activeSectionKey, setActiveSectionKey] = useState<string>("");
 
   const [requirementsView, setRequirementsView] = useState<ViewMode>("summary");
   const [retrievalView, setRetrievalView] = useState<ViewMode>("summary");
@@ -229,6 +276,7 @@ export default function HomePage() {
     setRunError(null);
     setResult(null);
     setActivePane("requirements");
+    setActiveSectionKey("");
     setActivityFeed([]);
     resetStages();
 
@@ -250,85 +298,100 @@ export default function HomePage() {
       const extraction = (requirementsPayload.extraction as JsonValue) ?? null;
       const questionPrompts = readQuestionPrompts(requirements);
       setStage("extract", "done", `Extracted ${questionPrompts.length} question(s).`);
+      const sectionTargets = buildSectionTargets(questionPrompts);
+      appendFeed(`Orchestrating ${sectionTargets.length} section(s).`);
 
-      const selectedSection = questionPrompts[0]?.trim() || "Need Statement";
-      appendFeed(`Auto-selected section: ${selectedSection}`);
+      const sectionRuns: SectionRunResult[] = [];
+      for (const [index, target] of sectionTargets.entries()) {
+        const ordinal = `${index + 1}/${sectionTargets.length}`;
+        appendFeed(`Section ${ordinal}: ${target.sectionKey}`);
 
-      failedStage = "retrieve";
-      setActivePane("retrieval");
-      setStage("retrieve", "running", `Retrieving evidence for "${selectedSection}"...`);
-      const retrievalResponse = await fetch(`${apiBase}/projects/${currentProjectId}/retrieve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: selectedSection, top_k: 6 }),
-      });
-      const retrievalPayload = await parseJsonResponse(retrievalResponse);
-      const retrieval = retrievalPayload as JsonValue;
-      const retrievalCount = Array.isArray(retrievalPayload.results) ? retrievalPayload.results.length : 0;
-      setStage("retrieve", "done", `Retrieved ${retrievalCount} evidence chunk(s).`);
+        failedStage = "retrieve";
+        setActivePane("retrieval");
+        setStage("retrieve", "running", `Retrieving evidence for "${target.sectionKey}" (${ordinal})...`);
+        const retrievalResponse = await fetch(`${apiBase}/projects/${currentProjectId}/retrieve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: target.prompt, top_k: 6 }),
+        });
+        const retrievalPayload = await parseJsonResponse(retrievalResponse);
+        const retrieval = retrievalPayload as JsonValue;
+        const retrievalCount = Array.isArray(retrievalPayload.results) ? retrievalPayload.results.length : 0;
+        setStage("retrieve", "done", `Retrieved ${retrievalCount} evidence chunk(s) for ${target.sectionKey}.`);
 
-      failedStage = "draft";
-      setActivePane("draft");
-      setStage("draft", "running", "Generating cited draft...");
-      const draftResponse = await fetch(`${apiBase}/projects/${currentProjectId}/generate-section`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section_key: selectedSection }),
-      });
-      const draftPayload = await parseJsonResponse(draftResponse);
-      const draft = draftPayload.draft as JsonValue;
-      const draftRecord = asRecord(draft);
-      const paragraphs = Array.isArray(draftRecord?.paragraphs) ? draftRecord.paragraphs.length : 0;
-      setStage("draft", "done", `Draft generated with ${paragraphs} paragraph(s).`);
+        failedStage = "draft";
+        setActivePane("draft");
+        setStage("draft", "running", `Generating cited draft for "${target.sectionKey}" (${ordinal})...`);
+        const draftResponse = await fetch(`${apiBase}/projects/${currentProjectId}/generate-section`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section_key: target.sectionKey }),
+        });
+        const draftPayload = await parseJsonResponse(draftResponse);
+        const draft = draftPayload.draft as JsonValue;
+        const draftRecord = asRecord(draft);
+        const paragraphs = Array.isArray(draftRecord?.paragraphs) ? draftRecord.paragraphs.length : 0;
+        setStage("draft", "done", `${target.sectionKey}: ${paragraphs} paragraph(s).`);
 
-      failedStage = "coverage";
-      setActivePane("coverage");
-      setStage("coverage", "running", "Computing coverage matrix...");
-      const coverageResponse = await fetch(`${apiBase}/projects/${currentProjectId}/coverage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section_key: selectedSection }),
-      });
-      const coveragePayload = await parseJsonResponse(coverageResponse);
-      const coverage = coveragePayload.coverage as JsonValue;
-      const coverageRecord = asRecord(coverage);
-      const coverageItems = Array.isArray(coverageRecord?.items) ? coverageRecord.items.length : 0;
-      setStage("coverage", "done", `Coverage computed for ${coverageItems} item(s).`);
+        failedStage = "coverage";
+        setActivePane("coverage");
+        setStage("coverage", "running", `Computing coverage for "${target.sectionKey}" (${ordinal})...`);
+        const coverageResponse = await fetch(`${apiBase}/projects/${currentProjectId}/coverage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section_key: target.sectionKey }),
+        });
+        const coveragePayload = await parseJsonResponse(coverageResponse);
+        const coverage = coveragePayload.coverage as JsonValue;
 
-      failedStage = "export";
-      setActivePane("export");
-      setStage("export", "running", "Generating JSON and Markdown exports...");
-      const exportJsonResponse = await fetch(
-        `${apiBase}/projects/${currentProjectId}/export?format=json&section_key=${encodeURIComponent(selectedSection)}`
-      );
-      if (!exportJsonResponse.ok) {
-        const fallback = await exportJsonResponse.text();
-        throw new Error(fallback || `JSON export failed (${exportJsonResponse.status})`);
+        failedStage = "export";
+        setActivePane("export");
+        setStage("export", "running", `Generating exports for "${target.sectionKey}" (${ordinal})...`);
+        const exportJsonResponse = await fetch(
+          `${apiBase}/projects/${currentProjectId}/export?format=json&section_key=${encodeURIComponent(target.sectionKey)}`
+        );
+        if (!exportJsonResponse.ok) {
+          const fallback = await exportJsonResponse.text();
+          throw new Error(fallback || `JSON export failed (${exportJsonResponse.status})`);
+        }
+        const exportJson = (await exportJsonResponse.json()) as JsonValue;
+
+        const exportMarkdownResponse = await fetch(
+          `${apiBase}/projects/${currentProjectId}/export?format=markdown&section_key=${encodeURIComponent(target.sectionKey)}`
+        );
+        if (!exportMarkdownResponse.ok) {
+          const fallback = await exportMarkdownResponse.text();
+          throw new Error(fallback || `Markdown export failed (${exportMarkdownResponse.status})`);
+        }
+        const exportMarkdown = await exportMarkdownResponse.text();
+
+        sectionRuns.push({
+          sectionKey: target.sectionKey,
+          prompt: target.prompt,
+          retrieval,
+          draft,
+          coverage,
+          exportJson,
+          exportMarkdown,
+        });
       }
-      const exportJson = (await exportJsonResponse.json()) as JsonValue;
+      setStage("export", "done", `JSON + Markdown exports ready for ${sectionRuns.length} section(s).`);
 
-      const exportMarkdownResponse = await fetch(
-        `${apiBase}/projects/${currentProjectId}/export?format=markdown&section_key=${encodeURIComponent(selectedSection)}`
-      );
-      if (!exportMarkdownResponse.ok) {
-        const fallback = await exportMarkdownResponse.text();
-        throw new Error(fallback || `Markdown export failed (${exportMarkdownResponse.status})`);
-      }
-      const exportMarkdown = await exportMarkdownResponse.text();
-      setStage("export", "done", "JSON + Markdown exports ready.");
-
+      const primarySection = sectionRuns[0];
       setResult({
         projectId: currentProjectId,
-        sectionKey: selectedSection,
+        sectionKey: primarySection?.sectionKey ?? "Need Statement",
         documentsIndexed,
         requirements,
         extraction,
-        retrieval,
-        draft,
-        coverage,
-        exportJson,
-        exportMarkdown,
+        sectionRuns,
+        retrieval: primarySection?.retrieval ?? null,
+        draft: primarySection?.draft ?? null,
+        coverage: primarySection?.coverage ?? null,
+        exportJson: primarySection?.exportJson ?? null,
+        exportMarkdown: primarySection?.exportMarkdown ?? "",
       });
+      setActiveSectionKey(primarySection?.sectionKey ?? "");
       setFiles([]);
       appendFeed("Run complete.");
       setRunStatus("success");
@@ -381,14 +444,14 @@ export default function HomePage() {
   }
 
   function downloadJson() {
-    if (!result?.exportJson) {
+    if (!result || !currentSectionRun?.exportJson) {
       return;
     }
-    const blob = new Blob([JSON.stringify(result.exportJson, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(currentSectionRun.exportJson, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `nebula-${result.projectId}.json`;
+    link.download = `nebula-${result.projectId}-${fileSafeSectionKey(currentSectionRun.sectionKey)}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -396,19 +459,36 @@ export default function HomePage() {
   }
 
   function downloadMarkdown() {
-    if (!result?.exportMarkdown) {
+    if (!result || !currentSectionRun?.exportMarkdown) {
       return;
     }
-    const blob = new Blob([result.exportMarkdown], { type: "text/markdown" });
+    const blob = new Blob([currentSectionRun.exportMarkdown], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `nebula-${result.projectId}.md`;
+    link.download = `nebula-${result.projectId}-${fileSafeSectionKey(currentSectionRun.sectionKey)}.md`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
   }
+
+  const sectionOptions = useMemo(() => {
+    if (!result) {
+      return [];
+    }
+    return result.sectionRuns.map((section) => section.sectionKey);
+  }, [result]);
+
+  const currentSectionRun = useMemo(() => {
+    if (!result || result.sectionRuns.length === 0) {
+      return null;
+    }
+    if (!activeSectionKey) {
+      return result.sectionRuns[0];
+    }
+    return result.sectionRuns.find((section) => section.sectionKey === activeSectionKey) ?? result.sectionRuns[0];
+  }, [result, activeSectionKey]);
 
   const requirementsSummary = useMemo(() => {
     if (!result) {
@@ -456,7 +536,7 @@ export default function HomePage() {
     if (!result) {
       return [];
     }
-    const retrievalRecord = asRecord(result.retrieval);
+    const retrievalRecord = currentSectionRun ? asRecord(currentSectionRun.retrieval) : null;
     if (!retrievalRecord) {
       return [];
     }
@@ -465,6 +545,7 @@ export default function HomePage() {
     const query = typeof retrievalRecord.query === "string" ? retrievalRecord.query : "Unknown";
     const results = Array.isArray(retrievalRecord.results) ? retrievalRecord.results : [];
 
+    lines.push(`Section: ${currentSectionRun?.sectionKey ?? "Unknown"}`);
     lines.push(`Query: ${query}`);
     lines.push(`Evidence chunks: ${results.length}`);
     for (const [index, item] of results.slice(0, 6).entries()) {
@@ -478,13 +559,13 @@ export default function HomePage() {
       lines.push(`${index + 1}. ${fileName} (${page}) score=${score}`);
     }
     return lines;
-  }, [result]);
+  }, [result, currentSectionRun]);
 
   const draftSummary = useMemo(() => {
     if (!result) {
       return [];
     }
-    const draftRecord = asRecord(result.draft);
+    const draftRecord = currentSectionRun ? asRecord(currentSectionRun.draft) : null;
     if (!draftRecord) {
       return [];
     }
@@ -523,13 +604,13 @@ export default function HomePage() {
       lines.push(`Missing evidence items: ${missingEvidence.length}`);
     }
     return lines;
-  }, [result]);
+  }, [result, currentSectionRun]);
 
   const coverageSummary = useMemo(() => {
     if (!result) {
       return [];
     }
-    const coverageRecord = asRecord(result.coverage);
+    const coverageRecord = currentSectionRun ? asRecord(currentSectionRun.coverage) : null;
     if (!coverageRecord) {
       return [];
     }
@@ -559,18 +640,19 @@ export default function HomePage() {
     lines.push(`Partial: ${partial}`);
     lines.push(`Missing: ${missing}`);
     return lines;
-  }, [result]);
+  }, [result, currentSectionRun]);
 
   const exportSummary = useMemo(() => {
     if (!result) {
       return [];
     }
-    const exportRecord = asRecord(result.exportJson);
+    const exportRecord = currentSectionRun ? asRecord(currentSectionRun.exportJson) : null;
     const lines: string[] = [];
     lines.push(`Project ID: ${result.projectId}`);
-    lines.push(`Section: ${result.sectionKey}`);
+    lines.push(`Sections generated: ${result.sectionRuns.length}`);
+    lines.push(`Section: ${currentSectionRun?.sectionKey ?? "Unknown"}`);
     lines.push(`Documents indexed: ${result.documentsIndexed}`);
-    lines.push(`Markdown length: ${result.exportMarkdown.length}`);
+    lines.push(`Markdown length: ${currentSectionRun?.exportMarkdown.length ?? 0}`);
     if (exportRecord) {
       lines.push("JSON export includes:");
       lines.push(`- requirements: ${exportRecord.requirements !== undefined ? "yes" : "no"}`);
@@ -578,7 +660,7 @@ export default function HomePage() {
       lines.push(`- coverage: ${exportRecord.coverage !== undefined ? "yes" : "no"}`);
     }
     return lines;
-  }, [result]);
+  }, [result, currentSectionRun]);
 
   if (!showWorkspace) {
     return (
@@ -717,7 +799,7 @@ export default function HomePage() {
             )}
 
             <button type="button" className="primary-button" onClick={runWorkspacePipeline} disabled={isRunning}>
-              {isRunning ? "Generating..." : "Start Generation"}
+              {isRunning ? "Generating..." : "Generate All Sections"}
             </button>
 
             <div className="meta-row">
@@ -808,6 +890,23 @@ export default function HomePage() {
                   {activePane === "retrieval" ? (
                     <>
                       <h3>Retrieval</h3>
+                      {sectionOptions.length > 1 ? (
+                        <div className="field">
+                          <label htmlFor="section-picker-retrieval">Section</label>
+                          <select
+                            id="section-picker-retrieval"
+                            className="input"
+                            value={currentSectionRun?.sectionKey ?? ""}
+                            onChange={(e) => setActiveSectionKey(e.target.value)}
+                          >
+                            {sectionOptions.map((sectionKey) => (
+                              <option key={sectionKey} value={sectionKey}>
+                                {sectionKey}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
                       <SegmentedToggle
                         label="View mode"
                         value={retrievalView}
@@ -820,7 +919,7 @@ export default function HomePage() {
                       {retrievalView === "summary" ? (
                         <pre className="code-block">{retrievalSummary.join("\n") || "No retrieval results."}</pre>
                       ) : (
-                        <pre className="code-block">{JSON.stringify(result.retrieval, null, 2)}</pre>
+                        <pre className="code-block">{JSON.stringify(currentSectionRun?.retrieval ?? null, null, 2)}</pre>
                       )}
                     </>
                   ) : null}
@@ -828,6 +927,23 @@ export default function HomePage() {
                   {activePane === "draft" ? (
                     <>
                       <h3>Draft</h3>
+                      {sectionOptions.length > 1 ? (
+                        <div className="field">
+                          <label htmlFor="section-picker-draft">Section</label>
+                          <select
+                            id="section-picker-draft"
+                            className="input"
+                            value={currentSectionRun?.sectionKey ?? ""}
+                            onChange={(e) => setActiveSectionKey(e.target.value)}
+                          >
+                            {sectionOptions.map((sectionKey) => (
+                              <option key={sectionKey} value={sectionKey}>
+                                {sectionKey}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
                       <SegmentedToggle
                         label="View mode"
                         value={draftView}
@@ -840,7 +956,7 @@ export default function HomePage() {
                       {draftView === "summary" ? (
                         <pre className="code-block">{draftSummary.join("\n") || "No draft generated."}</pre>
                       ) : (
-                        <pre className="code-block">{JSON.stringify(result.draft, null, 2)}</pre>
+                        <pre className="code-block">{JSON.stringify(currentSectionRun?.draft ?? null, null, 2)}</pre>
                       )}
                     </>
                   ) : null}
@@ -848,6 +964,23 @@ export default function HomePage() {
                   {activePane === "coverage" ? (
                     <>
                       <h3>Coverage</h3>
+                      {sectionOptions.length > 1 ? (
+                        <div className="field">
+                          <label htmlFor="section-picker-coverage">Section</label>
+                          <select
+                            id="section-picker-coverage"
+                            className="input"
+                            value={currentSectionRun?.sectionKey ?? ""}
+                            onChange={(e) => setActiveSectionKey(e.target.value)}
+                          >
+                            {sectionOptions.map((sectionKey) => (
+                              <option key={sectionKey} value={sectionKey}>
+                                {sectionKey}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
                       <SegmentedToggle
                         label="View mode"
                         value={coverageView}
@@ -860,7 +993,7 @@ export default function HomePage() {
                       {coverageView === "summary" ? (
                         <pre className="code-block">{coverageSummary.join("\n") || "No coverage generated."}</pre>
                       ) : (
-                        <pre className="code-block">{JSON.stringify(result.coverage, null, 2)}</pre>
+                        <pre className="code-block">{JSON.stringify(currentSectionRun?.coverage ?? null, null, 2)}</pre>
                       )}
                     </>
                   ) : null}
@@ -868,6 +1001,23 @@ export default function HomePage() {
                   {activePane === "export" ? (
                     <>
                       <h3>Export</h3>
+                      {sectionOptions.length > 1 ? (
+                        <div className="field">
+                          <label htmlFor="section-picker-export">Section</label>
+                          <select
+                            id="section-picker-export"
+                            className="input"
+                            value={currentSectionRun?.sectionKey ?? ""}
+                            onChange={(e) => setActiveSectionKey(e.target.value)}
+                          >
+                            {sectionOptions.map((sectionKey) => (
+                              <option key={sectionKey} value={sectionKey}>
+                                {sectionKey}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
                       <pre className="code-block">{exportSummary.join("\n")}</pre>
                       <div className="action-row">
                         <button type="button" className="primary-button" onClick={downloadJson}>
@@ -878,9 +1028,9 @@ export default function HomePage() {
                         </button>
                       </div>
                       <pre className="code-block">
-                        {result.exportMarkdown.length > 1400
-                          ? `${result.exportMarkdown.slice(0, 1397)}...`
-                          : result.exportMarkdown}
+                        {(currentSectionRun?.exportMarkdown.length ?? 0) > 1400
+                          ? `${currentSectionRun?.exportMarkdown.slice(0, 1397)}...`
+                          : currentSectionRun?.exportMarkdown ?? ""}
                       </pre>
                     </>
                   ) : null}

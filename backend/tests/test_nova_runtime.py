@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from app.config import settings
-from app.nova_runtime import BedrockNovaOrchestrator
+from app.nova_runtime import BedrockNovaOrchestrator, NovaRuntimeError
 
 
 class FakeBedrockClient:
@@ -61,3 +63,31 @@ def test_nova_orchestrator_uses_expected_models() -> None:
     assert client.calls[0]["modelId"] == settings.bedrock_model_id
     assert client.calls[1]["modelId"] == settings.bedrock_model_id
     assert client.calls[2]["modelId"] == settings.bedrock_lite_model_id
+
+
+def test_nova_orchestrator_wraps_malformed_json_parse_errors() -> None:
+    class MalformedJsonClient:
+        def converse(self, **kwargs):
+            return {
+                "output": {
+                    "message": {
+                        "content": [
+                            {
+                                "text": "result follows {\"funder\":\"City\", this is malformed } trailing text"
+                            }
+                        ]
+                    }
+                }
+            }
+
+    orchestrator = BedrockNovaOrchestrator(settings=settings, client=MalformedJsonClient())
+    with pytest.raises(NovaRuntimeError, match="parsing failed"):
+        orchestrator.extract_requirements(
+            [
+                {
+                    "file_name": "rfp.txt",
+                    "page": 1,
+                    "text": "Question 1: Describe outcomes. Limit 250 words.",
+                }
+            ]
+        )
