@@ -16,16 +16,17 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
-- Last updated: `2026-02-08`
-- Overall completion: `88%`
-- Current milestone: `Week 4 - Submission Asset Packaging (In progress)`
+- Last updated: `2026-02-09`
+- Overall completion: `92%`
+- Current milestone: `Step 7 - Export and UX (active polish)`
 
 ### Done This Week
-- Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices
+- Added pre-ingest intake + template recommendation flow
+- Added template-gated pipeline UX and summary/json toggles across artifacts
 
 ### Next Up
+- Final polish of landing and navigation ergonomics
 - Produce and publish the 3-minute demo video with #AmazonNova and functional footage
-- Prepare public demo/test access instructions and fallback credentials path
 
 ### Current Blockers
 - No blockers recorded.
@@ -36,7 +37,7 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 2. Nebula extracts requirements (questions, limits, attachments, eligibility).
 3. Generate a section (e.g., Need Statement) with sentence-level citations.
 4. Review missing evidence flags + coverage matrix.
-5. Export JSON + Markdown/Docx draft.
+5. Export JSON + Markdown artifacts.
 
 ---
 
@@ -47,6 +48,8 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 - **Cited Drafting** → sections generated with citations (doc_id, page, snippet)
 - **Coverage Matrix** → requirement status: met / partial / missing, with pointers
 - **Validation** → JSON schema validation + basic numeric consistency checks
+- **Pre-Ingest Intake Wizard** → project setup context captured before ingest
+- **Template Recommendation** → deterministic recommendation with rationale/checklist
 
 ### Stretch goals
 - **Reviewer Mode** → rubric-aligned critique + score estimate
@@ -56,14 +59,15 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 ---
 
 ## Architecture (high level)
-- **Frontend:** Next.js (upload, editor, evidence sidebar, exports)
+- **Frontend:** Next.js (landing, intake wizard, workflow controls, artifact review)
 - **Backend:** FastAPI (ingestion, parsing, orchestration)
-- **Storage:** S3 for uploads, Postgres/DynamoDB for metadata (choose one)
-- **Retrieval:** embeddings + vector store (OpenSearch / pgvector / local FAISS)
+- **Storage (current default):** local filesystem + SQLite
+- **Storage (target options):** S3 for uploads, managed metadata store
+- **Retrieval:** local embedding similarity over indexed chunks (MVP baseline)
 - **Model:** Amazon Nova via Amazon Bedrock (requirements extraction + drafting + review)
 
 ### Data flow
-1. Upload documents → store originals (S3) + parse to text
+1. Upload documents → store originals (local filesystem by default) + parse to text
 2. Chunk text → embed → index
 3. Extract RFP requirements → `requirements.json`
 4. For each section:
@@ -219,6 +223,10 @@ Deployment note:
 * `POST /projects` → create a project
 * `POST /projects/{id}/upload` → upload one or more source files
 * `GET /projects/{id}/documents` → list uploaded document metadata
+* `POST /projects/{id}/intake` → persist pre-ingest intake payload
+* `GET /projects/{id}/intake` → fetch latest intake payload
+* `POST /projects/{id}/template-recommendation` → create template recommendation from intake
+* `GET /projects/{id}/template-recommendation/latest` → fetch latest recommendation
 * `POST /projects/{id}/retrieve` → semantic retrieval over indexed chunks
 * `POST /projects/{id}/extract-requirements` → generate validated `requirements` artifact
 * `GET /projects/{id}/requirements/latest` → fetch latest requirements artifact
@@ -254,7 +262,7 @@ If a claim cannot be supported, Nebula must:
 ## Safety & privacy
 
 * Only the minimum necessary text is sent to the model.
-* Original files remain in your controlled storage (S3/local).
+* Original files remain in your controlled storage (local filesystem by default; S3 optional).
 * Optional redaction hooks can mask PII before LLM calls.
 * Structured logs include correlation IDs and redact sensitive fields/patterns.
 

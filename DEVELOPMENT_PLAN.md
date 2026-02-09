@@ -249,7 +249,7 @@ Exit criteria:
 - Evidence pack includes deterministic test evidence plus at least one credentialed Bedrock runtime run.
 
 Documentation:
-- `NEBULA.md` issue-level migration checklist and verification plan
+- `README.md` issue-level migration checklist and verification plan
 - `ARCHITECTURE.md` updated agent/orchestrator flow
 - `README.md` runtime config and demo execution updates
 - `AWS_ALIGNMENT.md` Nova compliance evidence references
