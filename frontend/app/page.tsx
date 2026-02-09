@@ -425,7 +425,6 @@ export default function HomePage() {
         <div className="hero">
           <div className="arc" aria-hidden="true" />
           <div className="grain" aria-hidden="true" />
-          <img src="/icon.png" alt="Nebula icon" className="hero-logo" />
           <h1 className="title">Nebula</h1>
           <button
             type="button"
