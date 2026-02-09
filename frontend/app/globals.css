@@ -232,7 +232,7 @@ input {
 
 .workspace-heading-inline {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -362,8 +362,8 @@ input {
 
 .primary-button,
 .secondary-button {
-  border-radius: 10px;
-  padding: 10px 14px;
+  border-radius: 999px;
+  padding: 12px 24px;
   cursor: pointer;
   font-weight: 700;
   border: 1px solid transparent;
