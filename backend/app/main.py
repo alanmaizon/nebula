@@ -10,7 +10,10 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.coverage import validate_with_repair as validate_coverage_with_repair
+from app.coverage import (
+    normalize_coverage_payload,
+    validate_with_repair as validate_coverage_with_repair,
+)
 from app.db import (
     create_chunks,
     create_coverage_artifact,
@@ -461,6 +464,10 @@ def create_app() -> FastAPI:
                 status_code=502,
                 detail={"message": "Nova coverage computation failed.", "error": str(exc)},
             ) from exc
+        coverage_payload = normalize_coverage_payload(
+            requirements=requirements_artifact["payload"],
+            payload=coverage_payload,
+        )
         validated, repaired, validation_errors = validate_coverage_with_repair(coverage_payload)
         if validated is None:
             raise HTTPException(

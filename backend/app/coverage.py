@@ -20,6 +20,116 @@ class CoverageArtifact(BaseModel):
     items: list[CoverageItem] = Field(default_factory=list)
 
 
+def _normalize_text(value: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
+
+
+def _build_requirement_catalog(requirements: dict[str, object]) -> tuple[dict[str, str], dict[str, str]]:
+    canonical: dict[str, str] = {}
+    aliases: dict[str, str] = {}
+
+    questions = requirements.get("questions", [])
+    if isinstance(questions, list):
+        for index, question in enumerate(questions, start=1):
+            if not isinstance(question, dict):
+                continue
+            prompt = str(question.get("prompt", "")).strip()
+            if not prompt:
+                continue
+            raw_id = str(question.get("id", "")).strip()
+            identifier = raw_id or f"Q{index}"
+            canonical[identifier] = prompt
+
+            aliases[_normalize_text(identifier)] = identifier
+            aliases[_normalize_text(prompt)] = identifier
+
+            digits_match = re.fullmatch(r"[Qq]?(\d+)", identifier)
+            if digits_match:
+                number = digits_match.group(1)
+                aliases[_normalize_text(number)] = identifier
+                aliases[_normalize_text(f"question {number}")] = identifier
+
+    attachments = requirements.get("required_attachments", [])
+    if isinstance(attachments, list):
+        attachment_index = 1
+        for attachment in attachments:
+            attachment_text = str(attachment).strip()
+            if not attachment_text:
+                continue
+            identifier = f"A{attachment_index}"
+            attachment_index += 1
+            canonical[identifier] = attachment_text
+            aliases[_normalize_text(identifier)] = identifier
+            aliases[_normalize_text(attachment_text)] = identifier
+
+    return canonical, aliases
+
+
+def normalize_coverage_payload(
+    requirements: dict[str, object],
+    payload: dict[str, object],
+) -> dict[str, object]:
+    canonical, aliases = _build_requirement_catalog(requirements)
+    items = payload.get("items", [])
+    if not isinstance(items, list):
+        items = []
+
+    normalized_items: list[dict[str, object]] = []
+    seen_ids: set[str] = set()
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        raw_requirement_id = str(item.get("requirement_id", "")).strip()
+        if not raw_requirement_id:
+            continue
+
+        alias_key = _normalize_text(raw_requirement_id)
+        requirement_id = aliases.get(alias_key, raw_requirement_id)
+        status = str(item.get("status", "")).strip()
+        notes = str(item.get("notes", "")).strip()
+        refs = item.get("evidence_refs", [])
+        if not isinstance(refs, list):
+            refs = []
+
+        if not notes:
+            notes = "Coverage note unavailable."
+        if status not in {"met", "partial", "missing"}:
+            status = "missing"
+
+        existing_index = next(
+            (index for index, existing in enumerate(normalized_items) if existing["requirement_id"] == requirement_id),
+            None,
+        )
+        if existing_index is not None:
+            continue
+
+        normalized_items.append(
+            {
+                "requirement_id": requirement_id,
+                "status": status,
+                "notes": notes,
+                "evidence_refs": [str(ref) for ref in refs],
+            }
+        )
+        seen_ids.add(requirement_id)
+
+    for requirement_id, requirement_text in canonical.items():
+        if requirement_id in seen_ids:
+            continue
+        normalized_items.append(
+            {
+                "requirement_id": requirement_id,
+                "status": "missing",
+                "notes": f"No coverage item returned for requirement: {requirement_text}",
+                "evidence_refs": [],
+            }
+        )
+
+    return {"items": normalized_items}
+
+
 def _tokens(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", text.lower()))
 
