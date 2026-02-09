@@ -43,7 +43,13 @@ def test_intake_and_template_recommendation_roundtrip(tmp_path: Path) -> None:
         assert len(payload["rationale"]) >= 1
         assert len(payload["required_checklist"]) >= 1
 
+        latest_recommendation = client.get(f"/projects/{project_id}/template-recommendation/latest")
+        assert latest_recommendation.status_code == 200
+        assert latest_recommendation.json()["recommendation"]["template_key"] == "irish_heritage_grant"
+
         export_json = client.get(f"/projects/{project_id}/export?format=json&section_key=Need Statement")
         assert export_json.status_code == 200
         assert export_json.json()["intake"] is not None
         assert export_json.json()["template_recommendation"] is not None
+        assert export_json.json()["template_metadata"]["template_key"] == "irish_heritage_grant"
+        assert export_json.json()["template_metadata"]["locked_at"] is not None

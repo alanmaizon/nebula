@@ -361,6 +361,26 @@ def create_app() -> FastAPI:
             "artifact": artifact_meta,
         }
 
+    @app.get("/projects/{project_id}/template-recommendation/latest")
+    def get_latest_template_recommendation(project_id: str) -> dict[str, object]:
+        project = get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        latest = get_latest_template_recommendation_artifact(project_id)
+        if latest is None:
+            raise HTTPException(status_code=404, detail="No template recommendation artifact found for project")
+
+        return {
+            "project_id": project_id,
+            "recommendation": latest["payload"],
+            "artifact": {
+                "id": latest["id"],
+                "source": latest["source"],
+                "created_at": latest["created_at"],
+            },
+        }
+
     @app.post("/projects/{project_id}/retrieve")
     def retrieve_project_chunks(project_id: str, payload: RetrievalRequest) -> dict[str, object]:
         project = get_project(project_id)
@@ -617,6 +637,12 @@ def create_app() -> FastAPI:
         template_reco_payload = template_reco_artifact["payload"] if template_reco_artifact else None
 
         if format == "json":
+            template_metadata = None
+            if template_reco_artifact is not None:
+                template_metadata = {
+                    "template_key": template_reco_payload.get("template_key") if isinstance(template_reco_payload, dict) else None,
+                    "locked_at": template_reco_artifact["created_at"],
+                }
             return {
                 "project_id": project_id,
                 "section_key": section_key,
@@ -625,6 +651,7 @@ def create_app() -> FastAPI:
                 "coverage": coverage_payload,
                 "intake": intake_payload,
                 "template_recommendation": template_reco_payload,
+                "template_metadata": template_metadata,
             }
 
         markdown = render_markdown_export(

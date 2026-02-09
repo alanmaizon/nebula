@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -32,6 +32,7 @@ export default function HomePage() {
   });
 
   const isBusy = useMemo(() => loadingAction !== null, [loadingAction]);
+  const isTemplateLocked = recommendation !== null;
 
   async function runAction(actionName: string, fn: () => Promise<void>) {
     setLoadingAction(actionName);
@@ -64,6 +65,7 @@ export default function HomePage() {
       });
       const payload = await parseJsonResponse(response);
       setProjectId(String(payload.id));
+      setRecommendation(null);
     });
   }
 
@@ -73,6 +75,9 @@ export default function HomePage() {
     }
     if (!selectedFiles || selectedFiles.length === 0) {
       throw new Error("Select one or more files before uploading.");
+    }
+    if (!isTemplateLocked) {
+      throw new Error("Complete intake and lock a template recommendation before ingest.");
     }
     await runAction("Uploading files", async () => {
       const formData = new FormData();
@@ -89,6 +94,9 @@ export default function HomePage() {
     if (!projectId) {
       throw new Error("Create a project first.");
     }
+    if (!isTemplateLocked) {
+      throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
+    }
     await runAction("Extracting requirements", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/extract-requirements`, {
         method: "POST",
@@ -101,6 +109,9 @@ export default function HomePage() {
   async function generateSection() {
     if (!projectId) {
       throw new Error("Create a project first.");
+    }
+    if (!isTemplateLocked) {
+      throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
     }
     await runAction("Generating section", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/generate-section`, {
@@ -117,6 +128,9 @@ export default function HomePage() {
     if (!projectId) {
       throw new Error("Create a project first.");
     }
+    if (!isTemplateLocked) {
+      throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
+    }
     await runAction("Computing coverage", async () => {
       const response = await fetch(`${apiBase}/projects/${projectId}/coverage`, {
         method: "POST",
@@ -131,6 +145,9 @@ export default function HomePage() {
   async function exportArtifacts(format: "json" | "markdown") {
     if (!projectId) {
       throw new Error("Create a project first.");
+    }
+    if (!isTemplateLocked) {
+      throw new Error("Complete intake and lock a template recommendation before export.");
     }
     await runAction(`Exporting ${format}`, async () => {
       const response = await fetch(
@@ -180,6 +197,33 @@ export default function HomePage() {
       setRecommendation(payload.recommendation as JsonValue);
     });
   }
+
+  async function loadLatestTemplateRecommendation(currentProjectId: string) {
+    if (!currentProjectId) {
+      return;
+    }
+    const response = await fetch(`${apiBase}/projects/${currentProjectId}/template-recommendation/latest`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        setRecommendation(null);
+        return;
+      }
+      const fallback = await response.text();
+      throw new Error(fallback || `Template recommendation lookup failed (${response.status})`);
+    }
+    const payload = (await response.json()) as Record<string, unknown>;
+    setRecommendation(payload.recommendation as JsonValue);
+  }
+
+  useEffect(() => {
+    if (!projectId) {
+      setRecommendation(null);
+      return;
+    }
+    runAction("Loading template recommendation", async () => {
+      await loadLatestTemplateRecommendation(projectId);
+    });
+  }, [projectId]);
 
   return (
     <main className="stack">
@@ -316,13 +360,16 @@ export default function HomePage() {
 
       <section className="card stack">
         <h2>Documents</h2>
+        {!isTemplateLocked ? (
+          <p className="notice">Complete intake and click “Recommend Template” before uploading documents.</p>
+        ) : null}
         <input
           type="file"
           multiple
           onChange={(e) => setSelectedFiles(e.target.files)}
           className="input"
         />
-        <button type="button" className="button" onClick={uploadFiles} disabled={isBusy}>
+        <button type="button" className="button" onClick={uploadFiles} disabled={isBusy || !isTemplateLocked}>
           Upload and Index Files
         </button>
       </section>
@@ -338,23 +385,28 @@ export default function HomePage() {
           />
         </div>
         <div className="row wrap">
-          <button type="button" className="button" onClick={extractRequirements} disabled={isBusy}>
+          <button type="button" className="button" onClick={extractRequirements} disabled={isBusy || !isTemplateLocked}>
             Extract Requirements
           </button>
-          <button type="button" className="button" onClick={generateSection} disabled={isBusy}>
+          <button type="button" className="button" onClick={generateSection} disabled={isBusy || !isTemplateLocked}>
             Generate Section
           </button>
-          <button type="button" className="button" onClick={computeCoverage} disabled={isBusy}>
+          <button type="button" className="button" onClick={computeCoverage} disabled={isBusy || !isTemplateLocked}>
             Compute Coverage
           </button>
-          <button type="button" className="button ghost" onClick={() => exportArtifacts("json")} disabled={isBusy}>
+          <button
+            type="button"
+            className="button ghost"
+            onClick={() => exportArtifacts("json")}
+            disabled={isBusy || !isTemplateLocked}
+          >
             Export JSON
           </button>
           <button
             type="button"
             className="button ghost"
             onClick={() => exportArtifacts("markdown")}
-            disabled={isBusy}
+            disabled={isBusy || !isTemplateLocked}
           >
             Export Markdown
           </button>
@@ -380,6 +432,7 @@ export default function HomePage() {
 
       <section className="card stack">
         <h2>Template Recommendation</h2>
+        {!isTemplateLocked ? <p className="notice">Template not locked yet.</p> : null}
         <pre className="code">{JSON.stringify(recommendation, null, 2)}</pre>
       </section>
     </main>
