@@ -17,6 +17,19 @@ export default function HomePage() {
   const [requirements, setRequirements] = useState<JsonValue>(null);
   const [draft, setDraft] = useState<JsonValue>(null);
   const [coverage, setCoverage] = useState<JsonValue>(null);
+  const [recommendation, setRecommendation] = useState<JsonValue>(null);
+  const [intake, setIntake] = useState({
+    country: "Ireland",
+    organization_type: "Non-profit",
+    charity_registered: false,
+    tax_registered: false,
+    has_group_bank_account: false,
+    funder_track: "community-foundation",
+    funding_goal: "project",
+    sector_focus: "general",
+    timeline_quarters: 4,
+    has_evidence_data: false,
+  });
 
   const isBusy = useMemo(() => loadingAction !== null, [loadingAction]);
 
@@ -139,6 +152,35 @@ export default function HomePage() {
     });
   }
 
+  async function saveIntake() {
+    if (!projectId) {
+      throw new Error("Create a project first.");
+    }
+    await runAction("Saving intake", async () => {
+      const response = await fetch(`${apiBase}/projects/${projectId}/intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(intake),
+      });
+      await parseJsonResponse(response);
+    });
+  }
+
+  async function generateTemplateRecommendation() {
+    if (!projectId) {
+      throw new Error("Create a project first.");
+    }
+    await runAction("Recommending template", async () => {
+      const response = await fetch(`${apiBase}/projects/${projectId}/template-recommendation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const payload = await parseJsonResponse(response);
+      setRecommendation(payload.recommendation as JsonValue);
+    });
+  }
+
   return (
     <main className="stack">
       <section className="hero-wrap">
@@ -180,6 +222,96 @@ export default function HomePage() {
           </button>
         </form>
         <p className="mono">Project ID: {projectId || "not created yet"}</p>
+      </section>
+
+      <section className="card stack">
+        <h2>Pre-Ingest Intake Wizard</h2>
+        <p>Capture grant context first so Nebula can recommend the best submission template.</p>
+        <div className="row wrap">
+          <input
+            value={intake.country}
+            onChange={(e) => setIntake((prev) => ({ ...prev, country: e.target.value }))}
+            placeholder="Country"
+            className="input"
+          />
+          <input
+            value={intake.organization_type}
+            onChange={(e) => setIntake((prev) => ({ ...prev, organization_type: e.target.value }))}
+            placeholder="Organization type"
+            className="input"
+          />
+          <input
+            value={intake.funder_track}
+            onChange={(e) => setIntake((prev) => ({ ...prev, funder_track: e.target.value }))}
+            placeholder="Funder track (community-foundation, government, eu)"
+            className="input"
+          />
+        </div>
+        <div className="row wrap">
+          <input
+            value={intake.funding_goal}
+            onChange={(e) => setIntake((prev) => ({ ...prev, funding_goal: e.target.value }))}
+            placeholder="Funding goal (project/core)"
+            className="input"
+          />
+          <input
+            value={intake.sector_focus}
+            onChange={(e) => setIntake((prev) => ({ ...prev, sector_focus: e.target.value }))}
+            placeholder="Sector focus (general, heritage, rural)"
+            className="input"
+          />
+          <input
+            type="number"
+            min={1}
+            max={12}
+            value={intake.timeline_quarters}
+            onChange={(e) => setIntake((prev) => ({ ...prev, timeline_quarters: Number(e.target.value) || 1 }))}
+            placeholder="Timeline quarters"
+            className="input"
+          />
+        </div>
+        <div className="row wrap">
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={intake.charity_registered}
+              onChange={(e) => setIntake((prev) => ({ ...prev, charity_registered: e.target.checked }))}
+            />
+            Charity registered
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={intake.tax_registered}
+              onChange={(e) => setIntake((prev) => ({ ...prev, tax_registered: e.target.checked }))}
+            />
+            Tax registered
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={intake.has_group_bank_account}
+              onChange={(e) => setIntake((prev) => ({ ...prev, has_group_bank_account: e.target.checked }))}
+            />
+            Group bank account
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={intake.has_evidence_data}
+              onChange={(e) => setIntake((prev) => ({ ...prev, has_evidence_data: e.target.checked }))}
+            />
+            Evidence dataset ready
+          </label>
+        </div>
+        <div className="row wrap">
+          <button type="button" className="button" onClick={saveIntake} disabled={isBusy}>
+            Save Intake
+          </button>
+          <button type="button" className="button ghost" onClick={generateTemplateRecommendation} disabled={isBusy}>
+            Recommend Template
+          </button>
+        </div>
       </section>
 
       <section className="card stack">
@@ -244,6 +376,11 @@ export default function HomePage() {
       <section className="card stack">
         <h2>Coverage</h2>
         <pre className="code">{JSON.stringify(coverage, null, 2)}</pre>
+      </section>
+
+      <section className="card stack">
+        <h2>Template Recommendation</h2>
+        <pre className="code">{JSON.stringify(recommendation, null, 2)}</pre>
       </section>
     </main>
   );

@@ -99,6 +99,30 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_coverage_project_id
                 ON coverage_artifacts(project_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS intake_artifacts (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_intake_project_id
+                ON intake_artifacts(project_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS template_recommendation_artifacts (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_template_reco_project_id
+                ON template_recommendation_artifacts(project_id, created_at DESC);
             """
         )
 
@@ -385,6 +409,100 @@ def get_latest_coverage_artifact(project_id: str) -> dict[str, object] | None:
             """
             SELECT id, project_id, payload_json, source, created_at
             FROM coverage_artifacts
+            WHERE project_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (project_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    parsed = dict(row)
+    parsed["payload"] = json.loads(parsed.pop("payload_json"))
+    return parsed
+
+
+def create_intake_artifact(
+    project_id: str,
+    payload: dict[str, object],
+    source: str,
+) -> dict[str, object]:
+    artifact = {
+        "id": str(uuid4()),
+        "project_id": project_id,
+        "payload_json": json.dumps(payload),
+        "source": source,
+        "created_at": _utc_now_iso(),
+    }
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO intake_artifacts (id, project_id, payload_json, source, created_at)
+            VALUES (:id, :project_id, :payload_json, :source, :created_at)
+            """,
+            artifact,
+        )
+    return {
+        "id": artifact["id"],
+        "project_id": artifact["project_id"],
+        "source": artifact["source"],
+        "created_at": artifact["created_at"],
+    }
+
+
+def get_latest_intake_artifact(project_id: str) -> dict[str, object] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, payload_json, source, created_at
+            FROM intake_artifacts
+            WHERE project_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (project_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    parsed = dict(row)
+    parsed["payload"] = json.loads(parsed.pop("payload_json"))
+    return parsed
+
+
+def create_template_recommendation_artifact(
+    project_id: str,
+    payload: dict[str, object],
+    source: str,
+) -> dict[str, object]:
+    artifact = {
+        "id": str(uuid4()),
+        "project_id": project_id,
+        "payload_json": json.dumps(payload),
+        "source": source,
+        "created_at": _utc_now_iso(),
+    }
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO template_recommendation_artifacts (id, project_id, payload_json, source, created_at)
+            VALUES (:id, :project_id, :payload_json, :source, :created_at)
+            """,
+            artifact,
+        )
+    return {
+        "id": artifact["id"],
+        "project_id": artifact["project_id"],
+        "source": artifact["source"],
+        "created_at": artifact["created_at"],
+    }
+
+
+def get_latest_template_recommendation_artifact(project_id: str) -> dict[str, object] | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT id, project_id, payload_json, source, created_at
+            FROM template_recommendation_artifacts
             WHERE project_id = ?
             ORDER BY created_at DESC
             LIMIT 1

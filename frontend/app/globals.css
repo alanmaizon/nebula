@@ -55,6 +55,14 @@ p {
   flex-wrap: wrap;
 }
 
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #2a3142;
+}
+
 .badge {
   display: inline-flex;
   padding: 4px 10px;

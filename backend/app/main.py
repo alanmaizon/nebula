@@ -19,17 +19,22 @@ from app.db import (
     create_coverage_artifact,
     create_document,
     create_draft_artifact,
+    create_intake_artifact,
     create_project,
     create_requirements_artifact,
+    create_template_recommendation_artifact,
     get_latest_coverage_artifact,
     get_latest_draft_artifact,
+    get_latest_intake_artifact,
     get_latest_requirements_artifact,
+    get_latest_template_recommendation_artifact,
     get_project,
     init_db,
     list_chunks,
     list_documents,
 )
 from app.drafting import build_draft_payload, validate_with_repair as validate_draft_with_repair
+from app.intake import IntakePayload, recommend_template
 from app.observability import (
     configure_logging,
     normalize_request_id,
@@ -60,6 +65,10 @@ class GenerateSectionRequest(BaseModel):
 
 class CoverageComputeRequest(BaseModel):
     section_key: str = Field(default="Need Statement", min_length=1, max_length=120)
+
+
+class TemplateRecommendationRequest(BaseModel):
+    intake: IntakePayload | None = None
 
 
 def get_nova_orchestrator() -> BedrockNovaOrchestrator:
@@ -280,6 +289,77 @@ def create_app() -> FastAPI:
         if project is None:
             raise HTTPException(status_code=404, detail="Project not found")
         return {"project_id": project_id, "documents": list_documents(project_id)}
+
+    @app.post("/projects/{project_id}/intake")
+    def save_intake(project_id: str, payload: IntakePayload) -> dict[str, object]:
+        project = get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        artifact_meta = create_intake_artifact(
+            project_id=project_id,
+            payload=payload.model_dump(),
+            source="ui-intake-v1",
+        )
+        return {
+            "project_id": project_id,
+            "intake": payload.model_dump(),
+            "artifact": artifact_meta,
+        }
+
+    @app.get("/projects/{project_id}/intake")
+    def get_latest_intake(project_id: str) -> dict[str, object]:
+        project = get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        latest = get_latest_intake_artifact(project_id)
+        if latest is None:
+            raise HTTPException(status_code=404, detail="No intake artifact found for project")
+
+        return {
+            "project_id": project_id,
+            "intake": latest["payload"],
+            "artifact": {
+                "id": latest["id"],
+                "source": latest["source"],
+                "created_at": latest["created_at"],
+            },
+        }
+
+    @app.post("/projects/{project_id}/template-recommendation")
+    def create_template_recommendation(project_id: str, payload: TemplateRecommendationRequest) -> dict[str, object]:
+        project = get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        if payload.intake is not None:
+            intake = payload.intake
+            create_intake_artifact(
+                project_id=project_id,
+                payload=intake.model_dump(),
+                source="ui-intake-v1",
+            )
+        else:
+            latest_intake = get_latest_intake_artifact(project_id)
+            if latest_intake is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No intake artifact found for project. Save intake first or provide intake payload.",
+                )
+            intake = IntakePayload.model_validate(latest_intake["payload"])
+
+        recommendation = recommend_template(intake)
+        artifact_meta = create_template_recommendation_artifact(
+            project_id=project_id,
+            payload=recommendation.model_dump(),
+            source="template-reco-v1",
+        )
+        return {
+            "project_id": project_id,
+            "recommendation": recommendation.model_dump(),
+            "artifact": artifact_meta,
+        }
 
     @app.post("/projects/{project_id}/retrieve")
     def retrieve_project_chunks(project_id: str, payload: RetrievalRequest) -> dict[str, object]:
@@ -527,10 +607,14 @@ def create_app() -> FastAPI:
         requirements_artifact = get_latest_requirements_artifact(project_id)
         draft_artifact = get_latest_draft_artifact(project_id, section_key)
         coverage_artifact = get_latest_coverage_artifact(project_id)
+        intake_artifact = get_latest_intake_artifact(project_id)
+        template_reco_artifact = get_latest_template_recommendation_artifact(project_id)
 
         requirements_payload = requirements_artifact["payload"] if requirements_artifact else None
         draft_payload = draft_artifact["payload"] if draft_artifact else None
         coverage_payload = coverage_artifact["payload"] if coverage_artifact else None
+        intake_payload = intake_artifact["payload"] if intake_artifact else None
+        template_reco_payload = template_reco_artifact["payload"] if template_reco_artifact else None
 
         if format == "json":
             return {
@@ -539,6 +623,8 @@ def create_app() -> FastAPI:
                 "requirements": requirements_payload,
                 "draft": draft_payload,
                 "coverage": coverage_payload,
+                "intake": intake_payload,
+                "template_recommendation": template_reco_payload,
             }
 
         markdown = render_markdown_export(
