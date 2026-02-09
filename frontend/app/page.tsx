@@ -1,12 +1,80 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type DragEvent } from "react";
 import SegmentedToggle from "./components/SegmentedToggle";
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
 type ViewMode = "summary" | "json";
+type RunStatus = "idle" | "loading" | "success" | "error";
+type StageId = "upload" | "extract" | "retrieve" | "draft" | "coverage" | "export";
+type StageState = "pending" | "running" | "done" | "error";
+type ResultPane = "requirements" | "retrieval" | "draft" | "coverage" | "export";
+
+type StageInfo = {
+  state: StageState;
+  note: string;
+};
+
+type IntakeContext = {
+  country: string;
+  organization_type: string;
+  funder_track: string;
+  funding_goal: string;
+  sector_focus: string;
+};
+
+type PipelineRunResult = {
+  projectId: string;
+  sectionKey: string;
+  documentsIndexed: number;
+  requirements: JsonValue;
+  extraction: JsonValue | null;
+  retrieval: JsonValue;
+  draft: JsonValue;
+  coverage: JsonValue;
+  exportJson: JsonValue;
+  exportMarkdown: string;
+};
+
+const workflowSteps: Array<{ id: StageId; label: string }> = [
+  { id: "upload", label: "Upload documents" },
+  { id: "extract", label: "Extract requirements" },
+  { id: "retrieve", label: "Retrieve evidence" },
+  { id: "draft", label: "Draft with citations" },
+  { id: "coverage", label: "Coverage matrix" },
+  { id: "export", label: "Export artifacts" },
+];
+const workflowStepLabelSet = new Set(workflowSteps.map((step) => step.label));
+
+const paneForStage: Record<StageId, ResultPane> = {
+  upload: "requirements",
+  extract: "requirements",
+  retrieve: "retrieval",
+  draft: "draft",
+  coverage: "coverage",
+  export: "export",
+};
+
+const paneTabs: Array<{ key: ResultPane; label: string }> = [
+  { key: "requirements", label: "Requirements" },
+  { key: "retrieval", label: "Retrieval" },
+  { key: "draft", label: "Draft" },
+  { key: "coverage", label: "Coverage" },
+  { key: "export", label: "Export" },
+];
+
+function emptyPipelineStages(): Record<StageId, StageInfo> {
+  return {
+    upload: { state: "pending", note: "Waiting for documents" },
+    extract: { state: "pending", note: "Waiting for extraction" },
+    retrieve: { state: "pending", note: "Waiting for section selection" },
+    draft: { state: "pending", note: "Waiting for draft generation" },
+    coverage: { state: "pending", note: "Waiting for coverage" },
+    export: { state: "pending", note: "Waiting for export" },
+  };
+}
 
 function asRecord(value: JsonValue): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -14,694 +82,814 @@ function asRecord(value: JsonValue): Record<string, unknown> | null {
     : null;
 }
 
+function readQuestionPrompts(requirements: JsonValue | null): string[] {
+  const record = asRecord(requirements);
+  const maybeQuestions = record?.questions;
+  if (!Array.isArray(maybeQuestions)) {
+    return [];
+  }
+
+  const prompts: string[] = [];
+  for (const item of maybeQuestions) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const prompt = (item as Record<string, unknown>).prompt;
+    if (typeof prompt === "string" && prompt.trim()) {
+      prompts.push(prompt.trim());
+    }
+  }
+  return Array.from(new Set(prompts));
+}
+
 export default function HomePage() {
+  const [showWorkspace, setShowWorkspace] = useState(false);
+
   const [projectName, setProjectName] = useState("Nebula Demo Project");
   const [projectId, setProjectId] = useState("");
-  const [sectionKey, setSectionKey] = useState("Need Statement");
-  const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
-  const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [activityFeed, setActivityFeed] = useState<string[]>([]);
 
-  const [requirements, setRequirements] = useState<JsonValue>(null);
-  const [draft, setDraft] = useState<JsonValue>(null);
-  const [coverage, setCoverage] = useState<JsonValue>(null);
-  const [recommendation, setRecommendation] = useState<JsonValue>(null);
-
-  const [recommendationView, setRecommendationView] = useState<ViewMode>("summary");
-  const [requirementsView, setRequirementsView] = useState<ViewMode>("summary");
-  const [draftView, setDraftView] = useState<ViewMode>("summary");
-  const [coverageView, setCoverageView] = useState<ViewMode>("summary");
-
-  const [intake, setIntake] = useState({
+  const [intake, setIntake] = useState<IntakeContext>({
     country: "Ireland",
     organization_type: "Non-profit",
-    charity_registered: false,
-    tax_registered: false,
-    has_group_bank_account: false,
     funder_track: "community-foundation",
     funding_goal: "project",
     sector_focus: "general",
-    timeline_quarters: 4,
-    has_evidence_data: false,
   });
 
-  const isBusy = useMemo(() => loadingAction !== null, [loadingAction]);
-  const isTemplateLocked = recommendation !== null;
+  const [runStatus, setRunStatus] = useState<RunStatus>("idle");
+  const [runError, setRunError] = useState<string | null>(null);
+  const [, setStages] = useState<Record<StageId, StageInfo>>(emptyPipelineStages());
+  const [result, setResult] = useState<PipelineRunResult | null>(null);
+  const [activePane, setActivePane] = useState<ResultPane>("requirements");
 
-  const recommendationRecord = asRecord(recommendation);
-  const requirementsRecord = asRecord(requirements);
-  const draftRecord = asRecord(draft);
-  const coverageRecord = asRecord(coverage);
+  const [requirementsView, setRequirementsView] = useState<ViewMode>("summary");
+  const [retrievalView, setRetrievalView] = useState<ViewMode>("summary");
+  const [draftView, setDraftView] = useState<ViewMode>("summary");
+  const [coverageView, setCoverageView] = useState<ViewMode>("summary");
 
-  async function runAction(actionName: string, fn: () => Promise<void>) {
-    setLoadingAction(actionName);
-    setError(null);
-    try {
-      await fn();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unexpected error";
-      setError(message);
-    } finally {
-      setLoadingAction(null);
+  const isRunning = runStatus === "loading";
+
+  function appendFeed(message: string) {
+    setActivityFeed((prev) => [...prev, message]);
+  }
+
+  function setStage(id: StageId, state: StageState, note: string) {
+    setStages((prev) => ({ ...prev, [id]: { state, note } }));
+    const stepLabel = workflowSteps.find((step) => step.id === id)?.label ?? id;
+    if (state === "running") {
+      appendFeed(stepLabel);
+      return;
     }
+    if (state === "done" || state === "error") {
+      appendFeed(note);
+    }
+  }
+
+  function resetStages() {
+    setStages(emptyPipelineStages());
   }
 
   async function parseJsonResponse(response: Response): Promise<Record<string, unknown>> {
     const payload = (await response.json()) as Record<string, unknown>;
     if (!response.ok) {
-      throw new Error(typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail));
+      const detail = payload.detail;
+      if (typeof detail === "string") {
+        throw new Error(detail);
+      }
+      if (detail !== undefined) {
+        throw new Error(JSON.stringify(detail));
+      }
+      throw new Error(`Request failed (${response.status})`);
     }
     return payload;
   }
 
-  async function createProject(e: FormEvent) {
-    e.preventDefault();
-    await runAction("Creating project", async () => {
-      const response = await fetch(`${apiBase}/projects`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: projectName }),
-      });
-      const payload = await parseJsonResponse(response);
-      setProjectId(String(payload.id));
-      setRecommendation(null);
+  async function ensureProject(): Promise<string> {
+    if (projectId.trim()) {
+      return projectId;
+    }
+
+    const response = await fetch(`${apiBase}/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: projectName || "Nebula Project" }),
     });
+    const payload = await parseJsonResponse(response);
+    const created = String(payload.id);
+    setProjectId(created);
+    return created;
   }
 
-  async function uploadFiles() {
-    if (!projectId) {
-      throw new Error("Create a project first.");
-    }
-    if (!selectedFiles || selectedFiles.length === 0) {
-      throw new Error("Select one or more files before uploading.");
-    }
-    if (!isTemplateLocked) {
-      throw new Error("Complete intake and lock a template recommendation before ingest.");
-    }
+  async function saveIntakeContext(currentProjectId: string) {
+    const response = await fetch(`${apiBase}/projects/${currentProjectId}/intake`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(intake),
+    });
+    await parseJsonResponse(response);
+  }
 
-    await runAction("Uploading files", async () => {
+  async function ensureIndexedDocuments(currentProjectId: string): Promise<number> {
+    if (files.length > 0) {
+      setStage("upload", "running", "Uploading selected documents...");
       const formData = new FormData();
-      Array.from(selectedFiles).forEach((file) => formData.append("files", file));
-      const response = await fetch(`${apiBase}/projects/${projectId}/upload`, {
+      for (const file of files) {
+        formData.append("files", file);
+      }
+      const response = await fetch(`${apiBase}/projects/${currentProjectId}/upload`, {
         method: "POST",
         body: formData,
       });
-      await parseJsonResponse(response);
-    });
+      const payload = await parseJsonResponse(response);
+      const uploadedDocs = Array.isArray(payload.documents)
+        ? payload.documents.filter((item) => !!item && typeof item === "object")
+        : [];
+      setStage("upload", "done", `Indexed ${uploadedDocs.length} uploaded file(s).`);
+      return uploadedDocs.length;
+    }
+
+    setStage("upload", "running", "Checking existing indexed documents...");
+    const docsResponse = await fetch(`${apiBase}/projects/${currentProjectId}/documents`);
+    const docsPayload = await parseJsonResponse(docsResponse);
+    const docs = Array.isArray(docsPayload.documents)
+      ? docsPayload.documents.filter((item) => !!item && typeof item === "object")
+      : [];
+    if (docs.length === 0) {
+      throw new Error("Select files to upload, or reuse a project that already has indexed documents.");
+    }
+    setStage("upload", "done", `Using ${docs.length} previously indexed document(s).`);
+    return docs.length;
   }
 
-  async function extractRequirements() {
-    if (!projectId) {
-      throw new Error("Create a project first.");
-    }
-    if (!isTemplateLocked) {
-      throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
-    }
+  async function runWorkspacePipeline() {
+    setRunStatus("loading");
+    setRunError(null);
+    setResult(null);
+    setActivePane("requirements");
+    setActivityFeed([]);
+    resetStages();
 
-    await runAction("Extracting requirements", async () => {
-      const response = await fetch(`${apiBase}/projects/${projectId}/extract-requirements`, {
+    let failedStage: StageId = "upload";
+
+    try {
+      const currentProjectId = await ensureProject();
+      await saveIntakeContext(currentProjectId);
+      const documentsIndexed = await ensureIndexedDocuments(currentProjectId);
+
+      failedStage = "extract";
+      setActivePane("requirements");
+      setStage("extract", "running", "Extracting requirements...");
+      const requirementsResponse = await fetch(`${apiBase}/projects/${currentProjectId}/extract-requirements`, {
         method: "POST",
       });
-      const payload = await parseJsonResponse(response);
-      setRequirements(payload.requirements as JsonValue);
-    });
-  }
+      const requirementsPayload = await parseJsonResponse(requirementsResponse);
+      const requirements = (requirementsPayload.requirements as JsonValue) ?? null;
+      const extraction = (requirementsPayload.extraction as JsonValue) ?? null;
+      const questionPrompts = readQuestionPrompts(requirements);
+      setStage("extract", "done", `Extracted ${questionPrompts.length} question(s).`);
 
-  async function generateSection() {
-    if (!projectId) {
-      throw new Error("Create a project first.");
-    }
-    if (!isTemplateLocked) {
-      throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
-    }
+      const selectedSection = questionPrompts[0]?.trim() || "Need Statement";
+      appendFeed(`Auto-selected section: ${selectedSection}`);
 
-    await runAction("Generating section", async () => {
-      const response = await fetch(`${apiBase}/projects/${projectId}/generate-section`, {
+      failedStage = "retrieve";
+      setActivePane("retrieval");
+      setStage("retrieve", "running", `Retrieving evidence for "${selectedSection}"...`);
+      const retrievalResponse = await fetch(`${apiBase}/projects/${currentProjectId}/retrieve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section_key: sectionKey }),
+        body: JSON.stringify({ query: selectedSection, top_k: 6 }),
       });
-      const payload = await parseJsonResponse(response);
-      setDraft(payload.draft as JsonValue);
-    });
-  }
+      const retrievalPayload = await parseJsonResponse(retrievalResponse);
+      const retrieval = retrievalPayload as JsonValue;
+      const retrievalCount = Array.isArray(retrievalPayload.results) ? retrievalPayload.results.length : 0;
+      setStage("retrieve", "done", `Retrieved ${retrievalCount} evidence chunk(s).`);
 
-  async function computeCoverage() {
-    if (!projectId) {
-      throw new Error("Create a project first.");
-    }
-    if (!isTemplateLocked) {
-      throw new Error("Complete intake and lock a template recommendation before pipeline actions.");
-    }
-
-    await runAction("Computing coverage", async () => {
-      const response = await fetch(`${apiBase}/projects/${projectId}/coverage`, {
+      failedStage = "draft";
+      setActivePane("draft");
+      setStage("draft", "running", "Generating cited draft...");
+      const draftResponse = await fetch(`${apiBase}/projects/${currentProjectId}/generate-section`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section_key: sectionKey }),
+        body: JSON.stringify({ section_key: selectedSection }),
       });
-      const payload = await parseJsonResponse(response);
-      setCoverage(payload.coverage as JsonValue);
-    });
-  }
+      const draftPayload = await parseJsonResponse(draftResponse);
+      const draft = draftPayload.draft as JsonValue;
+      const draftRecord = asRecord(draft);
+      const paragraphs = Array.isArray(draftRecord?.paragraphs) ? draftRecord.paragraphs.length : 0;
+      setStage("draft", "done", `Draft generated with ${paragraphs} paragraph(s).`);
 
-  async function exportArtifacts(format: "json" | "markdown") {
-    if (!projectId) {
-      throw new Error("Create a project first.");
-    }
-    if (!isTemplateLocked) {
-      throw new Error("Complete intake and lock a template recommendation before export.");
-    }
+      failedStage = "coverage";
+      setActivePane("coverage");
+      setStage("coverage", "running", "Computing coverage matrix...");
+      const coverageResponse = await fetch(`${apiBase}/projects/${currentProjectId}/coverage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section_key: selectedSection }),
+      });
+      const coveragePayload = await parseJsonResponse(coverageResponse);
+      const coverage = coveragePayload.coverage as JsonValue;
+      const coverageRecord = asRecord(coverage);
+      const coverageItems = Array.isArray(coverageRecord?.items) ? coverageRecord.items.length : 0;
+      setStage("coverage", "done", `Coverage computed for ${coverageItems} item(s).`);
 
-    await runAction(`Exporting ${format}`, async () => {
-      const response = await fetch(
-        `${apiBase}/projects/${projectId}/export?format=${format}&section_key=${encodeURIComponent(sectionKey)}`
+      failedStage = "export";
+      setActivePane("export");
+      setStage("export", "running", "Generating JSON and Markdown exports...");
+      const exportJsonResponse = await fetch(
+        `${apiBase}/projects/${currentProjectId}/export?format=json&section_key=${encodeURIComponent(selectedSection)}`
       );
-      if (!response.ok) {
-        const fallback = await response.text();
-        throw new Error(fallback || `Export failed (${response.status})`);
+      if (!exportJsonResponse.ok) {
+        const fallback = await exportJsonResponse.text();
+        throw new Error(fallback || `JSON export failed (${exportJsonResponse.status})`);
       }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `nebula-${projectId}.${format === "json" ? "json" : "md"}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    });
-  }
+      const exportJson = (await exportJsonResponse.json()) as JsonValue;
 
-  async function saveIntake() {
-    if (!projectId) {
-      throw new Error("Create a project first.");
-    }
+      const exportMarkdownResponse = await fetch(
+        `${apiBase}/projects/${currentProjectId}/export?format=markdown&section_key=${encodeURIComponent(selectedSection)}`
+      );
+      if (!exportMarkdownResponse.ok) {
+        const fallback = await exportMarkdownResponse.text();
+        throw new Error(fallback || `Markdown export failed (${exportMarkdownResponse.status})`);
+      }
+      const exportMarkdown = await exportMarkdownResponse.text();
+      setStage("export", "done", "JSON + Markdown exports ready.");
 
-    await runAction("Saving intake", async () => {
-      const response = await fetch(`${apiBase}/projects/${projectId}/intake`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(intake),
+      setResult({
+        projectId: currentProjectId,
+        sectionKey: selectedSection,
+        documentsIndexed,
+        requirements,
+        extraction,
+        retrieval,
+        draft,
+        coverage,
+        exportJson,
+        exportMarkdown,
       });
-      await parseJsonResponse(response);
-    });
-  }
-
-  async function generateTemplateRecommendation() {
-    if (!projectId) {
-      throw new Error("Create a project first.");
+      setFiles([]);
+      appendFeed("Run complete.");
+      setRunStatus("success");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Pipeline failed.";
+      setStage(failedStage, "error", message);
+      setRunError(message);
+      setRunStatus("error");
+      setActivePane(paneForStage[failedStage]);
     }
-
-    await runAction("Recommending template", async () => {
-      const response = await fetch(`${apiBase}/projects/${projectId}/template-recommendation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const payload = await parseJsonResponse(response);
-      setRecommendation(payload.recommendation as JsonValue);
-    });
   }
 
-  async function loadLatestTemplateRecommendation(currentProjectId: string) {
-    if (!currentProjectId) {
+  function addFiles(newFiles: File[]) {
+    if (newFiles.length === 0) {
       return;
     }
-
-    const response = await fetch(`${apiBase}/projects/${currentProjectId}/template-recommendation/latest`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        setRecommendation(null);
-        return;
-      }
-      const fallback = await response.text();
-      throw new Error(fallback || `Template recommendation lookup failed (${response.status})`);
-    }
-    const payload = (await response.json()) as Record<string, unknown>;
-    setRecommendation(payload.recommendation as JsonValue);
+    setFiles((prev) => [...prev, ...newFiles]);
+    appendFeed(`Queued ${newFiles.length} file(s) for upload.`);
   }
 
-  useEffect(() => {
-    if (!projectId) {
-      setRecommendation(null);
+  function handleFileSelection(fileList: FileList | null) {
+    if (!fileList) {
       return;
     }
+    addFiles(Array.from(fileList));
+  }
 
-    runAction("Loading template recommendation", async () => {
-      await loadLatestTemplateRecommendation(projectId);
-    });
-  }, [projectId]);
+  function handleFileDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragActive(false);
+    addFiles(Array.from(event.dataTransfer.files));
+  }
 
-  const recommendationSummary = useMemo(() => {
-    if (!recommendationRecord) {
-      return [];
-    }
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+  }
 
-    const lines: string[] = [];
-    const templateName = typeof recommendationRecord.template_name === "string" ? recommendationRecord.template_name : null;
-    const templateKey = typeof recommendationRecord.template_key === "string" ? recommendationRecord.template_key : null;
-    const rationale = Array.isArray(recommendationRecord.rationale)
-      ? recommendationRecord.rationale.filter((item): item is string => typeof item === "string")
-      : [];
-    const checklist = Array.isArray(recommendationRecord.required_checklist)
-      ? recommendationRecord.required_checklist.filter((item): item is string => typeof item === "string")
-      : [];
-    const warnings = Array.isArray(recommendationRecord.warnings)
-      ? recommendationRecord.warnings.filter((item): item is string => typeof item === "string")
-      : [];
+  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragActive(true);
+  }
 
-    if (templateName) {
-      lines.push(`Template: ${templateName}${templateKey ? ` (${templateKey})` : ""}`);
-    }
-    if (rationale.length > 0) {
-      lines.push("Why this template:");
-      rationale.slice(0, 3).forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
-    }
-    if (checklist.length > 0) {
-      lines.push("Required checklist:");
-      checklist.slice(0, 5).forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
-    }
-    if (warnings.length > 0) {
-      lines.push("Warnings:");
-      warnings.slice(0, 3).forEach((item, idx) => lines.push(`${idx + 1}. ${item}`));
-    }
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragActive(false);
+  }
 
-    return lines;
-  }, [recommendationRecord]);
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, current) => current !== index));
+  }
+
+  function downloadJson() {
+    if (!result?.exportJson) {
+      return;
+    }
+    const blob = new Blob([JSON.stringify(result.exportJson, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `nebula-${result.projectId}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadMarkdown() {
+    if (!result?.exportMarkdown) {
+      return;
+    }
+    const blob = new Blob([result.exportMarkdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `nebula-${result.projectId}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
 
   const requirementsSummary = useMemo(() => {
+    if (!result) {
+      return [];
+    }
+    const requirementsRecord = asRecord(result.requirements);
+    const extractionRecord = asRecord(result.extraction);
     if (!requirementsRecord) {
       return [];
     }
 
     const lines: string[] = [];
-    const funder = typeof requirementsRecord.funder === "string" ? requirementsRecord.funder : null;
-    const deadline = typeof requirementsRecord.deadline === "string" ? requirementsRecord.deadline : null;
-    const questions = Array.isArray(requirementsRecord.questions)
-      ? requirementsRecord.questions.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-      : [];
+    const funder = typeof requirementsRecord.funder === "string" ? requirementsRecord.funder : "Unknown";
+    const deadline = typeof requirementsRecord.deadline === "string" ? requirementsRecord.deadline : "Not specified";
+    const questions = Array.isArray(requirementsRecord.questions) ? requirementsRecord.questions : [];
     const attachments = Array.isArray(requirementsRecord.required_attachments)
-      ? requirementsRecord.required_attachments.filter((item): item is string => typeof item === "string")
+      ? requirementsRecord.required_attachments
       : [];
 
-    lines.push(`Funder: ${funder || "Unknown"}`);
-    lines.push(`Deadline: ${deadline || "Not specified"}`);
+    lines.push(`Funder: ${funder}`);
+    lines.push(`Deadline: ${deadline}`);
+    if (extractionRecord && typeof extractionRecord.mode === "string") {
+      lines.push(`Extraction mode: ${extractionRecord.mode}`);
+    }
     lines.push(`Questions extracted: ${questions.length}`);
-    questions.slice(0, 4).forEach((question, index) => {
-      const prompt = typeof question.prompt === "string" ? question.prompt : `Question ${index + 1}`;
-      lines.push(`${index + 1}. ${prompt}`);
-    });
+    for (const [index, question] of questions.slice(0, 6).entries()) {
+      if (!question || typeof question !== "object") {
+        continue;
+      }
+      const prompt = (question as Record<string, unknown>).prompt;
+      if (typeof prompt === "string") {
+        lines.push(`${index + 1}. ${prompt}`);
+      }
+    }
     lines.push(`Required attachments: ${attachments.length}`);
-    attachments.slice(0, 3).forEach((item, index) => lines.push(`${index + 1}. ${item}`));
-
+    for (const [index, attachment] of attachments.slice(0, 6).entries()) {
+      if (typeof attachment === "string") {
+        lines.push(`${index + 1}. ${attachment}`);
+      }
+    }
     return lines;
-  }, [requirementsRecord]);
+  }, [result]);
+
+  const retrievalSummary = useMemo(() => {
+    if (!result) {
+      return [];
+    }
+    const retrievalRecord = asRecord(result.retrieval);
+    if (!retrievalRecord) {
+      return [];
+    }
+
+    const lines: string[] = [];
+    const query = typeof retrievalRecord.query === "string" ? retrievalRecord.query : "Unknown";
+    const results = Array.isArray(retrievalRecord.results) ? retrievalRecord.results : [];
+
+    lines.push(`Query: ${query}`);
+    lines.push(`Evidence chunks: ${results.length}`);
+    for (const [index, item] of results.slice(0, 6).entries()) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const row = item as Record<string, unknown>;
+      const fileName = typeof row.file_name === "string" ? row.file_name : "unknown";
+      const page = typeof row.page === "number" ? `p.${row.page}` : "p.?";
+      const score = typeof row.score === "number" ? row.score.toFixed(3) : "n/a";
+      lines.push(`${index + 1}. ${fileName} (${page}) score=${score}`);
+    }
+    return lines;
+  }, [result]);
 
   const draftSummary = useMemo(() => {
+    if (!result) {
+      return [];
+    }
+    const draftRecord = asRecord(result.draft);
     if (!draftRecord) {
       return [];
     }
 
     const lines: string[] = [];
     const section = typeof draftRecord.section_key === "string" ? draftRecord.section_key : "Unknown";
-    const paragraphs = Array.isArray(draftRecord.paragraphs)
-      ? draftRecord.paragraphs.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-      : [];
-    const missingEvidence = Array.isArray(draftRecord.missing_evidence)
-      ? draftRecord.missing_evidence.filter((item): item is string => typeof item === "string")
-      : [];
+    const paragraphs = Array.isArray(draftRecord.paragraphs) ? draftRecord.paragraphs : [];
+    const missingEvidence = Array.isArray(draftRecord.missing_evidence) ? draftRecord.missing_evidence : [];
 
-    const citationCount = paragraphs.reduce((count, paragraph) => {
-      const citations = paragraph.citations;
-      return count + (Array.isArray(citations) ? citations.length : 0);
-    }, 0);
+    let citationCount = 0;
+    for (const paragraph of paragraphs) {
+      if (!paragraph || typeof paragraph !== "object") {
+        continue;
+      }
+      const citations = (paragraph as Record<string, unknown>).citations;
+      if (Array.isArray(citations)) {
+        citationCount += citations.length;
+      }
+    }
 
     lines.push(`Section: ${section}`);
     lines.push(`Paragraphs: ${paragraphs.length}`);
     lines.push(`Citations: ${citationCount}`);
-
-    const firstParagraph = paragraphs[0];
-    if (firstParagraph && typeof firstParagraph.text === "string") {
-      const preview = firstParagraph.text.length > 260 ? `${firstParagraph.text.slice(0, 257)}...` : firstParagraph.text;
-      lines.push("Preview:");
-      lines.push(preview);
+    if (paragraphs.length > 0) {
+      const first = paragraphs[0];
+      if (first && typeof first === "object") {
+        const text = (first as Record<string, unknown>).text;
+        if (typeof text === "string") {
+          const preview = text.length > 320 ? `${text.slice(0, 317)}...` : text;
+          lines.push("Preview:");
+          lines.push(preview);
+        }
+      }
     }
-
     if (missingEvidence.length > 0) {
-      lines.push("Missing evidence:");
-      missingEvidence.slice(0, 3).forEach((item, index) => lines.push(`${index + 1}. ${item}`));
+      lines.push(`Missing evidence items: ${missingEvidence.length}`);
     }
-
     return lines;
-  }, [draftRecord]);
+  }, [result]);
 
   const coverageSummary = useMemo(() => {
+    if (!result) {
+      return [];
+    }
+    const coverageRecord = asRecord(result.coverage);
     if (!coverageRecord) {
       return [];
     }
 
     const lines: string[] = [];
-    const items = Array.isArray(coverageRecord.items)
-      ? coverageRecord.items.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-      : [];
-
+    const items = Array.isArray(coverageRecord.items) ? coverageRecord.items : [];
     let met = 0;
     let partial = 0;
     let missing = 0;
+
     for (const item of items) {
-      const status = typeof item.status === "string" ? item.status : "";
-      if (status === "met") met += 1;
-      else if (status === "partial") partial += 1;
-      else if (status === "missing") missing += 1;
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const status = (item as Record<string, unknown>).status;
+      if (status === "met") {
+        met += 1;
+      } else if (status === "partial") {
+        partial += 1;
+      } else if (status === "missing") {
+        missing += 1;
+      }
     }
 
     lines.push(`Coverage items: ${items.length}`);
     lines.push(`Met: ${met}`);
     lines.push(`Partial: ${partial}`);
     lines.push(`Missing: ${missing}`);
-    if (items.length > 0) {
-      lines.push("Top items:");
-      items.slice(0, 4).forEach((item, index) => {
-        const id = typeof item.requirement_id === "string" ? item.requirement_id : `item-${index + 1}`;
-        const status = typeof item.status === "string" ? item.status : "unknown";
-        lines.push(`${id}: ${status}`);
-      });
-    }
-
     return lines;
-  }, [coverageRecord]);
+  }, [result]);
 
-  const suggestedSectionKeys = useMemo(() => {
-    const defaults = [
-      "Need Statement",
-      "Program Design",
-      "Outcomes and Evaluation",
-      "Sustainability",
-      "Implementation Timeline",
-      "Budget Narrative",
-    ];
-
-    const fromRequirements: string[] = [];
-    const maybeQuestions = requirementsRecord?.questions;
-    if (Array.isArray(maybeQuestions)) {
-      for (const item of maybeQuestions) {
-        if (!item || typeof item !== "object") {
-          continue;
-        }
-        const prompt = (item as Record<string, unknown>).prompt;
-        if (typeof prompt === "string" && prompt.trim()) {
-          fromRequirements.push(prompt.trim());
-        }
-      }
+  const exportSummary = useMemo(() => {
+    if (!result) {
+      return [];
     }
+    const exportRecord = asRecord(result.exportJson);
+    const lines: string[] = [];
+    lines.push(`Project ID: ${result.projectId}`);
+    lines.push(`Section: ${result.sectionKey}`);
+    lines.push(`Documents indexed: ${result.documentsIndexed}`);
+    lines.push(`Markdown length: ${result.exportMarkdown.length}`);
+    if (exportRecord) {
+      lines.push("JSON export includes:");
+      lines.push(`- requirements: ${exportRecord.requirements !== undefined ? "yes" : "no"}`);
+      lines.push(`- draft: ${exportRecord.draft !== undefined ? "yes" : "no"}`);
+      lines.push(`- coverage: ${exportRecord.coverage !== undefined ? "yes" : "no"}`);
+    }
+    return lines;
+  }, [result]);
 
-    return Array.from(new Set([...fromRequirements, ...defaults]));
-  }, [requirementsRecord]);
+  if (!showWorkspace) {
+    return (
+      <main className="nebula-landing">
+        <div className="landing-grid" aria-hidden="true" />
+        <section className="landing-shell">
+          <article className="landing-hero">
+            <div className="landing-gradient" aria-hidden="true" />
+            <img src="/icon.png" alt="Nebula icon" className="landing-logo" />
+            <h1 className="brand-wordmark">Nebula</h1>
+            <p>Automated grant drafting workspace powered by Amazon Nova.</p>
+            <button type="button" className="workspace-enter" onClick={() => setShowWorkspace(true)}>
+              Enter Workspace
+            </button>
+          </article>
+        </section>
+      </main>
+    );
+  }
 
   return (
-    <main className="stack">
-      <section className="hero-wrap">
-        <div className="hero">
-          <div className="arc" aria-hidden="true" />
-          <div className="grain" aria-hidden="true" />
-          <h1 className="title">Nebula</h1>
-          <button
-            type="button"
-            className="button hero-cta"
-            onClick={() => {
-              const el = document.getElementById("demo-workspace");
-              el?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-          >
-            Start Demo
-          </button>
+    <main className="workspace-main">
+      <section className="workspace-header-line">
+        <img src="/icon.svg" alt="Nebula icon" className="title-icon" />
+        <div className="workspace-heading-inline">
+          <h1 className="brand-wordmark">Nebula</h1>
+          <span className="workspace-tagline">AI-Powered Draft Generation Workspace</span>
         </div>
       </section>
 
-      <section id="demo-workspace" className="stack">
-        <h2>Nebula Demo Workspace</h2>
-        <p>Follow the flow: create project, complete intake, lock template recommendation, then run pipeline actions.</p>
-      </section>
+      <div className="workspace-grid">
+        <aside className="workspace-left">
+          <section className="control-panel">
+            <div className="field">
+              <label htmlFor="project-name">Project Name</label>
+              <input
+                id="project-name"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Project name"
+                className="input"
+              />
+            </div>
 
-      <section className="card stack">
-        <h2>Project Setup</h2>
-        <form className="row" onSubmit={createProject}>
-          <input
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            placeholder="Project name"
-            className="input"
-          />
-          <button type="submit" className="button" disabled={isBusy}>
-            Create Project
-          </button>
-        </form>
-        <p className="mono">Project ID: {projectId || "not created yet"}</p>
-      </section>
+            <div className="form-grid">
+              <div className="field">
+                <label htmlFor="country">Country</label>
+                <input
+                  id="country"
+                  value={intake.country}
+                  onChange={(e) => setIntake((prev) => ({ ...prev, country: e.target.value }))}
+                  placeholder="e.g., Ireland"
+                  className="input"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="org-type">Organization Type</label>
+                <input
+                  id="org-type"
+                  value={intake.organization_type}
+                  onChange={(e) => setIntake((prev) => ({ ...prev, organization_type: e.target.value }))}
+                  placeholder="e.g., Non-profit"
+                  className="input"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="funder-track">Funder Track</label>
+                <input
+                  id="funder-track"
+                  value={intake.funder_track}
+                  onChange={(e) => setIntake((prev) => ({ ...prev, funder_track: e.target.value }))}
+                  placeholder="e.g., community-foundation"
+                  className="input"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="funding-goal">Funding Goal</label>
+                <input
+                  id="funding-goal"
+                  value={intake.funding_goal}
+                  onChange={(e) => setIntake((prev) => ({ ...prev, funding_goal: e.target.value }))}
+                  placeholder="e.g., project"
+                  className="input"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="sector-focus">Sector Focus</label>
+                <input
+                  id="sector-focus"
+                  value={intake.sector_focus}
+                  onChange={(e) => setIntake((prev) => ({ ...prev, sector_focus: e.target.value }))}
+                  placeholder="e.g., youth employment"
+                  className="input"
+                />
+              </div>
+            </div>
 
-      <section className="card stack">
-        <h2>Pre-Ingest Intake Wizard</h2>
-        <p>Capture grant context first so Nebula can recommend the best submission template.</p>
-        <div className="row wrap">
-          <input
-            value={intake.country}
-            onChange={(e) => setIntake((prev) => ({ ...prev, country: e.target.value }))}
-            placeholder="Country"
-            className="input"
-          />
-          <input
-            value={intake.organization_type}
-            onChange={(e) => setIntake((prev) => ({ ...prev, organization_type: e.target.value }))}
-            placeholder="Organization type"
-            className="input"
-          />
-          <input
-            value={intake.funder_track}
-            onChange={(e) => setIntake((prev) => ({ ...prev, funder_track: e.target.value }))}
-            placeholder="Funder track (community-foundation, government, eu)"
-            className="input"
-          />
-        </div>
-        <div className="row wrap">
-          <input
-            value={intake.funding_goal}
-            onChange={(e) => setIntake((prev) => ({ ...prev, funding_goal: e.target.value }))}
-            placeholder="Funding goal (project/core)"
-            className="input"
-          />
-          <input
-            value={intake.sector_focus}
-            onChange={(e) => setIntake((prev) => ({ ...prev, sector_focus: e.target.value }))}
-            placeholder="Sector focus (general, heritage, rural)"
-            className="input"
-          />
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={intake.timeline_quarters}
-            onChange={(e) => setIntake((prev) => ({ ...prev, timeline_quarters: Number(e.target.value) || 1 }))}
-            placeholder="Timeline quarters"
-            className="input"
-          />
-        </div>
-        <div className="row wrap">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={intake.charity_registered}
-              onChange={(e) => setIntake((prev) => ({ ...prev, charity_registered: e.target.checked }))}
-            />
-            Charity registered
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={intake.tax_registered}
-              onChange={(e) => setIntake((prev) => ({ ...prev, tax_registered: e.target.checked }))}
-            />
-            Tax registered
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={intake.has_group_bank_account}
-              onChange={(e) => setIntake((prev) => ({ ...prev, has_group_bank_account: e.target.checked }))}
-            />
-            Group bank account
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={intake.has_evidence_data}
-              onChange={(e) => setIntake((prev) => ({ ...prev, has_evidence_data: e.target.checked }))}
-            />
-            Evidence dataset ready
-          </label>
-        </div>
-        <div className="row wrap">
-          <button type="button" className="button" onClick={saveIntake} disabled={isBusy}>
-            Save Intake
-          </button>
-          <button type="button" className="button ghost" onClick={generateTemplateRecommendation} disabled={isBusy}>
-            Recommend Template
-          </button>
-        </div>
-      </section>
+            <div className="field">
+              <label htmlFor="docs-upload">Documents</label>
+              <div
+                className={`dropzone ${isDragActive ? "active" : ""}`}
+                onDrop={handleFileDrop}
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+              >
+                <input
+                  id="docs-upload"
+                  type="file"
+                  multiple
+                  onChange={(e) => handleFileSelection(e.target.files)}
+                  className="dropzone-input"
+                />
+                <label htmlFor="docs-upload" className="dropzone-content">
+                  <strong>Drop documents here</strong>
+                  <span>or click to browse files</span>
+                </label>
+              </div>
+            </div>
 
-      <section className="card stack">
-        <h2>Template Recommendation</h2>
-        {!isTemplateLocked ? <p className="notice">Template not locked yet.</p> : null}
-        <SegmentedToggle
-          label="View mode"
-          value={recommendationView}
-          onChange={(value) => setRecommendationView(value as ViewMode)}
-          options={[
-            { value: "summary", label: "Summary" },
-            { value: "json", label: "JSON" },
-          ]}
-        />
-        {recommendationView === "summary" ? (
-          <pre className="code">{recommendationSummary.join("\n") || "No recommendation yet."}</pre>
-        ) : (
-          <pre className="code">{JSON.stringify(recommendation, null, 2)}</pre>
-        )}
-      </section>
+            {files.length > 0 ? (
+              <div className="file-list">
+                {files.map((file, index) => (
+                  <div key={`${file.name}-${index}`} className="file-item">
+                    <span>{file.name}</span>
+                    <button type="button" className="chip-button" onClick={() => removeFile(index)} disabled={isRunning}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="hint">No new files selected. Nebula will reuse indexed files if this project already has them.</p>
+            )}
 
-      <section className="card stack">
-        <h2>Documents</h2>
-        {!isTemplateLocked ? (
-          <p className="notice">Complete intake and click "Recommend Template" before uploading documents.</p>
-        ) : null}
-        <input type="file" multiple onChange={(e) => setSelectedFiles(e.target.files)} className="input" />
-        <button type="button" className="button" onClick={uploadFiles} disabled={isBusy || !isTemplateLocked}>
-          Upload and Index Files
-        </button>
-      </section>
-
-      <section className="card stack">
-        <h2>Pipeline Actions</h2>
-        <p className="notice">
-          Section key means the exact grant answer you want Nebula to draft and score. Default is <strong>Need
-          Statement</strong> because it is usually Question 1 in grant applications.
-        </p>
-        <div className="row stack-on-mobile">
-          <input
-            list="section-key-suggestions"
-            value={sectionKey}
-            onChange={(e) => setSectionKey(e.target.value)}
-            placeholder="Pick or type a section key"
-            className="input"
-          />
-          <datalist id="section-key-suggestions">
-            {suggestedSectionKeys.map((item) => (
-              <option key={item} value={item} />
-            ))}
-          </datalist>
-        </div>
-        <div className="row wrap">
-          {suggestedSectionKeys.slice(0, 6).map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={`pill ${sectionKey === item ? "active" : ""}`}
-              onClick={() => setSectionKey(item)}
-            >
-              {item}
+            <button type="button" className="primary-button" onClick={runWorkspacePipeline} disabled={isRunning}>
+              {isRunning ? "Generating..." : "Start Generation"}
             </button>
-          ))}
-        </div>
-        <div className="stack help">
-          <p>Extract Requirements: parse funder rules/questions from uploaded files.</p>
-          <p>Generate Section: draft only the section in the section key input above.</p>
-          <p>Compute Coverage: evaluate how well the draft covers extracted requirements.</p>
-          <p>Export JSON/Markdown: download full project artifacts for review/submission.</p>
-        </div>
-        <div className="row wrap">
-          <button type="button" className="button" onClick={extractRequirements} disabled={isBusy || !isTemplateLocked}>
-            Extract Requirements
-          </button>
-          <button type="button" className="button" onClick={generateSection} disabled={isBusy || !isTemplateLocked}>
-            Generate Section
-          </button>
-          <button type="button" className="button" onClick={computeCoverage} disabled={isBusy || !isTemplateLocked}>
-            Compute Coverage
-          </button>
-          <button
-            type="button"
-            className="button ghost"
-            onClick={() => exportArtifacts("json")}
-            disabled={isBusy || !isTemplateLocked}
-          >
-            Export JSON
-          </button>
-          <button
-            type="button"
-            className="button ghost"
-            onClick={() => exportArtifacts("markdown")}
-            disabled={isBusy || !isTemplateLocked}
-          >
-            Export Markdown
-          </button>
-        </div>
-        <p className="mono">Action: {loadingAction ?? "idle"}</p>
-        {error ? <p className="error">Error: {error}</p> : null}
-      </section>
 
-      <section className="card stack">
-        <h2>Requirements</h2>
-        <SegmentedToggle
-          label="View mode"
-          value={requirementsView}
-          onChange={(value) => setRequirementsView(value as ViewMode)}
-          options={[
-            { value: "summary", label: "Summary" },
-            { value: "json", label: "JSON" },
-          ]}
-        />
-        {requirementsView === "summary" ? (
-          <pre className="code">{requirementsSummary.join("\n") || "No requirements yet."}</pre>
-        ) : (
-          <pre className="code">{JSON.stringify(requirements, null, 2)}</pre>
-        )}
-      </section>
+            <div className="meta-row">
+              <span>Current Project ID:</span>
+              <code>{projectId || "not created yet"}</code>
+            </div>
+            {result ? (
+              <div className="meta-row">
+                <span>Last Run:</span>
+                <code>{result.projectId}</code>
+              </div>
+            ) : null}
+          </section>
+        </aside>
 
-      <section className="card stack">
-        <h2>Draft</h2>
-        <SegmentedToggle
-          label="View mode"
-          value={draftView}
-          onChange={(value) => setDraftView(value as ViewMode)}
-          options={[
-            { value: "summary", label: "Summary" },
-            { value: "json", label: "JSON" },
-          ]}
-        />
-        {draftView === "summary" ? (
-          <pre className="code">{draftSummary.join("\n") || "No draft yet."}</pre>
-        ) : (
-          <pre className="code">{JSON.stringify(draft, null, 2)}</pre>
-        )}
-      </section>
+        <section className="workspace-right">
+          <section className="workspace-output">
+            {isRunning ? (
+              <section className="thinking-stream">
+                <div className="chat-lines">
+                  {activityFeed.map((line, index) => (
+                    <p key={`${line}-${index}`} className={`chat-line ${workflowStepLabelSet.has(line) ? "thinking" : ""}`}>
+                      {line}
+                    </p>
+                  ))}
+                  <p className="chat-line thinking live">
+                    <span className="typing-dot" />
+                    Nebulating...
+                  </p>
+                </div>
+              </section>
+            ) : null}
 
-      <section className="card stack">
-        <h2>Coverage</h2>
-        <SegmentedToggle
-          label="View mode"
-          value={coverageView}
-          onChange={(value) => setCoverageView(value as ViewMode)}
-          options={[
-            { value: "summary", label: "Summary" },
-            { value: "json", label: "JSON" },
-          ]}
-        />
-        {coverageView === "summary" ? (
-          <pre className="code">{coverageSummary.join("\n") || "No coverage yet."}</pre>
-        ) : (
-          <pre className="code">{JSON.stringify(coverage, null, 2)}</pre>
-        )}
-      </section>
+            {!isRunning && !result && runStatus !== "error" ? (
+              <section className="idle-state">
+                <svg
+                  className="idle-icon"
+                  viewBox="0 0 24 24"
+                  role="img"
+                  aria-label="Magnifier icon"
+                >
+                  <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <p>Waiting for input data...</p>
+              </section>
+            ) : null}
+
+            {!isRunning && result ? (
+              <div className="result-shell">
+                <section className="pane-tabs">
+                  {paneTabs.map((tab) => {
+                    const active = activePane === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        className={`pane-tab ${active ? "active" : ""}`}
+                        onClick={() => setActivePane(tab.key)}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </section>
+
+                <section className="pane-body">
+                  {activePane === "requirements" ? (
+                    <>
+                      <h3>Requirements</h3>
+                      <SegmentedToggle
+                        label="View mode"
+                        value={requirementsView}
+                        onChange={(value) => setRequirementsView(value as ViewMode)}
+                        options={[
+                          { value: "summary", label: "Summary" },
+                          { value: "json", label: "JSON" },
+                        ]}
+                      />
+                      {requirementsView === "summary" ? (
+                        <pre className="code-block">{requirementsSummary.join("\n") || "No requirements generated."}</pre>
+                      ) : (
+                        <pre className="code-block">{JSON.stringify(result.requirements, null, 2)}</pre>
+                      )}
+                    </>
+                  ) : null}
+
+                  {activePane === "retrieval" ? (
+                    <>
+                      <h3>Retrieval</h3>
+                      <SegmentedToggle
+                        label="View mode"
+                        value={retrievalView}
+                        onChange={(value) => setRetrievalView(value as ViewMode)}
+                        options={[
+                          { value: "summary", label: "Summary" },
+                          { value: "json", label: "JSON" },
+                        ]}
+                      />
+                      {retrievalView === "summary" ? (
+                        <pre className="code-block">{retrievalSummary.join("\n") || "No retrieval results."}</pre>
+                      ) : (
+                        <pre className="code-block">{JSON.stringify(result.retrieval, null, 2)}</pre>
+                      )}
+                    </>
+                  ) : null}
+
+                  {activePane === "draft" ? (
+                    <>
+                      <h3>Draft</h3>
+                      <SegmentedToggle
+                        label="View mode"
+                        value={draftView}
+                        onChange={(value) => setDraftView(value as ViewMode)}
+                        options={[
+                          { value: "summary", label: "Summary" },
+                          { value: "json", label: "JSON" },
+                        ]}
+                      />
+                      {draftView === "summary" ? (
+                        <pre className="code-block">{draftSummary.join("\n") || "No draft generated."}</pre>
+                      ) : (
+                        <pre className="code-block">{JSON.stringify(result.draft, null, 2)}</pre>
+                      )}
+                    </>
+                  ) : null}
+
+                  {activePane === "coverage" ? (
+                    <>
+                      <h3>Coverage</h3>
+                      <SegmentedToggle
+                        label="View mode"
+                        value={coverageView}
+                        onChange={(value) => setCoverageView(value as ViewMode)}
+                        options={[
+                          { value: "summary", label: "Summary" },
+                          { value: "json", label: "JSON" },
+                        ]}
+                      />
+                      {coverageView === "summary" ? (
+                        <pre className="code-block">{coverageSummary.join("\n") || "No coverage generated."}</pre>
+                      ) : (
+                        <pre className="code-block">{JSON.stringify(result.coverage, null, 2)}</pre>
+                      )}
+                    </>
+                  ) : null}
+
+                  {activePane === "export" ? (
+                    <>
+                      <h3>Export</h3>
+                      <pre className="code-block">{exportSummary.join("\n")}</pre>
+                      <div className="action-row">
+                        <button type="button" className="primary-button" onClick={downloadJson}>
+                          Download JSON
+                        </button>
+                        <button type="button" className="secondary-button" onClick={downloadMarkdown}>
+                          Download Markdown
+                        </button>
+                      </div>
+                      <pre className="code-block">
+                        {result.exportMarkdown.length > 1400
+                          ? `${result.exportMarkdown.slice(0, 1397)}...`
+                          : result.exportMarkdown}
+                      </pre>
+                    </>
+                  ) : null}
+                </section>
+              </div>
+            ) : null}
+
+            {runStatus === "error" ? <p className="error-text">{runError ?? "Pipeline failed."}</p> : null}
+          </section>
+        </section>
+      </div>
     </main>
   );
 }
