@@ -74,3 +74,171 @@ def test_merge_requirements_handles_object_rubric_entries() -> None:
     assert "Feasibility and readiness" in merged["rubric"]
     assert "Outcomes and evidence quality" in merged["rubric"]
     assert "Budget reasonableness" in merged["rubric"]
+
+
+def test_merge_requirements_prefers_richer_prompt_for_same_section() -> None:
+    deterministic = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [
+            {
+                "id": "Q1",
+                "prompt": "Need Statement (350 words max): Describe the specific community need.",
+                "limit": {"type": "words", "value": 350},
+            }
+        ],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [],
+    }
+    nova = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [{"id": "1", "prompt": "Need Statement", "limit": {"type": "words", "value": 350}}],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [],
+    }
+
+    merged = merge_requirements_payload(deterministic, nova)
+
+    need_statement_prompts = [item["prompt"] for item in merged["questions"] if "need statement" in item["prompt"].lower()]
+    assert len(need_statement_prompts) == 1
+    assert need_statement_prompts[0] == "Need Statement (350 words max): Describe the specific community need."
+
+
+def test_merge_requirements_omits_heading_only_list_entries() -> None:
+    deterministic = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [
+            "Eligibility:",
+            "Applicants must be nonprofit organizations with active 501(c)(3) status.",
+        ],
+        "questions": [],
+        "required_attachments": ["Required Attachments:", "Attachment A: Project Budget"],
+        "rubric": ["Rubric and Scoring Criteria:"],
+        "disallowed_costs": ["Disallowed costs:", "Political campaign activity"],
+    }
+    nova = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": ["Eligibility"],
+        "questions": [],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [],
+    }
+
+    merged = merge_requirements_payload(deterministic, nova)
+
+    assert merged["eligibility"] == ["Applicants must be nonprofit organizations with active 501(c)(3) status."]
+    assert merged["required_attachments"] == ["Attachment A: Project Budget"]
+    assert merged["rubric"] == []
+    assert merged["disallowed_costs"] == ["Political campaign activity"]
+
+
+def test_extract_requirements_payload_captures_rubric_items_from_section_block() -> None:
+    rfp_text = """
+Rubric and Scoring Criteria:
+- Need alignment and urgency (30 points)
+- Feasibility and readiness (30 points)
+- Outcomes and evidence quality (25 points)
+- Budget reasonableness (15 points)
+"""
+
+    payload = extract_requirements_payload([{"text": rfp_text}])
+
+    assert payload["rubric"] == [
+        "Need alignment and urgency (30 points)",
+        "Feasibility and readiness (30 points)",
+        "Outcomes and evidence quality (25 points)",
+        "Budget reasonableness (15 points)",
+    ]
+
+
+def test_merge_requirements_moves_rubric_scored_items_out_of_disallowed_costs() -> None:
+    deterministic = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [],
+        "required_attachments": [],
+        "rubric": ["Need alignment and urgency (30 points)"],
+        "disallowed_costs": ["Expenses unrelated to direct program delivery"],
+    }
+    nova = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [
+            "(30 points)",
+            "Outcomes and evidence quality (25 points)",
+            "Budget reasonableness (15 points)",
+            "Expenses unrelated to direct pr",
+            "Expenses unrelated to direct program delivery",
+        ],
+    }
+
+    merged = merge_requirements_payload(deterministic, nova)
+
+    assert "Outcomes and evidence quality (25 points)" in merged["rubric"]
+    assert "Budget reasonableness (15 points)" in merged["rubric"]
+    assert "(30 points)" not in merged["rubric"]
+
+    assert "Outcomes and evidence quality (25 points)" not in merged["disallowed_costs"]
+    assert "Budget reasonableness (15 points)" not in merged["disallowed_costs"]
+    assert "(30 points)" not in merged["disallowed_costs"]
+    assert "Expenses unrelated to direct pr" not in merged["disallowed_costs"]
+    assert "Expenses unrelated to direct program delivery" in merged["disallowed_costs"]
+
+
+def test_merge_requirements_filters_non_cost_noise_from_disallowed() -> None:
+    deterministic = {
+        "funder": "City of Dublin",
+        "deadline": "April 30, 2027",
+        "eligibility": [],
+        "questions": [],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [
+            "Restrictions",
+            "No alcohol, entertainment, or lobbying expenses.",
+            "Equipment purchases above EUR 10,000 require prior approval.",
+            "Indirect costs capped at 12%.",
+        ],
+    }
+    nova = {
+        "funder": "City of Dublin",
+        "deadline": "April 30, 2027",
+        "eligibility": [],
+        "questions": [],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [
+            "Funding Opportunity: City of Dublin Youth Workforce Innovation Grant 2026",
+            "Program Overview",
+            "Required Narrative Questions",
+            "Describe how services continue after grant period.",
+            "No alcohol, entertainment, or lobbying expenses.",
+            "Indirect costs capped at 12%.",
+            "ters",
+        ],
+    }
+
+    merged = merge_requirements_payload(deterministic, nova)
+
+    assert "No alcohol, entertainment, or lobbying expenses." in merged["disallowed_costs"]
+    assert "Equipment purchases above EUR 10,000 require prior approval." in merged["disallowed_costs"]
+    assert "Indirect costs capped at 12%." in merged["disallowed_costs"]
+
+    assert "Funding Opportunity: City of Dublin Youth Workforce Innovation Grant 2026" not in merged["disallowed_costs"]
+    assert "Program Overview" not in merged["disallowed_costs"]
+    assert "Required Narrative Questions" not in merged["disallowed_costs"]
+    assert "Describe how services continue after grant period." not in merged["disallowed_costs"]
+    assert "ters" not in merged["disallowed_costs"]

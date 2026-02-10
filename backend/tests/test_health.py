@@ -79,10 +79,35 @@ def test_create_project_and_upload(tmp_path: Path) -> None:
         assert len(payload["documents"]) == 1
         assert payload["documents"][0]["file_name"] == "rfp.txt"
         assert payload["documents"][0]["chunks_indexed"] >= 1
+        assert payload["documents"][0]["parse_report"]["quality"] in {"good", "low", "none"}
+        assert payload["parse_report"]["documents_total"] == 1
 
         list_response = scoped_client.get(f"/projects/{project_id}/documents")
         assert list_response.status_code == 200
         assert len(list_response.json()["documents"]) == 1
+
+
+def test_upload_parse_report_marks_unsupported_file_types(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 40
+    settings.chunk_overlap_chars = 10
+    settings.embedding_dim = 64
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Parse Report"}).json()["id"]
+
+        upload_response = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("scan.pdf", b"%PDF-1.7 binary payload", "application/pdf"))],
+        )
+        assert upload_response.status_code == 200
+        payload = upload_response.json()
+        document = payload["documents"][0]
+        report = document["parse_report"]
+        assert report["quality"] == "none"
+        assert report["reason"] == "unsupported_file_type"
+        assert report["chunks_indexed"] == 0
 
 
 def test_retrieve_is_project_scoped(tmp_path: Path) -> None:
@@ -136,6 +161,86 @@ def test_retrieve_is_project_scoped(tmp_path: Path) -> None:
         assert len(payload["results"]) >= 1
         top = payload["results"][0]
         assert top["file_name"] == "impact.txt"
+
+
+def test_retrieve_defaults_to_latest_upload_batch(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 80
+    settings.chunk_overlap_chars = 20
+    settings.embedding_dim = 64
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Batch Scope"}).json()["id"]
+
+        first_upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("old.txt", b"legacyterm legacyterm legacyterm", "text/plain"))],
+        )
+        assert first_upload.status_code == 200
+
+        second_upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("new.txt", b"newterm newterm newterm", "text/plain"))],
+        )
+        assert second_upload.status_code == 200
+        second_batch_id = second_upload.json()["upload_batch_id"]
+
+        latest_scoped = client.post(
+            f"/projects/{project_id}/retrieve",
+            json={"query": "legacyterm", "top_k": 3},
+        )
+        assert latest_scoped.status_code == 200
+        latest_payload = latest_scoped.json()
+        assert latest_payload["upload_batch_id"] == second_batch_id
+        assert len(latest_payload["results"]) >= 1
+        assert latest_payload["results"][0]["file_name"] == "new.txt"
+
+        all_scoped = client.post(
+            f"/projects/{project_id}/retrieve?document_scope=all",
+            json={"query": "legacyterm", "top_k": 3},
+        )
+        assert all_scoped.status_code == 200
+        all_payload = all_scoped.json()
+        assert all_payload["upload_batch_id"] is None
+        assert len(all_payload["results"]) >= 1
+        assert all_payload["results"][0]["file_name"] == "old.txt"
+
+
+def test_extract_requirements_defaults_to_latest_upload_batch(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 250
+    settings.chunk_overlap_chars = 40
+    settings.embedding_dim = 64
+
+    first_rfp = b"Funder: Legacy Foundation\nQuestion 1: Legacy prompt. Limit 100 words."
+    second_rfp = b"Funder: New Foundation\nQuestion 1: Fresh prompt. Limit 120 words."
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Batch RFP"}).json()["id"]
+
+        assert (
+            client.post(
+                f"/projects/{project_id}/upload",
+                files=[("files", ("rfp_legacy.txt", first_rfp, "text/plain"))],
+            ).status_code
+            == 200
+        )
+        second_upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("rfp_new.txt", second_rfp, "text/plain"))],
+        )
+        assert second_upload.status_code == 200
+        second_batch_id = second_upload.json()["upload_batch_id"]
+
+        extract = client.post(f"/projects/{project_id}/extract-requirements")
+        assert extract.status_code == 200
+        payload = extract.json()
+        assert payload["upload_batch_id"] == second_batch_id
+        assert payload["requirements"]["funder"] == "New Foundation"
+        rfp_selection = payload["extraction"]["rfp_selection"]
+        assert rfp_selection["selected_file_name"] == "rfp_new.txt"
 
 
 def test_extract_requirements_and_read_latest(tmp_path: Path) -> None:
@@ -346,12 +451,24 @@ def test_export_json_and_markdown(tmp_path: Path) -> None:
 
         export_json = client.get(f"/projects/{project_id}/export?format=json&section_key=Need Statement")
         assert export_json.status_code == 200
-        assert export_json.json()["project_id"] == project_id
-        assert export_json.json()["requirements"] is not None
+        payload = export_json.json()
+        assert payload["export_version"] == "nebula.export.v1"
+        assert payload["project"]["id"] == project_id
+        assert payload["bundle"]["json"] is not None
+        assert payload["bundle"]["json"]["requirements"] is not None
+        assert payload["bundle"]["markdown"] is not None
+        markdown_files = payload["bundle"]["markdown"]["files"]
+        assert isinstance(markdown_files, list)
+        assert len(markdown_files) >= 1
+
+        exports_root = tmp_path / "exports" / project_id
+        assert exports_root.exists()
+        assert (exports_root / "application.md").exists()
+        assert (exports_root / "requirements.md").exists()
 
         export_md = client.get(f"/projects/{project_id}/export?format=markdown&section_key=Need Statement")
         assert export_md.status_code == 200
-        assert "Nebula Export" in export_md.text
+        assert "Draft Application" in export_md.text
 
 
 def test_agentic_orchestration_pilot_retries_missing_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

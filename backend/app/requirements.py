@@ -74,12 +74,217 @@ def _normalize_question_key(value: str) -> str:
     return " ".join(stripped.split())
 
 
+def _normalize_question_base_key(value: str) -> str:
+    base = value.split(":", maxsplit=1)[0]
+    return _normalize_question_key(base)
+
+
+def _question_prompt_rank(value: str) -> int:
+    normalized = " ".join(value.split()).strip()
+    if not normalized:
+        return 0
+    rank = len(normalized)
+    if ":" in normalized:
+        rank += 50
+    if _extract_question_limit(normalized).type != "none":
+        rank += 20
+    return rank
+
+
 def _normalize_attachment_key(value: str) -> str:
     lowered = value.lower().strip(" -\t")
     lowered = re.sub(r"^include\s+", "", lowered)
     lowered = re.sub(r"^attachment\s+[a-z0-9]+\s*[:\-]\s*", "", lowered)
     lowered = re.sub(r"[^a-z0-9\s]", " ", lowered)
     return " ".join(lowered.split())
+
+
+def _normalize_free_text(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9\s]", " ", value.lower())
+    return " ".join(normalized.split())
+
+
+def _is_question_or_heading_line(value: str) -> bool:
+    lowered = value.lower().strip()
+    if _section_from_heading(value) is not None:
+        return True
+    if lowered.startswith(("funding opportunity", "program overview", "required narrative questions", "submission requirements")):
+        return True
+    if re.match(r"^(?:q(?:uestion)?\s*)?\d+[\).:\-]\s+", lowered):
+        return True
+    return False
+
+
+def _looks_like_rubric_item(value: str) -> bool:
+    lowered = value.lower()
+    if re.search(r"\(\s*\d+\s*points?\s*\)", lowered):
+        return True
+    if lowered.strip().endswith("points"):
+        return True
+    return False
+
+
+def _is_points_only_fragment(value: str) -> bool:
+    lowered = value.lower().strip()
+    return re.fullmatch(r"\(?\s*\d+\s*points?\s*\)?", lowered) is not None
+
+
+def _looks_like_disallowed_cost_item(value: str) -> bool:
+    normalized = _normalize_free_text(value)
+    if not normalized:
+        return False
+    if _is_question_or_heading_line(value):
+        return False
+    if _is_points_only_fragment(value) or _looks_like_rubric_item(value):
+        return False
+    if normalized in {"restrictions", "disallowed costs", "ineligible costs"}:
+        return False
+    if len(normalized) < 8:
+        return False
+
+    negative_patterns = (
+        "no ",
+        "not allowed",
+        "disallowed",
+        "ineligible",
+        "unallowable",
+        "without prior approval",
+        "capped at",
+        "cap at",
+        "above ",
+        "maximum ",
+    )
+    cost_topics = (
+        "cost",
+        "costs",
+        "expense",
+        "expenses",
+        "equipment",
+        "real estate",
+        "alcohol",
+        "entertainment",
+        "lobbying",
+        "political",
+        "indirect",
+        "overhead",
+    )
+
+    has_negative = any(pattern in normalized for pattern in negative_patterns)
+    has_topic = any(topic in normalized for topic in cost_topics)
+    if has_negative and has_topic:
+        return True
+    if normalized.startswith("purchase of real estate"):
+        return True
+    if normalized.startswith("political campaign activity"):
+        return True
+    if normalized.startswith("expenses unrelated to direct program delivery"):
+        return True
+    return False
+
+
+def _clean_disallowed_costs(items: list[str]) -> list[str]:
+    filtered = [item for item in items if _looks_like_disallowed_cost_item(item)]
+    if not filtered:
+        return []
+
+    normalized_items = [_normalize_free_text(item) for item in filtered]
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for item, normalized in zip(filtered, normalized_items, strict=False):
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(item)
+    return _drop_prefix_fragments(deduped, min_prefix_len=10)
+
+
+def _drop_prefix_fragments(items: list[str], min_prefix_len: int = 12) -> list[str]:
+    normalized = [_normalize_free_text(item) for item in items]
+    keep = [True] * len(items)
+    for index, key in enumerate(normalized):
+        if not key:
+            keep[index] = False
+            continue
+        if len(key) < min_prefix_len:
+            continue
+        for other_index, other_key in enumerate(normalized):
+            if index == other_index:
+                continue
+            if other_key.startswith(key) and other_key != key:
+                keep[index] = False
+                break
+    return [item for item, should_keep in zip(items, keep, strict=False) if should_keep]
+
+
+def _is_section_heading(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped.endswith(":"):
+        return False
+    if stripped.startswith(("-", "*", "•")):
+        return False
+    if re.match(r"^\d+[\).:]", stripped):
+        return False
+    return True
+
+
+def _section_from_heading(line: str) -> str | None:
+    normalized = _normalize_free_text(line.removesuffix(":").strip())
+    if not normalized:
+        return None
+    if normalized.startswith("eligibility"):
+        return "eligibility"
+    if normalized.startswith("required attachments") or normalized in {"required attachment", "attachments", "attachment"}:
+        return "required_attachments"
+    if "rubric" in normalized or "scoring criteria" in normalized:
+        return "rubric"
+    if normalized.startswith("disallowed costs") or normalized.startswith("disallowed cost"):
+        return "disallowed_costs"
+    if normalized.startswith("ineligible costs") or normalized.startswith("ineligible cost"):
+        return "disallowed_costs"
+    return None
+
+
+def _drop_heading_only(items: object, aliases: tuple[str, ...]) -> list[str]:
+    values = items if isinstance(items, list) else []
+    cleaned = _dedupe(values)
+    alias_keys = {_normalize_free_text(alias) for alias in aliases}
+    result: list[str] = []
+    for item in cleaned:
+        key = _normalize_free_text(item.removesuffix(":").strip())
+        if key in alias_keys:
+            continue
+        result.append(item)
+    return result
+
+
+def _clean_requirements_lists(payload: dict[str, object]) -> dict[str, object]:
+    cleaned = dict(payload)
+    eligibility_items = _drop_heading_only(cleaned.get("eligibility"), ("eligibility",))
+    attachment_items = _drop_heading_only(
+        cleaned.get("required_attachments"),
+        ("required attachments", "required attachment", "attachments", "attachment"),
+    )
+    rubric_items = _drop_heading_only(
+        cleaned.get("rubric"),
+        ("rubric", "rubric and scoring criteria", "scoring criteria"),
+    )
+    disallowed_items = _drop_heading_only(
+        cleaned.get("disallowed_costs"),
+        ("disallowed costs", "disallowed cost", "ineligible costs", "ineligible cost"),
+    )
+
+    rubric_promoted = [item for item in disallowed_items if _looks_like_rubric_item(item)]
+    if rubric_promoted:
+        rubric_items = _dedupe([*rubric_items, *rubric_promoted])
+        disallowed_items = [item for item in disallowed_items if not _looks_like_rubric_item(item)]
+
+    rubric_items = [item for item in rubric_items if not _is_points_only_fragment(item)]
+
+    cleaned["eligibility"] = _drop_prefix_fragments(eligibility_items)
+    cleaned["required_attachments"] = _drop_prefix_fragments(attachment_items)
+    cleaned["rubric"] = _drop_prefix_fragments(rubric_items)
+    cleaned["disallowed_costs"] = _clean_disallowed_costs(disallowed_items)
+    return cleaned
 
 
 def _extract_question_limit(text: str) -> QuestionLimit:
@@ -132,8 +337,14 @@ def extract_requirements_payload(chunks: list[dict[str, object]]) -> dict[str, o
     required_attachments: list[str] = []
     rubric: list[str] = []
     disallowed_costs: list[str] = []
+    active_section: str | None = None
 
     for line in lines:
+        if _is_section_heading(line):
+            active_section = _section_from_heading(line)
+            if active_section is not None:
+                continue
+
         if funder is None:
             funder_match = re.search(
                 r"(?:funder|grantor|funding organization)\s*[:\-]\s*(.+)",
@@ -176,6 +387,19 @@ def extract_requirements_payload(chunks: list[dict[str, object]]) -> dict[str, o
             if deadline_match:
                 deadline = deadline_match.group(1).strip()
 
+        if active_section == "eligibility":
+            eligibility.append(line)
+            continue
+        if active_section == "required_attachments":
+            required_attachments.append(line)
+            continue
+        if active_section == "rubric":
+            rubric.append(line)
+            continue
+        if active_section == "disallowed_costs":
+            disallowed_costs.append(line)
+            continue
+
         lowered = line.lower()
         if "eligib" in lowered:
             eligibility.append(line)
@@ -202,7 +426,7 @@ def extract_requirements_payload(chunks: list[dict[str, object]]) -> dict[str, o
         "rubric": _dedupe(rubric),
         "disallowed_costs": _dedupe(disallowed_costs),
     }
-    return payload
+    return _clean_requirements_lists(payload)
 
 
 def merge_requirements_payload(
@@ -212,7 +436,8 @@ def merge_requirements_payload(
     right = repair_requirements_payload(nova_payload)
 
     merged_questions: list[dict[str, object]] = []
-    seen_prompts: set[str] = set()
+    seen_prompt_keys: set[str] = set()
+    base_question_index: dict[str, int] = {}
     for source in (left, right):
         for question in source.get("questions", []):
             if not isinstance(question, dict):
@@ -220,15 +445,28 @@ def merge_requirements_payload(
             prompt = str(question.get("prompt", "")).strip()
             if not prompt:
                 continue
-            key = _normalize_question_key(prompt)
-            if key in seen_prompts:
+            prompt_key = _normalize_question_key(prompt)
+            if prompt_key in seen_prompt_keys:
                 continue
-            seen_prompts.add(key)
             question_id = str(question.get("id", "")).strip() or f"Q{len(merged_questions) + 1}"
             limit = question.get("limit", {"type": "none", "value": None})
             if not isinstance(limit, dict):
                 limit = {"type": "none", "value": None}
-            merged_questions.append({"id": question_id, "prompt": prompt, "limit": limit})
+            candidate = {"id": question_id, "prompt": prompt, "limit": limit}
+
+            base_key = _normalize_question_base_key(prompt)
+            if base_key and base_key in base_question_index:
+                existing_index = base_question_index[base_key]
+                existing_prompt = str(merged_questions[existing_index].get("prompt", ""))
+                if _question_prompt_rank(prompt) > _question_prompt_rank(existing_prompt):
+                    merged_questions[existing_index] = candidate
+                    seen_prompt_keys.add(prompt_key)
+                continue
+
+            merged_questions.append(candidate)
+            seen_prompt_keys.add(prompt_key)
+            if base_key:
+                base_question_index[base_key] = len(merged_questions) - 1
 
     attachments: list[str] = [*left.get("required_attachments", []), *right.get("required_attachments", [])]
     merged_attachments: list[str] = []
@@ -240,7 +478,7 @@ def merge_requirements_payload(
         seen_attachment_keys.add(key)
         merged_attachments.append(str(item))
 
-    return {
+    merged = {
         "funder": left.get("funder") or right.get("funder"),
         "deadline": left.get("deadline") or right.get("deadline"),
         "eligibility": _dedupe([*left.get("eligibility", []), *right.get("eligibility", [])]),
@@ -249,6 +487,7 @@ def merge_requirements_payload(
         "rubric": _dedupe([*left.get("rubric", []), *right.get("rubric", [])]),
         "disallowed_costs": _dedupe([*left.get("disallowed_costs", []), *right.get("disallowed_costs", [])]),
     }
+    return _clean_requirements_lists(merged)
 
 
 def repair_requirements_payload(payload: dict[str, object]) -> dict[str, object]:
@@ -293,7 +532,7 @@ def repair_requirements_payload(payload: dict[str, object]) -> dict[str, object]
         repaired["funder"] = str(repaired["funder"]).strip() or None
     if repaired.get("deadline") is not None:
         repaired["deadline"] = str(repaired["deadline"]).strip() or None
-    return repaired
+    return _clean_requirements_lists(repaired)
 
 
 def validate_with_repair(payload: dict[str, object]) -> tuple[RequirementsArtifact | None, bool, list[str]]:
