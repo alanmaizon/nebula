@@ -238,3 +238,77 @@ def test_build_export_bundle_reconciles_coverage_across_all_sections() -> None:
 
     assert q1["status"] in {"partial", "met"}
     assert q2["status"] in {"partial", "met"}
+
+
+def test_build_export_bundle_flags_citation_mismatch_and_downgrades_scores() -> None:
+    test_input = _base_input()
+    test_input["drafts"]["Need Statement"]["draft"]["paragraphs"][0]["text"] = (
+        "Need is documented. (doc: impact_report.txt, page: 2)"
+    )
+    test_input["drafts"]["Need Statement"]["draft"]["paragraphs"][0]["citations"] = [
+        {
+            "doc_id": "impact_report.txt",
+            "page": 1,
+            "snippet": "",
+        }
+    ]
+
+    payload = build_export_bundle(test_input)
+    quality = payload["quality_gates"]
+    assert "citation mismatch warning" in quality["warnings"]
+    assert payload["summary"]["uncertainty"]["citation_mismatch_count"] >= 1
+    assert payload["summary"]["overall_completion"] != "100.0%"
+
+
+def test_build_export_bundle_attachment_requirements_need_attachment_grounded_evidence() -> None:
+    test_input = _base_input()
+    test_input["coverage"]["items"] = [
+        {
+            "requirement_id": "A1",
+            "status": "met",
+            "notes": "Budget covered by narrative.",
+            "evidence_refs": ["section_key: Need Statement, paragraph 1, citation: impact_report.txt:p1"],
+        }
+    ]
+
+    payload = build_export_bundle(test_input)
+    coverage_items = payload["bundle"]["json"]["coverage"]["items"]
+    attachment = next(item for item in coverage_items if item["requirement_id"] == "A1")
+
+    assert attachment["status"] != "met"
+    assert "attachment-grounded evidence" in attachment["notes"].lower()
+
+
+def test_build_export_bundle_warns_for_empty_required_sections() -> None:
+    test_input = _base_input()
+    test_input["requirements"]["questions"] = [
+        {
+            "id": "Q1",
+            "prompt": "Need Statement (350 words max): Describe need.",
+            "limit": {"type": "words", "value": 350},
+        },
+        {
+            "id": "Q2",
+            "prompt": "Program Design (400 words max): Explain your activities and implementation timeline.",
+            "limit": {"type": "words", "value": 400},
+        },
+    ]
+    test_input["coverage"]["items"] = [
+        {
+            "requirement_id": "Q1",
+            "status": "met",
+            "notes": "Covered",
+            "evidence_refs": ["impact_report.txt:p1"],
+        },
+        {
+            "requirement_id": "Q2",
+            "status": "missing",
+            "notes": "No section content.",
+            "evidence_refs": [],
+        },
+    ]
+
+    payload = build_export_bundle(test_input)
+    quality = payload["quality_gates"]
+    assert "empty required section warning" in quality["warnings"]
+    assert payload["summary"]["uncertainty"]["empty_required_sections_count"] >= 1

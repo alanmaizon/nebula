@@ -13,6 +13,24 @@ _NARRATIVE_REQUIREMENT_SECTION_MAP = {
     "Q3": "Outcomes and Evaluation",
 }
 _COVERAGE_STATUS_ORDER = {"missing": 0, "partial": 1, "met": 2}
+_INLINE_CITATION_HINT_PATTERN = re.compile(
+    r"\(\s*(?:doc(?:_id)?|source)\s*[:=]\s*([^,)\n]+)\s*,\s*page\s*[:=]\s*(\d+)\s*\)",
+    flags=re.IGNORECASE,
+)
+_ATTACHMENT_NOISE_TOKENS = {
+    "a",
+    "an",
+    "and",
+    "attachment",
+    "appendix",
+    "by",
+    "for",
+    "of",
+    "required",
+    "the",
+    "to",
+}
+_MIN_CONFIDENCE_FOR_SUPPORTED = 0.35
 
 _AWS_ACCESS_KEY_PATTERN = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
 _PRIVATE_KEY_PATTERN = re.compile(
@@ -70,7 +88,7 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
         quality_reasons.append("Requirements artifact exists but coverage artifact is missing.")
 
     valid_doc_ids, doc_page_counts = _build_document_lookup(documents)
-    exported_drafts, unsupported_claims_count, draft_warnings, invalid_citation_doc_ids = _prepare_drafts_for_export(
+    exported_drafts, unsupported_claims_count, draft_warnings, integrity_signals = _prepare_drafts_for_export(
         drafts_map=drafts_map,
         selected_sections=selected_sections,
         valid_doc_ids=valid_doc_ids,
@@ -85,11 +103,14 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
     )
     coverage_counts = _coverage_counts(reconciled_coverage_items)
 
+    invalid_citation_doc_ids = set(integrity_signals.get("invalid_doc_ids") or [])
     if invalid_citation_doc_ids:
         quality_reasons.append(
             "Citation doc_id not found in project documents: "
             + ", ".join(sorted(invalid_citation_doc_ids))
         )
+    if int(integrity_signals.get("citation_mismatch_count") or 0) > 0:
+        warnings.append("citation mismatch warning")
 
     merged_missing_evidence = _merge_missing_evidence(raw_missing_evidence, exported_drafts)
     missing_evidence_count = len(merged_missing_evidence)
@@ -100,7 +121,18 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
     if unsupported_claims_count > 0:
         warnings.append("unsupported_claims_count > 0")
 
-    completion = _compute_completion(coverage_counts)
+    coverage_uncertainty = _derive_coverage_uncertainty_signals(
+        requirements=requirements,
+        coverage_items=reconciled_coverage_items,
+        section_stats=_build_section_stats(exported_drafts),
+    )
+    warnings.extend(coverage_uncertainty["warnings"])
+    completion = _compute_completion(
+        coverage_counts,
+        unsupported_claims_count=unsupported_claims_count,
+        citation_mismatch_count=int(integrity_signals.get("citation_mismatch_count") or 0),
+        empty_required_sections_count=int(coverage_uncertainty.get("empty_required_sections_count") or 0),
+    )
     overall_completion = (
         f"{completion:.1f}%"
         if completion is not None
@@ -112,6 +144,12 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
         "coverage_overview": coverage_counts,
         "unsupported_claims_count": unsupported_claims_count,
         "missing_evidence_count": missing_evidence_count,
+        "uncertainty": {
+            "citation_mismatch_count": int(integrity_signals.get("citation_mismatch_count") or 0),
+            "source_conflict_count": int(coverage_uncertainty.get("source_conflict_count") or 0),
+            "empty_required_sections_count": int(coverage_uncertainty.get("empty_required_sections_count") or 0),
+            "unsupported_claims_count": unsupported_claims_count,
+        },
         "constraints": {
             "known": known_constraints,
             "unknown": unknown_constraints,
@@ -132,6 +170,7 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
             selected_sections=selected_sections,
             coverage_items=reconciled_coverage_items,
             coverage_counts=coverage_counts,
+            uncertainty=summary["uncertainty"] if isinstance(summary.get("uncertainty"), dict) else {},
             missing_evidence=merged_missing_evidence,
             validations=validations,
             run_metadata=run_metadata,
@@ -268,6 +307,17 @@ def _reconcile_coverage_items(
             notes = f"No coverage item returned for requirement: {requirement_text}"
         if not notes:
             notes = "Coverage note unavailable."
+        if requirement_id.upper().startswith("A"):
+            if status == "met" and not _has_attachment_grounded_evidence(
+                requirement_id=requirement_id,
+                requirement_text=requirement_text,
+                evidence_refs=refs,
+            ):
+                status = "partial" if refs else "missing"
+                notes = (
+                    "Attachment requirement needs attachment-grounded evidence; "
+                    "narrative-only evidence cannot be marked met."
+                )
 
         reconciled.append(
             {
@@ -629,6 +679,7 @@ def _build_markdown_files(
     selected_sections: list[str],
     coverage_items: list[dict[str, object]],
     coverage_counts: dict[str, int],
+    uncertainty: dict[str, object],
     missing_evidence: list[dict[str, object]],
     validations: dict[str, object],
     run_metadata: dict[str, object],
@@ -639,7 +690,7 @@ def _build_markdown_files(
     requirement_rows = _build_requirement_rows(requirements, coverage_items)
     draft_application = _render_draft_application_markdown(selected_sections, drafts)
     requirements_matrix = _render_requirements_matrix_markdown(requirement_rows)
-    coverage_markdown = _render_coverage_markdown(coverage_items, coverage_counts)
+    coverage_markdown = _render_coverage_markdown(coverage_items, coverage_counts, uncertainty)
     missing_evidence_markdown = _render_missing_evidence_markdown(missing_evidence)
     validation_markdown = _render_validation_markdown(validations, include_debug)
 
@@ -815,14 +866,29 @@ def _render_draft_application_markdown(
     return "\n".join(lines).strip()
 
 
-def _render_coverage_markdown(coverage_items: list[dict[str, object]], coverage_counts: dict[str, int]) -> str:
+def _render_coverage_markdown(
+    coverage_items: list[dict[str, object]],
+    coverage_counts: dict[str, int],
+    uncertainty: dict[str, object],
+) -> str:
     met = coverage_counts.get("met", 0)
     partial = coverage_counts.get("partial", 0)
     missing = coverage_counts.get("missing", 0)
     total = met + partial + missing
 
-    readiness = ((met + 0.5 * partial) / total * 100) if total > 0 else 0.0
-    completion = (met / total * 100) if total > 0 else 0.0
+    unsupported_claims = _coerce_positive_int(uncertainty.get("unsupported_claims_count"))
+    citation_mismatch_count = _coerce_positive_int(uncertainty.get("citation_mismatch_count"))
+    empty_required_sections_count = _coerce_positive_int(uncertainty.get("empty_required_sections_count"))
+    uncertainty_penalty = _uncertainty_penalty_factor(
+        total=max(total, 1),
+        unsupported_claims_count=unsupported_claims or 0,
+        citation_mismatch_count=citation_mismatch_count or 0,
+        empty_required_sections_count=empty_required_sections_count or 0,
+    )
+    readiness_base = ((met + 0.5 * partial) / total * 100) if total > 0 else 0.0
+    completion_base = (met / total * 100) if total > 0 else 0.0
+    readiness = readiness_base * (1.0 - uncertainty_penalty)
+    completion = completion_base * (1.0 - uncertainty_penalty)
 
     lines = [
         "# Coverage Summary",
@@ -833,8 +899,29 @@ def _render_coverage_markdown(coverage_items: list[dict[str, object]], coverage_
         f"- Partial: {partial}",
         f"- Missing: {missing}",
     ]
+    source_conflict_count = _coerce_positive_int(uncertainty.get("source_conflict_count")) or 0
+    if source_conflict_count > 0:
+        lines.append(f"- Source conflicts detected: {source_conflict_count}")
+    if citation_mismatch_count:
+        lines.append(f"- Citation mismatches detected: {citation_mismatch_count}")
+    if empty_required_sections_count:
+        lines.append(f"- Empty required sections detected: {empty_required_sections_count}")
+    if unsupported_claims:
+        lines.append(f"- Unsupported claims detected: {unsupported_claims}")
 
     recommendations: list[str] = []
+    if source_conflict_count > 0:
+        recommendations.append(
+            "Resolve source conflict warning: align contradictory evidence before finalizing scores."
+        )
+    if (citation_mismatch_count or 0) > 0:
+        recommendations.append(
+            "Resolve citation mismatch warning: fix doc/page/snippet integrity and inline-vs-structured citations."
+        )
+    if (empty_required_sections_count or 0) > 0:
+        recommendations.append(
+            "Address empty required section warning: add grounded content for missing required sections."
+        )
     for item in coverage_items:
         status = str(item.get("status") or "").strip().lower()
         if status not in {"missing", "partial"}:
@@ -987,10 +1074,11 @@ def _prepare_drafts_for_export(
     selected_sections: list[str],
     valid_doc_ids: set[str],
     doc_page_counts: dict[str, int],
-) -> tuple[dict[str, dict[str, object]], int, list[str], set[str]]:
+) -> tuple[dict[str, dict[str, object]], int, list[str], dict[str, object]]:
     unsupported_claims_count = 0
     warnings: list[str] = []
     invalid_doc_ids: set[str] = set()
+    citation_mismatch_count = 0
     exported: dict[str, dict[str, object]] = {}
 
     for section_key in selected_sections:
@@ -1003,6 +1091,7 @@ def _prepare_drafts_for_export(
 
         for paragraph in paragraphs:
             text = str(paragraph.get("text") or "").strip()
+            confidence = _coerce_confidence(paragraph.get("confidence"))
             raw_citations = paragraph.get("citations")
             citations = _as_dict_list(raw_citations)
             normalized_citations: list[dict[str, object]] = []
@@ -1017,13 +1106,23 @@ def _prepare_drafts_for_export(
 
                 if doc_id and doc_id not in valid_doc_ids:
                     invalid_doc_ids.add(doc_id)
+                    citation_mismatch_count += 1
+                    warnings.append(
+                        f"Citation mismatch in section '{section_key}': doc_id '{doc_id}' not in document registry."
+                    )
                 if doc_id and page is not None:
                     max_page = doc_page_counts.get(doc_id)
                     if max_page is not None and page > max_page:
+                        citation_mismatch_count += 1
                         warnings.append(
                             f"Citation page out of bounds for doc '{doc_id}' in section '{section_key}' "
                             f"(page {page}, max {max_page})."
                         )
+                if not snippet:
+                    citation_mismatch_count += 1
+                    warnings.append(
+                        f"Citation mismatch in section '{section_key}': missing snippet for doc '{doc_id or 'unknown'}'."
+                    )
 
                 normalized_citations.append(
                     {
@@ -1033,7 +1132,25 @@ def _prepare_drafts_for_export(
                     }
                 )
 
-            unsupported = len(normalized_citations) == 0 or "[UNSUPPORTED]" in text
+            inline_hint_pairs = _extract_inline_citation_pairs(text)
+            structured_pairs = {
+                (str(citation.get("doc_id") or "").strip(), _coerce_positive_int(citation.get("page")) or 1)
+                for citation in normalized_citations
+            }
+            for inline_hint in inline_hint_pairs:
+                if inline_hint not in structured_pairs:
+                    citation_mismatch_count += 1
+                    warnings.append(
+                        f"Citation mismatch in section '{section_key}': inline hint {inline_hint[0]} p{inline_hint[1]} "
+                        "not represented in structured citations."
+                    )
+
+            unsupported = (
+                len(normalized_citations) == 0
+                or "[UNSUPPORTED]" in text
+                or confidence < _MIN_CONFIDENCE_FOR_SUPPORTED
+                or len(inline_hint_pairs) > 0 and any(hint not in structured_pairs for hint in inline_hint_pairs)
+            )
             if unsupported:
                 unsupported_claims_count += 1
 
@@ -1041,7 +1158,7 @@ def _prepare_drafts_for_export(
                 {
                     "text": text,
                     "citations": normalized_citations,
-                    "confidence": _coerce_confidence(paragraph.get("confidence")),
+                    "confidence": confidence,
                     "unsupported": unsupported,
                 }
             )
@@ -1059,7 +1176,10 @@ def _prepare_drafts_for_export(
             },
         }
 
-    return exported, unsupported_claims_count, warnings, invalid_doc_ids
+    return exported, unsupported_claims_count, warnings, {
+        "invalid_doc_ids": invalid_doc_ids,
+        "citation_mismatch_count": citation_mismatch_count,
+    }
 
 
 def _merge_missing_evidence(
@@ -1132,12 +1252,25 @@ def _extract_constraints(requirements: dict[str, object] | None) -> tuple[list[s
     return known, unknown
 
 
-def _compute_completion(coverage_counts: dict[str, int]) -> float | None:
+def _compute_completion(
+    coverage_counts: dict[str, int],
+    *,
+    unsupported_claims_count: int = 0,
+    citation_mismatch_count: int = 0,
+    empty_required_sections_count: int = 0,
+) -> float | None:
     total = coverage_counts.get("met", 0) + coverage_counts.get("partial", 0) + coverage_counts.get("missing", 0)
     if total <= 0:
         return None
     score = coverage_counts.get("met", 0) + 0.5 * coverage_counts.get("partial", 0)
-    return (score / total) * 100
+    base = (score / total) * 100
+    penalty = _uncertainty_penalty_factor(
+        total=total,
+        unsupported_claims_count=unsupported_claims_count,
+        citation_mismatch_count=citation_mismatch_count,
+        empty_required_sections_count=empty_required_sections_count,
+    )
+    return base * (1.0 - penalty)
 
 
 def _coverage_counts(coverage_items: list[dict[str, object]]) -> dict[str, int]:
@@ -1265,6 +1398,123 @@ def _collect_section_citations(paragraphs: list[dict[str, object]]) -> list[dict
                 }
             )
     return citations
+
+
+def _extract_inline_citation_pairs(paragraph_text: str) -> list[tuple[str, int]]:
+    pairs: list[tuple[str, int]] = []
+    for match in _INLINE_CITATION_HINT_PATTERN.finditer(paragraph_text):
+        doc_id = str(match.group(1) or "").strip()
+        page = _coerce_positive_int(match.group(2))
+        if doc_id and page is not None:
+            pairs.append((doc_id, page))
+    return pairs
+
+
+def _uncertainty_penalty_factor(
+    *,
+    total: int,
+    unsupported_claims_count: int,
+    citation_mismatch_count: int,
+    empty_required_sections_count: int,
+) -> float:
+    denominator = max(total, 1)
+    weighted = (
+        unsupported_claims_count * 1.0
+        + citation_mismatch_count * 1.25
+        + empty_required_sections_count * 1.5
+    )
+    return min(0.6, (weighted / denominator) * 0.12)
+
+
+def _derive_coverage_uncertainty_signals(
+    *,
+    requirements: dict[str, object] | None,
+    coverage_items: list[dict[str, object]],
+    section_stats: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    empty_required_sections_count = 0
+    source_conflict_count = 0
+    warnings: list[str] = []
+
+    expected_sections: list[str] = []
+    if requirements and isinstance(requirements.get("questions"), list):
+        for index, question in enumerate(requirements["questions"], start=1):
+            if not isinstance(question, dict):
+                continue
+            req_id = str(question.get("id") or f"Q{index}").strip() or f"Q{index}"
+            prompt = str(question.get("prompt") or "").strip()
+            section_title = _NARRATIVE_REQUIREMENT_SECTION_MAP.get(req_id.upper()) or _question_section_title(prompt)
+            if section_title:
+                expected_sections.append(section_title)
+
+    for section_title in expected_sections:
+        section = _match_expected_section(section_stats, section_title)
+        if section is None or not bool(section.get("substantive")):
+            empty_required_sections_count += 1
+
+    for item in coverage_items:
+        if not isinstance(item, dict):
+            continue
+        req_id = str(item.get("requirement_id") or "").strip()
+        status = _normalize_coverage_status(item.get("status"))
+        if not req_id or status == "missing":
+            continue
+        refs = _as_str_list(item.get("evidence_refs"))
+        doc_ids = _doc_ids_from_evidence_refs(refs)
+        if len(doc_ids) >= 2 and req_id.upper().startswith("Q"):
+            source_conflict_count += 1
+
+    if source_conflict_count > 0:
+        warnings.append("source conflict warning")
+    if empty_required_sections_count > 0:
+        warnings.append("empty required section warning")
+    return {
+        "source_conflict_count": source_conflict_count,
+        "empty_required_sections_count": empty_required_sections_count,
+        "warnings": warnings,
+    }
+
+
+def _doc_ids_from_evidence_refs(refs: list[str]) -> set[str]:
+    doc_ids: set[str] = set()
+    for ref in refs:
+        citation_match = re.search(r"citation:\s*([^,\s]+)", ref, flags=re.IGNORECASE)
+        if citation_match:
+            doc_token = citation_match.group(1).strip()
+            doc_ids.add(doc_token.split(":p", 1)[0].strip())
+            continue
+        plain_match = re.search(r"([a-z0-9._-]+\.[a-z0-9]{2,6})(?::p\d+)?", ref, flags=re.IGNORECASE)
+        if plain_match:
+            doc_ids.add(plain_match.group(1).strip())
+    return doc_ids
+
+
+def _has_attachment_grounded_evidence(
+    *,
+    requirement_id: str,
+    requirement_text: str,
+    evidence_refs: list[str],
+) -> bool:
+    doc_ids = _doc_ids_from_evidence_refs(evidence_refs)
+    if not doc_ids:
+        return False
+    attachment_number = _coerce_positive_int(re.sub(r"^[Aa]", "", requirement_id.strip()))
+    requirement_tokens = {
+        token for token in _token_set(requirement_text) if token and token not in _ATTACHMENT_NOISE_TOKENS
+    }
+
+    for doc_id in doc_ids:
+        doc_tokens = _token_set(doc_id)
+        if "attachment" in doc_tokens or "appendix" in doc_tokens:
+            return True
+        if attachment_number is not None and (
+            f"attachment{attachment_number}" in _normalize_key(doc_id).replace(" ", "")
+            or f"a{attachment_number}" in _normalize_key(doc_id).replace(" ", "")
+        ):
+            return True
+        if requirement_tokens and len(requirement_tokens & doc_tokens) > 0:
+            return True
+    return False
 
 
 def _unsupported_paragraph_descriptions(paragraphs: list[dict[str, object]]) -> list[str]:

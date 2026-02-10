@@ -14,6 +14,12 @@ from app.export.policy import (
     word_count,
 )
 
+_INLINE_CITATION_HINT_PATTERN = re.compile(
+    r"\(\s*(?:doc(?:_id)?|source)\s*[:=]\s*([^,)\n]+)\s*,\s*page\s*[:=]\s*(\d+)\s*\)",
+    flags=re.IGNORECASE,
+)
+_MIN_CONFIDENCE_FOR_SUPPORTED = 0.35
+
 
 @dataclass
 class RequirementRow:
@@ -54,9 +60,15 @@ def compose_markdown_report(
     del validations
 
     missing_evidence = missing_evidence or []
-    valid_doc_ids = _document_registry(documents)
+    valid_doc_ids, page_counts = _document_registry(documents)
     section_limits = _section_word_limits(requirements)
-    sections = _prepare_sections(drafts=drafts, section_limits=section_limits, requirements=requirements)
+    sections = _prepare_sections(
+        drafts=drafts,
+        section_limits=section_limits,
+        requirements=requirements,
+        valid_doc_ids=valid_doc_ids,
+        page_counts=page_counts,
+    )
 
     requirement_defs = _build_requirement_definitions(requirements)
     if requirements is not None and len(requirement_defs) == 0:
@@ -170,14 +182,23 @@ def _resolve_title_name(requirements: dict[str, object] | None, project_name: st
     return project_name.strip() or "Opportunity"
 
 
-def _document_registry(documents: list[dict[str, object]]) -> set[str]:
+def _document_registry(documents: list[dict[str, object]]) -> tuple[set[str], dict[str, int]]:
     valid_ids: set[str] = set()
+    page_counts: dict[str, int] = {}
     for doc in documents:
+        max_page = None
+        try:
+            max_page = int(doc.get("page_count"))
+        except (TypeError, ValueError):
+            max_page = None
         for key in ("doc_id", "file_name", "id"):
             value = doc.get(key)
             if isinstance(value, str) and value.strip():
-                valid_ids.add(value.strip())
-    return valid_ids
+                doc_key = value.strip()
+                valid_ids.add(doc_key)
+                if max_page and max_page > 0:
+                    page_counts[doc_key] = max_page
+    return valid_ids, page_counts
 
 
 def _section_word_limits(requirements: dict[str, object] | None) -> dict[str, int]:
@@ -235,6 +256,8 @@ def _prepare_sections(
     drafts: dict[str, dict[str, object]],
     section_limits: dict[str, int],
     requirements: dict[str, object] | None,
+    valid_doc_ids: set[str],
+    page_counts: dict[str, int],
 ) -> list[dict[str, object]]:
     prepared: list[dict[str, object]] = []
 
@@ -256,11 +279,22 @@ def _prepare_sections(
             if not text:
                 continue
             citations = _normalize_citations(paragraph.get("citations"))
+            confidence = paragraph.get("confidence")
+            try:
+                confidence_value = float(confidence)
+            except (TypeError, ValueError):
+                confidence_value = 0.0
             boilerplate = is_boilerplate_paragraph(text, len(citations))
             if boilerplate and len(citations) == 0:
                 continue
             unsupported = False
-            if len(citations) == 0:
+            integrity_failures = _citation_integrity_issues(
+                text=text,
+                citations=citations,
+                valid_doc_ids=valid_doc_ids,
+                page_counts=page_counts,
+            )
+            if len(citations) == 0 or confidence_value < _MIN_CONFIDENCE_FOR_SUPPORTED or integrity_failures:
                 if "[UNSUPPORTED]" not in text:
                     text = f"{text} [UNSUPPORTED]"
                 unsupported = True
@@ -270,6 +304,8 @@ def _prepare_sections(
                     "citations": citations,
                     "boilerplate": boilerplate,
                     "unsupported": unsupported,
+                    "confidence": confidence_value,
+                    "integrity_failures": integrity_failures,
                     "word_count": word_count(text),
                 }
             )
@@ -355,6 +391,53 @@ def _trim_section_to_word_limit(paragraphs: list[dict[str, object]], limit: int)
 
 def _section_word_count(paragraphs: list[dict[str, object]]) -> int:
     return sum(int(item.get("word_count", 0)) for item in paragraphs)
+
+
+def _extract_inline_citation_pairs(text: str) -> list[tuple[str, int]]:
+    pairs: list[tuple[str, int]] = []
+    for match in _INLINE_CITATION_HINT_PATTERN.finditer(text):
+        doc_id = str(match.group(1) or "").strip()
+        try:
+            page = int(match.group(2))
+        except (TypeError, ValueError):
+            continue
+        if doc_id and page > 0:
+            pairs.append((doc_id, page))
+    return pairs
+
+
+def _citation_integrity_issues(
+    *,
+    text: str,
+    citations: list[dict[str, object]],
+    valid_doc_ids: set[str],
+    page_counts: dict[str, int],
+) -> list[str]:
+    issues: list[str] = []
+    for citation in citations:
+        doc_id = str(citation.get("doc_id") or "").strip()
+        page = int(citation.get("page") or 1)
+        snippet = str(citation.get("snippet") or "").strip()
+        if not doc_id or doc_id not in valid_doc_ids:
+            issues.append("citation doc missing from registry")
+        if page <= 0:
+            issues.append("citation page invalid")
+        max_page = page_counts.get(doc_id)
+        if max_page is not None and page > max_page:
+            issues.append("citation page out of bounds")
+        if not snippet:
+            issues.append("citation snippet missing")
+
+    inline_pairs = _extract_inline_citation_pairs(text)
+    if inline_pairs:
+        structured_pairs = {
+            (str(citation.get("doc_id") or "").strip(), int(citation.get("page") or 1))
+            for citation in citations
+        }
+        for hint in inline_pairs:
+            if hint not in structured_pairs:
+                issues.append("inline citation hint mismatch")
+    return issues
 
 
 def _normalize_citations(raw: object) -> list[dict[str, object]]:
