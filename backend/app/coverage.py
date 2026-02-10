@@ -65,6 +65,80 @@ def _build_requirement_catalog(requirements: dict[str, object]) -> tuple[dict[st
     return canonical, aliases
 
 
+def _attachment_index_from_token(token: str) -> int | None:
+    cleaned = token.strip().lower()
+    if not cleaned:
+        return None
+    if cleaned.isdigit():
+        value = int(cleaned)
+        return value if value >= 1 else None
+    if len(cleaned) == 1 and "a" <= cleaned <= "z":
+        return ord(cleaned) - ord("a") + 1
+    return None
+
+
+def _token_set(value: str) -> set[str]:
+    normalized = _normalize_text(value)
+    if not normalized:
+        return set()
+    return set(normalized.split())
+
+
+def _resolve_requirement_id(
+    raw_requirement_id: str,
+    canonical: dict[str, str],
+    aliases: dict[str, str],
+) -> str | None:
+    alias_key = _normalize_text(raw_requirement_id)
+    if not alias_key:
+        return None
+
+    direct = aliases.get(alias_key)
+    if direct in canonical:
+        return direct
+
+    question_match = re.search(r"\bq(?:uestion)?[_\s-]*(\d+)\b", raw_requirement_id, flags=re.IGNORECASE)
+    if question_match:
+        question_index = int(question_match.group(1))
+        candidate = f"Q{question_index}"
+        if candidate in canonical:
+            return candidate
+
+    attachment_letter_match = re.search(r"\battachment[_\s-]*([a-z0-9])\b", raw_requirement_id, flags=re.IGNORECASE)
+    if attachment_letter_match:
+        attachment_index = _attachment_index_from_token(attachment_letter_match.group(1))
+        if attachment_index is not None:
+            candidate = f"A{attachment_index}"
+            if candidate in canonical:
+                return candidate
+
+    attachment_digit_match = re.search(r"\ba[_\s-]*(\d+)\b", raw_requirement_id, flags=re.IGNORECASE)
+    if attachment_digit_match:
+        attachment_index = int(attachment_digit_match.group(1))
+        candidate = f"A{attachment_index}"
+        if candidate in canonical:
+            return candidate
+
+    raw_tokens = _token_set(raw_requirement_id)
+    if not raw_tokens:
+        return None
+
+    best_id: str | None = None
+    best_score = 0.0
+    for requirement_id, requirement_text in canonical.items():
+        target_tokens = _token_set(requirement_id) | _token_set(requirement_text)
+        if not target_tokens:
+            continue
+        overlap = len(raw_tokens & target_tokens) / len(raw_tokens)
+        if overlap > best_score:
+            best_score = overlap
+            best_id = requirement_id
+
+    if best_id and best_score >= 0.6:
+        return best_id
+    return None
+
+
 def normalize_coverage_payload(
     requirements: dict[str, object],
     payload: dict[str, object],
@@ -85,8 +159,9 @@ def normalize_coverage_payload(
         if not raw_requirement_id:
             continue
 
-        alias_key = _normalize_text(raw_requirement_id)
-        requirement_id = aliases.get(alias_key, raw_requirement_id)
+        requirement_id = _resolve_requirement_id(raw_requirement_id, canonical, aliases)
+        if requirement_id is None:
+            continue
         status = str(item.get("status", "")).strip()
         notes = str(item.get("notes", "")).strip()
         refs = item.get("evidence_refs", [])

@@ -17,7 +17,12 @@ class BedrockNovaOrchestrator:
         self._client = client or self._create_bedrock_client()
 
     def extract_requirements(self, chunks: list[dict[str, object]]) -> dict[str, object]:
-        context = self._render_chunk_context(chunks, max_chunks=20, max_chars_per_chunk=600)
+        context = self._render_chunk_context(
+            chunks,
+            max_chunks=20,
+            max_chars_per_chunk=600,
+            max_total_chars=4200,
+        )
         system_prompt = (
             "You are an RFP analyst. Extract requirements into strict JSON only. "
             "Do not include markdown or prose."
@@ -77,7 +82,12 @@ class BedrockNovaOrchestrator:
         *,
         intake_context: dict[str, str] | None = None,
     ) -> dict[str, object]:
-        context = self._render_ranked_context(ranked_chunks, max_chunks=8, max_chars_per_chunk=700)
+        context = self._render_ranked_context(
+            ranked_chunks,
+            max_chunks=8,
+            max_chars_per_chunk=700,
+            max_total_chars=3600,
+        )
         system_prompt = (
             "You are a grant writer. Produce strict JSON only. "
             "Every paragraph must include at least one citation grounded in provided evidence."
@@ -110,6 +120,28 @@ class BedrockNovaOrchestrator:
             f"Draft artifact:\n{json.dumps(draft, ensure_ascii=True)}"
         )
         return self._invoke_json_model(self._settings.bedrock_lite_model_id, system_prompt, user_prompt)
+
+    def package_export_bundle(self, export_input: dict[str, object]) -> dict[str, object]:
+        system_prompt = (
+            "You are NebulaExportAgent, the final-stage export/packaging agent. "
+            "Return strict JSON only. "
+            "Cite-first, no hallucinations, deterministic output, redact secrets, and enforce traceability. "
+            "Output must match schema keys exactly: export_version, generated_at, project, bundle, summary, "
+            "quality_gates, provenance."
+        )
+        user_prompt = (
+            "Build a deterministic submission-ready export bundle from INPUT.\n\n"
+            "Rules:\n"
+            "- Any factual claim in draft text must have citations or be marked unsupported.\n"
+            "- Do not invent evidence.\n"
+            "- Respect requirement limits if known.\n"
+            "- Include profile-based markdown file outputs.\n"
+            "- quality_gates.passed must be false when critical checks fail.\n"
+            "- provenance.run_metadata must redact secrets.\n\n"
+            f"INPUT:\n{json.dumps(export_input, ensure_ascii=True)}\n\n"
+            "Now produce the final export bundle JSON object only."
+        )
+        return self._invoke_json_model(self._settings.bedrock_model_id, system_prompt, user_prompt)
 
     def _create_bedrock_client(self) -> Any:
         try:
@@ -188,15 +220,19 @@ class BedrockNovaOrchestrator:
         *,
         max_chunks: int,
         max_chars_per_chunk: int,
+        max_total_chars: int,
     ) -> str:
         lines: list[str] = []
+        used_chars = 0
         for chunk in chunks[:max_chunks]:
-            lines.append(
-                (
-                    f"- doc={chunk.get('file_name')} page={chunk.get('page')} "
-                    f"text={BedrockNovaOrchestrator._truncate(str(chunk.get('text', '')), max_chars_per_chunk)}"
-                )
-            )
+            available = max_total_chars - used_chars
+            if available < 80:
+                break
+            chunk_limit = min(max_chars_per_chunk, max(40, available - 40))
+            text = BedrockNovaOrchestrator._truncate(str(chunk.get("text", "")), chunk_limit)
+            line = f"- doc={chunk.get('file_name')} page={chunk.get('page')} text={text}"
+            lines.append(line)
+            used_chars += len(line)
         return "\n".join(lines)
 
     @staticmethod
@@ -205,15 +241,29 @@ class BedrockNovaOrchestrator:
         *,
         max_chunks: int,
         max_chars_per_chunk: int,
+        max_total_chars: int,
     ) -> str:
         lines: list[str] = []
-        for chunk in ranked_chunks[:max_chunks]:
-            lines.append(
-                (
-                    f"- doc={chunk.get('file_name')} page={chunk.get('page')} score={chunk.get('score')} "
-                    f"text={BedrockNovaOrchestrator._truncate(str(chunk.get('text', '')), max_chars_per_chunk)}"
-                )
+        used_chars = 0
+        seen_locations: set[str] = set()
+        for chunk in ranked_chunks:
+            if len(lines) >= max_chunks:
+                break
+            location_key = f"{chunk.get('file_name')}::{chunk.get('page')}"
+            if location_key in seen_locations:
+                continue
+            available = max_total_chars - used_chars
+            if available < 80:
+                break
+            chunk_limit = min(max_chars_per_chunk, max(40, available - 60))
+            text = BedrockNovaOrchestrator._truncate(str(chunk.get("text", "")), chunk_limit)
+            line = (
+                f"- doc={chunk.get('file_name')} page={chunk.get('page')} score={chunk.get('score')} "
+                f"text={text}"
             )
+            lines.append(line)
+            used_chars += len(line)
+            seen_locations.add(location_key)
         return "\n".join(lines)
 
     @staticmethod

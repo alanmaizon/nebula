@@ -34,7 +34,8 @@ def test_intake_roundtrip_and_export_contains_context(tmp_path: Path) -> None:
         export_json = client.get(f"/projects/{project_id}/export?format=json&section_key=Need Statement")
         assert export_json.status_code == 200
         payload = export_json.json()
-        assert payload["intake"] is not None
-        assert payload["intake"]["sector_focus"] == "heritage"
+        assert payload["bundle"]["json"] is not None
+        assert payload["bundle"]["json"]["intake"] is not None
+        assert payload["bundle"]["json"]["intake"]["sector_focus"] == "heritage"
         assert "template_recommendation" not in payload
         assert "template_metadata" not in payload

@@ -1,0 +1,449 @@
+{
+  "export_version": "nebula.export.v1",
+  "generated_at": "2026-02-10T11:01:51.198417+00:00",
+  "project": {
+    "id": "83a7aa6a-3614-45f9-885a-592976121b09",
+    "name": "Portland Community Resilience 2026 Demo"
+  },
+  "bundle": {
+    "json": {
+      "project": {
+        "id": "83a7aa6a-3614-45f9-885a-592976121b09",
+        "name": "Portland Community Resilience 2026 Demo"
+      },
+      "export_request": {
+        "format": "both",
+        "profile": "submission",
+        "include_debug": false,
+        "sections": null,
+        "output_filename_base": null
+      },
+      "intake": {
+        "country": "United States",
+        "organization_type": "Non-profit (501(c)(3))",
+        "funder_track": "city-community-resilience",
+        "funding_goal": "housing-stability-program",
+        "sector_focus": "housing stability and family support"
+      },
+      "documents": [
+        {
+          "id": "9eb8fc5e-384c-427d-ac60-870ede54d60d",
+          "project_id": "83a7aa6a-3614-45f9-885a-592976121b09",
+          "file_name": "community_support_letters_excerpt.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/83a7aa6a-3614-45f9-885a-592976121b09/ed1b0f58-74e5-4094-ad90-eb9654aaa66c_community_support_letters_excerpt.txt",
+          "size_bytes": 543,
+          "created_at": "2026-02-10T11:01:33.422632+00:00",
+          "doc_id": "community_support_letters_excerpt.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "f8473054-b631-45a9-8ee9-6bd3e213dd17",
+          "project_id": "83a7aa6a-3614-45f9-885a-592976121b09",
+          "file_name": "program_timeline_attachment_b.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/83a7aa6a-3614-45f9-885a-592976121b09/8f7e8ce1-1b5c-4e06-abd5-68da184ef57d_program_timeline_attachment_b.txt",
+          "size_bytes": 800,
+          "created_at": "2026-02-10T11:01:33.425810+00:00",
+          "doc_id": "program_timeline_attachment_b.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "a212cd7e-e7aa-492d-95d9-91097a007197",
+          "project_id": "83a7aa6a-3614-45f9-885a-592976121b09",
+          "file_name": "project_budget_attachment_a.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/83a7aa6a-3614-45f9-885a-592976121b09/7a89df77-9b5f-423f-baea-0faadc16fe7f_project_budget_attachment_a.txt",
+          "size_bytes": 557,
+          "created_at": "2026-02-10T11:01:33.429818+00:00",
+          "doc_id": "project_budget_attachment_a.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "5fbf3af7-dbba-47e9-9ac8-750120dd89e6",
+          "project_id": "83a7aa6a-3614-45f9-885a-592976121b09",
+          "file_name": "org_impact_report_2025.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/83a7aa6a-3614-45f9-885a-592976121b09/43060e3d-2f40-480c-9f4d-c13b18e65a9c_org_impact_report_2025.txt",
+          "size_bytes": 1259,
+          "created_at": "2026-02-10T11:01:33.435392+00:00",
+          "doc_id": "org_impact_report_2025.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "6ec685d2-d674-4427-8661-eea2ae2061b5",
+          "project_id": "83a7aa6a-3614-45f9-885a-592976121b09",
+          "file_name": "rfp_community_resilience_2026.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/83a7aa6a-3614-45f9-885a-592976121b09/e123604f-b26f-4070-8671-a5fae726c2df_rfp_community_resilience_2026.txt",
+          "size_bytes": 1215,
+          "created_at": "2026-02-10T11:01:33.438489+00:00",
+          "doc_id": "rfp_community_resilience_2026.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        }
+      ],
+      "requirements": {
+        "funder": "City of Portland Community Resilience Microgrant 2026",
+        "deadline": "March 15, 2026 at 5:00 PM Pacific",
+        "eligibility": [
+          "Applicants must be nonprofit organizations with active 501(c)(3) status.",
+          "Applicants must provide services within Portland city limits.",
+          "Applicants must have at least one completed program cycle in the last 24 months."
+        ],
+        "questions": [
+          {
+            "id": "Q1",
+            "prompt": "Need Statement (350 words max): Describe the specific community need your program addresses and who is most affected.",
+            "limit": {
+              "type": "words",
+              "value": 350
+            }
+          },
+          {
+            "id": "Q2",
+            "prompt": "Program Design (400 words max): Explain your activities, implementation timeline, and how participants are served.",
+            "limit": {
+              "type": "words",
+              "value": 400
+            }
+          },
+          {
+            "id": "Q3",
+            "prompt": "Outcomes and Evaluation (300 words max): Identify measurable outcomes and how progress will be tracked.",
+            "limit": {
+              "type": "words",
+              "value": 300
+            }
+          }
+        ],
+        "required_attachments": [
+          "Attachment A: Project Budget",
+          "Attachment B: Program Timeline",
+          "Include two letters of community support"
+        ],
+        "rubric": [
+          "Need alignment and urgency (30 points)",
+          "Feasibility and readiness (30 points)",
+          "Outcomes and evidence quality (25 points)",
+          "Budget reasonableness (15 points)"
+        ],
+        "disallowed_costs": [
+          "Purchase of real estate",
+          "Political campaign activity",
+          "Expenses unrelated to direct program delivery"
+        ]
+      },
+      "drafts": {
+        "Need Statement": {
+          "draft": {
+            "section_key": "Need Statement",
+            "paragraphs": [
+              {
+                "text": "In 2025, 62% of enrolled households reported being at risk of eviction within 90 days, highlighting a critical need for housing stability services in East and North Portland neighborhoods . This alarming statistic underscores the urgency for targeted interventions to prevent homelessness and support families in maintaining stable housing.",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2025.txt",
+                    "page": 1,
+                    "snippet": "Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              },
+              {
+                "text": "The Harbor Community Network's 2025 Impact Report reveals that 71% of participating households had at least one child under age 18, indicating that children are disproportionately affected by housing instability . This demographic insight emphasizes the need for family-centered support services to address the unique challenges faced by households with young children.",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2025.txt",
+                    "page": 1,
+                    "snippet": "Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              },
+              {
+                "text": "Transportation barriers significantly impact service access, with 68% of client households identifying this as a reason for missed appointments . Addressing transportation issues is essential to ensuring that families can consistently engage with support services and maintain housing stability.",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2025.txt",
+                    "page": 1,
+                    "snippet": "Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "96011c71-e3b2-41af-8fa8-e61f3dbe5e5e",
+            "updated_at": "2026-02-10T11:01:37.906676+00:00",
+            "source": "nova-agents-v1"
+          }
+        },
+        "Program Design": {
+          "draft": {
+            "section_key": "Program Design",
+            "paragraphs": [
+              {
+                "text": "The proposed program is designed to address housing instability among low-income families in East and North Portland neighborhoods. According to the 2025 Impact Report, 62% of enrolled households reported being at risk of eviction within 90 days, highlighting the urgent need for intervention (doc_id: org_impact_report_2025, page: 1, snippet: '62% of enrolled households reported being at risk of eviction within 90 days'). The program will enroll 120 households into coordinated case management, providing weekly navigation sessions and emergency support vouchers to stabilize housing situations (doc_id: program_timeline_attachment_b, page: 1, snippet: 'Enroll 120 households into coordinated case management. Deliver weekly case navigation sessions. Issue transportation and emergency support vouchers').",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2025.txt",
+                    "page": 1,
+                    "snippet": "62% of enrolled households reported being at risk of eviction within 90 days"
+                  },
+                  {
+                    "doc_id": "program_timeline_attachment_b.txt",
+                    "page": 1,
+                    "snippet": "Attachment B: Program Timeline Project period: July 2026 - June 2027 Phase 1: Launch and enrollment (July - September 2026) - Finalize referral protocol with school and clinic partners. - Enroll 120 households into coordinated case manag..."
+                  }
+                ],
+                "confidence": 0.9,
+                "unsupported": false
+              },
+              {
+                "text": "The program's budget is structured to ensure all costs directly support participant services and program delivery, aligning with the funder's guidelines on disallowed costs (doc_id: project_budget_attachment_a, page: 1, snippet: 'All costs directly support participant services and program delivery. No real estate, political activity, or unrelated overhead costs are included'). Key budget items include program staff, participant transportation support, and community partner stipends, totaling $50,000 for the project period (doc_id: project_budget_attachment_a, page: 1, snippet: 'Request amount: $50,000').",
+                "citations": [
+                  {
+                    "doc_id": "project_budget_attachment_a.txt",
+                    "page": 1,
+                    "snippet": "Attachment A: Project Budget Project period: July 1, 2026 - June 30, 2027 Request amount: $50,000 Line items: - Program staff (0.50 FTE case coordinator): $28,000 - Participant transportation support: $6,000 - Program supplies and curric..."
+                  },
+                  {
+                    "doc_id": "project_budget_attachment_a.txt",
+                    "page": 1,
+                    "snippet": "Request amount: $50,000"
+                  }
+                ],
+                "confidence": 0.9,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "317e43fb-34a5-4266-942f-67ba4a11edbd",
+            "updated_at": "2026-02-10T11:01:44.869135+00:00",
+            "source": "nova-agents-v1"
+          }
+        },
+        "Outcomes and Evaluation": {
+          "draft": {
+            "section_key": "Outcomes and Evaluation",
+            "paragraphs": [
+              {
+                "text": "The primary outcomes of the housing stability program will be measured through participant retention rates, housing stability metrics, and service utilization data. Specifically, the program aims to achieve a 75% retention rate for enrolled households over a six-month period, as evidenced by previous program cycles where 289 out of 412 households remained stably housed for at least six months after intake . Additionally, the program will track the number of households that transition from being at risk of eviction to achieving stable housing, with a target of reducing the risk of eviction by 50% within the first year of enrollment.",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2025.txt",
+                    "page": 1,
+                    "snippet": "Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families..."
+                  }
+                ],
+                "confidence": 0.85,
+                "unsupported": false
+              },
+              {
+                "text": "Evaluation of the program will be conducted through a combination of quantitative and qualitative methods. Quantitative data will be collected through baseline and follow-up assessments at 90-day and 180-day intervals, measuring changes in housing stability, employment status, and access to essential services. Qualitative data will be gathered through participant interviews and focus groups to capture personal experiences and feedback on the program's impact. This mixed-methods approach will provide a comprehensive understanding of the program's effectiveness and areas for improvement.",
+                "citations": [
+                  {
+                    "doc_id": "rfp_community_resilience_2026.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi..."
+                  }
+                ],
+                "confidence": 0.8,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "2d556827-2562-4e8c-9e47-89b572a1027e",
+            "updated_at": "2026-02-10T11:01:49.590704+00:00",
+            "source": "nova-agents-v1"
+          }
+        }
+      },
+      "coverage": {
+        "items": [
+          {
+            "requirement_id": "Q1",
+            "status": "missing",
+            "notes": "Need Statement is not provided in the draft artifact.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "Q2",
+            "status": "met",
+            "notes": "Program Design is provided in the draft artifact.",
+            "evidence_refs": [
+              "{'doc_id': 'org_impact_report_2025.txt', 'page': 1, 'snippet': 'Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families...'}"
+            ]
+          },
+          {
+            "requirement_id": "Q3",
+            "status": "met",
+            "notes": "Outcomes and Evaluation are provided in the draft artifact.",
+            "evidence_refs": [
+              "{'doc_id': 'rfp_community_resilience_2026.txt', 'page': 1, 'snippet': 'Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi...'}"
+            ]
+          },
+          {
+            "requirement_id": "A1",
+            "status": "missing",
+            "notes": "No coverage item returned for requirement: Attachment A: Project Budget",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "A2",
+            "status": "missing",
+            "notes": "No coverage item returned for requirement: Attachment B: Program Timeline",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "A3",
+            "status": "missing",
+            "notes": "No coverage item returned for requirement: Include two letters of community support",
+            "evidence_refs": []
+          }
+        ]
+      },
+      "missing_evidence": [],
+      "validations": {
+        "requirements": {
+          "present": true
+        },
+        "drafts": {
+          "sections": 3
+        },
+        "coverage": {
+          "present": true
+        }
+      },
+      "summary": {
+        "overall_completion": "33.3%",
+        "coverage_overview": {
+          "met": 2,
+          "partial": 0,
+          "missing": 4
+        },
+        "unsupported_claims_count": 0,
+        "missing_evidence_count": 0,
+        "constraints": {
+          "known": [
+            "deadline: March 15, 2026 at 5:00 PM Pacific",
+            "Q1: 350 words",
+            "Q2: 400 words",
+            "Q3: 300 words"
+          ],
+          "unknown": []
+        }
+      }
+    },
+    "markdown": {
+      "files": [
+        {
+          "path": "application.md",
+          "content": "# Draft Application\n\n## Need Statement\n\n1. In 2025, 62% of enrolled households reported being at risk of eviction within 90 days, highlighting a critical need for housing stability services in East and North Portland neighborhoods . This alarming statistic underscores the urgency for targeted interventions to prevent homelessness and support families in maintaining stable housing.\n2. The Harbor Community Network's 2025 Impact Report reveals that 71% of participating households had at least one child under age 18, indicating that children are disproportionately affected by housing instability . This demographic insight emphasizes the need for family-centered support services to address the unique challenges faced by households with young children.\n3. Transportation barriers significantly impact service access, with 68% of client households identifying this as a reason for missed appointments . Addressing transportation issues is essential to ensuring that families can consistently engage with support services and maintain housing stability.\n\n### Citations\n- `org_impact_report_2025.txt` p1: Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families...\n\n### Unsupported / Missing\n- None\n\n## Program Design\n\n1. The proposed program is designed to address housing instability among low-income families in East and North Portland neighborhoods. According to the 2025 Impact Report, 62% of enrolled households reported being at risk of eviction within 90 days, highlighting the urgent need for intervention (doc_id: org_impact_report_2025, page: 1, snippet: '62% of enrolled households reported being at risk of eviction within 90 days'). The program will enroll 120 households into coordinated case management, providing weekly navigation sessions and emergency support vouchers to stabilize housing situations (doc_id: program_timeline_attachment_b, page: 1, snippet: 'Enroll 120 households into coordinated case management. Deliver weekly case navigation sessions. Issue transportation and emergency support vouchers').\n2. The program's budget is structured to ensure all costs directly support participant services and program delivery, aligning with the funder's guidelines on disallowed costs (doc_id: project_budget_attachment_a, page: 1, snippet: 'All costs directly support participant services and program delivery. No real estate, political activity, or unrelated overhead costs are included'). Key budget items include program staff, participant transportation support, and community partner stipends, totaling $50,000 for the project period (doc_id: project_budget_attachment_a, page: 1, snippet: 'Request amount: $50,000').\n\n### Citations\n- `org_impact_report_2025.txt` p1: 62% of enrolled households reported being at risk of eviction within 90 days\n- `program_timeline_attachment_b.txt` p1: Attachment B: Program Timeline Project period: July 2026 - June 2027 Phase 1: Launch and enrollment (July - September 2026) - Finalize referral protocol with school and clinic partners. - Enroll 120 households into coordinated case manag...\n- `project_budget_attachment_a.txt` p1: Attachment A: Project Budget Project period: July 1, 2026 - June 30, 2027 Request amount: $50,000 Line items: - Program staff (0.50 FTE case coordinator): $28,000 - Participant transportation support: $6,000 - Program supplies and curric...\n- `project_budget_attachment_a.txt` p1: Request amount: $50,000\n\n### Unsupported / Missing\n- None\n\n## Outcomes and Evaluation\n\n1. The primary outcomes of the housing stability program will be measured through participant retention rates, housing stability metrics, and service utilization data. Specifically, the program aims to achieve a 75% retention rate for enrolled households over a six-month period, as evidenced by previous program cycles where 289 out of 412 households remained stably housed for at least six months after intake . Additionally, the program will track the number of households that transition from being at risk of eviction to achieving stable housing, with a target of reducing the risk of eviction by 50% within the first year of enrollment.\n2. Evaluation of the program will be conducted through a combination of quantitative and qualitative methods. Quantitative data will be collected through baseline and follow-up assessments at 90-day and 180-day intervals, measuring changes in housing stability, employment status, and access to essential services. Qualitative data will be gathered through participant interviews and focus groups to capture personal experiences and feedback on the program's impact. This mixed-methods approach will provide a comprehensive understanding of the program's effectiveness and areas for improvement.\n\n### Citations\n- `org_impact_report_2025.txt` p1: Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families...\n- `rfp_community_resilience_2026.txt` p1: Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi...\n\n### Unsupported / Missing\n- None"
+        },
+        {
+          "path": "requirements.md",
+          "content": "# Requirements Matrix\n\n| requirement_id | requirement | status | evidence pointers | notes |\n|---|---|---|---|---|\n| Q1 | Need Statement (350 words max): Describe the specific community need your program addresses and who is most affected. | missing |  | Need Statement is not provided in the draft artifact. |\n| Q2 | Program Design (400 words max): Explain your activities, implementation timeline, and how participants are served. | met | {'doc_id': 'org_impact_report_2025.txt', 'page': 1, 'snippet': 'Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families...'} | Program Design is provided in the draft artifact. |\n| Q3 | Outcomes and Evaluation (300 words max): Identify measurable outcomes and how progress will be tracked. | met | {'doc_id': 'rfp_community_resilience_2026.txt', 'page': 1, 'snippet': 'Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi...'} | Outcomes and Evaluation are provided in the draft artifact. |\n| A1 | Attachment A: Project Budget | missing |  | No coverage item returned for requirement: Attachment A: Project Budget |\n| A2 | Attachment B: Program Timeline | missing |  | No coverage item returned for requirement: Attachment B: Program Timeline |\n| A3 | Include two letters of community support | missing |  | No coverage item returned for requirement: Include two letters of community support |\n| E1 | Applicants must be nonprofit organizations with active 501(c)(3) status. | missing |  | No coverage item returned. |\n| E2 | Applicants must provide services within Portland city limits. | missing |  | No coverage item returned. |\n| E3 | Applicants must have at least one completed program cycle in the last 24 months. | missing |  | No coverage item returned. |\n| R1 | Need alignment and urgency (30 points) | missing |  | No coverage item returned. |\n| R2 | Feasibility and readiness (30 points) | missing |  | No coverage item returned. |\n| R3 | Outcomes and evidence quality (25 points) | missing |  | No coverage item returned. |\n| R4 | Budget reasonableness (15 points) | missing |  | No coverage item returned. |\n| D1 | Purchase of real estate | missing |  | No coverage item returned. |\n| D2 | Political campaign activity | missing |  | No coverage item returned. |\n| D3 | Expenses unrelated to direct program delivery | missing |  | No coverage item returned. |"
+        },
+        {
+          "path": "coverage.md",
+          "content": "# Coverage\n\n- Met: 2\n- Partial: 0\n- Missing: 4\n\n## Top Missing Items\n- `Q1`: Need Statement is not provided in the draft artifact.\n- `A1`: No coverage item returned for requirement: Attachment A: Project Budget\n- `A2`: No coverage item returned for requirement: Attachment B: Program Timeline\n- `A3`: No coverage item returned for requirement: Include two letters of community support\n\n## Items\n\n| requirement_id | status | notes | evidence_refs |\n|---|---|---|---|\n| Q1 | missing | Need Statement is not provided in the draft artifact. |  |\n| Q2 | met | Program Design is provided in the draft artifact. | {'doc_id': 'org_impact_report_2025.txt', 'page': 1, 'snippet': 'Harbor Community Network Program Impact Report - 2025 Organization profile: - 501(c)(3) nonprofit serving East and North Portland neighborhoods. - Primary focus: housing stability, food access, and case navigation for low-income families...'} |\n| Q3 | met | Outcomes and Evaluation are provided in the draft artifact. | {'doc_id': 'rfp_community_resilience_2026.txt', 'page': 1, 'snippet': 'Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi...'} |\n| A1 | missing | No coverage item returned for requirement: Attachment A: Project Budget |  |\n| A2 | missing | No coverage item returned for requirement: Attachment B: Program Timeline |  |\n| A3 | missing | No coverage item returned for requirement: Include two letters of community support |  |"
+        },
+        {
+          "path": "missing_evidence.md",
+          "content": "# Missing Evidence\n\n| item | why | suggested uploads | impacts |\n|---|---|---|---|\n| n/a | none | none | none |"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "overall_completion": "33.3%",
+    "coverage_overview": {
+      "met": 2,
+      "partial": 0,
+      "missing": 4
+    },
+    "unsupported_claims_count": 0,
+    "missing_evidence_count": 0,
+    "constraints": {
+      "known": [
+        "deadline: March 15, 2026 at 5:00 PM Pacific",
+        "Q1: 350 words",
+        "Q2: 400 words",
+        "Q3: 300 words"
+      ],
+      "unknown": []
+    }
+  },
+  "quality_gates": {
+    "passed": true,
+    "reasons": [],
+    "warnings": []
+  },
+  "provenance": {
+    "artifacts_used": [
+      {
+        "type": "draft",
+        "id": "96011c71-e3b2-41af-8fa8-e61f3dbe5e5e",
+        "updated_at": "2026-02-10T11:01:37.906676+00:00"
+      },
+      {
+        "type": "draft",
+        "id": "2d556827-2562-4e8c-9e47-89b572a1027e",
+        "updated_at": "2026-02-10T11:01:49.590704+00:00"
+      },
+      {
+        "type": "draft",
+        "id": "317e43fb-34a5-4266-942f-67ba4a11edbd",
+        "updated_at": "2026-02-10T11:01:44.869135+00:00"
+      },
+      {
+        "type": "requirements",
+        "id": "8a0e20a4-e755-4c61-8504-9d441a8d787b",
+        "updated_at": "2026-02-10T11:01:35.068503+00:00"
+      },
+      {
+        "type": "coverage",
+        "id": "59e05cb4-aa5a-4275-b51f-b4be30911ad2",
+        "updated_at": "2026-02-10T11:01:51.177911+00:00"
+      },
+      {
+        "type": "intake",
+        "id": "a095ce4f-5f87-4250-bae5-decd61e25e82",
+        "updated_at": "2026-02-10T11:01:33.404515+00:00"
+      }
+    ],
+    "run_metadata": {
+      "model_ids": {
+        "primary": "eu.amazon.nova-pro-v1:0",
+        "lite": "eu.amazon.nova-lite-v1:0"
+      },
+      "temperatures": {
+        "agent_temperature": 0.1
+      },
+      "max_tokens": 2048,
+      "retrieval_top_k": 5,
+      "chunking": {
+        "chunk_size_chars": 1200,
+        "chunk_overlap_chars": 200
+      },
+      "request_ids": [
+        "6bd1e7fd-2682-4956-8e9b-908337b6e6c3"
+      ]
+    }
+  }
+}

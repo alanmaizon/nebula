@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+ARG PYTHON_BASE_IMAGE=public.ecr.aws/docker/library/python:3.11-slim
+FROM ${PYTHON_BASE_IMAGE}
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -13,4 +14,3 @@ COPY app /app/app
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-

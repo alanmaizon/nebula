@@ -2,6 +2,8 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-public.ecr.aws/docker/library/python:3.11-slim}
     container_name: nebula-backend
     ports:
       - "8000:8000"
@@ -45,6 +47,7 @@ services:
     build:
       context: ./frontend
       args:
+        NODE_BASE_IMAGE: ${NODE_BASE_IMAGE:-public.ecr.aws/docker/library/node:20-alpine}
         NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
     container_name: nebula-frontend
     ports:

@@ -1,11 +1,12 @@
-FROM node:20-alpine AS deps
+ARG NODE_BASE_IMAGE=public.ecr.aws/docker/library/node:20-alpine
+FROM ${NODE_BASE_IMAGE} AS deps
 
 WORKDIR /app
 
 COPY package.json /app/package.json
 RUN npm install
 
-FROM node:20-alpine AS builder
+FROM ${NODE_BASE_IMAGE} AS builder
 
 WORKDIR /app
 COPY --from=deps /app/node_modules /app/node_modules
@@ -15,7 +16,7 @@ ARG NEXT_PUBLIC_API_BASE=http://localhost:8000
 ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM ${NODE_BASE_IMAGE} AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production

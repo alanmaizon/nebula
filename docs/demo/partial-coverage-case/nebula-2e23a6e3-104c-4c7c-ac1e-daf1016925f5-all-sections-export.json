@@ -1,0 +1,874 @@
+{
+  "export_version": "nebula.export.v1",
+  "generated_at": "2026-02-10T12:52:36.389731+00:00",
+  "project": {
+    "id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+    "name": "Portland Community Resilience 2026 Demo"
+  },
+  "bundle": {
+    "json": {
+      "project": {
+        "id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+        "name": "Portland Community Resilience 2026 Demo"
+      },
+      "export_request": {
+        "format": "both",
+        "profile": "submission",
+        "include_debug": false,
+        "sections": null,
+        "output_filename_base": null
+      },
+      "intake": {
+        "country": "Ireland",
+        "organization_type": "Non-profit",
+        "funder_track": "city-council",
+        "funding_goal": "youth-program",
+        "sector_focus": "community network"
+      },
+      "documents": [
+        {
+          "id": "8b1ba20a-479f-4529-91dd-64cc1772bd47",
+          "project_id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+          "file_name": "community_support_letters_excerpt.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/2e23a6e3-104c-4c7c-ac1e-daf1016925f5/6733772a-c5c0-4286-8cc1-ae61b4802f4b_community_support_letters_excerpt.txt",
+          "size_bytes": 543,
+          "created_at": "2026-02-10T12:49:28.668277+00:00",
+          "doc_id": "community_support_letters_excerpt.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "d07447c8-e753-4be8-b7f1-19155f792be9",
+          "project_id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+          "file_name": "program_timeline_attachment_b.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/2e23a6e3-104c-4c7c-ac1e-daf1016925f5/42112b95-df4e-452b-a85b-fdc641b39d55_program_timeline_attachment_b.txt",
+          "size_bytes": 800,
+          "created_at": "2026-02-10T12:49:28.672742+00:00",
+          "doc_id": "program_timeline_attachment_b.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "990ad2dc-7e58-4a1d-94e0-bbed17c6cefb",
+          "project_id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+          "file_name": "project_budget_attachment_a.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/2e23a6e3-104c-4c7c-ac1e-daf1016925f5/de7fd9cc-8496-4918-8225-613b6e183ac3_project_budget_attachment_a.txt",
+          "size_bytes": 557,
+          "created_at": "2026-02-10T12:49:28.676398+00:00",
+          "doc_id": "project_budget_attachment_a.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "67578cde-e5bc-4efd-9001-9b1962a04019",
+          "project_id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+          "file_name": "org_impact_report_2025.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/2e23a6e3-104c-4c7c-ac1e-daf1016925f5/fd9bd570-0be1-4170-9d06-f4d09e76ad83_org_impact_report_2025.txt",
+          "size_bytes": 1259,
+          "created_at": "2026-02-10T12:49:28.679769+00:00",
+          "doc_id": "org_impact_report_2025.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "02228697-6219-4d66-b1eb-651b69037aa8",
+          "project_id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+          "file_name": "rfp_community_resilience_2026.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/2e23a6e3-104c-4c7c-ac1e-daf1016925f5/e8461b8b-f531-42d0-b405-7179a394154c_rfp_community_resilience_2026.txt",
+          "size_bytes": 1215,
+          "created_at": "2026-02-10T12:49:28.682824+00:00",
+          "doc_id": "rfp_community_resilience_2026.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "1defe506-d2e0-4693-86a8-52372cd77f6a",
+          "project_id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+          "file_name": "evidence.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/2e23a6e3-104c-4c7c-ac1e-daf1016925f5/b13156ab-970a-440d-a21a-02eb4888913b_evidence.txt",
+          "size_bytes": 769,
+          "created_at": "2026-02-10T12:52:19.816785+00:00",
+          "doc_id": "evidence.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "bf43c199-9bc0-4fba-b692-49540d5b7b19",
+          "project_id": "2e23a6e3-104c-4c7c-ac1e-daf1016925f5",
+          "file_name": "rfp.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/2e23a6e3-104c-4c7c-ac1e-daf1016925f5/3430c324-1088-43f5-b508-94663fe25114_rfp.txt",
+          "size_bytes": 1381,
+          "created_at": "2026-02-10T12:52:19.821823+00:00",
+          "doc_id": "rfp.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        }
+      ],
+      "requirements": {
+        "funder": "City of Portland Community Resilience Microgrant 2026",
+        "deadline": "March 15, 2026 at 5:00 PM Pacific",
+        "eligibility": [
+          "Applicants must be nonprofit organizations with active 501(c)(3) status.",
+          "Applicants must provide services within Portland city limits.",
+          "Applicants must have at least one completed program cycle in the last 24 months."
+        ],
+        "questions": [
+          {
+            "id": "Q1",
+            "prompt": "Need Statement (350 words max): Describe the specific community need your program addresses and who is most affected.",
+            "limit": {
+              "type": "words",
+              "value": 350
+            }
+          },
+          {
+            "id": "Q2",
+            "prompt": "Program Design (400 words max): Explain your activities, implementation timeline, and how participants are served.",
+            "limit": {
+              "type": "words",
+              "value": 400
+            }
+          },
+          {
+            "id": "Q3",
+            "prompt": "Outcomes and Evaluation (300 words max): Identify measurable outcomes and how progress will be tracked.",
+            "limit": {
+              "type": "words",
+              "value": 300
+            }
+          },
+          {
+            "id": "Q4",
+            "prompt": "Sustainability (max 250 words)",
+            "limit": {
+              "type": "words",
+              "value": 250
+            }
+          }
+        ],
+        "required_attachments": [
+          "Attachment A: Project Budget",
+          "Attachment B: Program Timeline",
+          "Include two letters of community support",
+          "implementation timeline by quarter"
+        ],
+        "rubric": [
+          "Need alignment and urgency (30 points)",
+          "Feasibility and readiness (30 points)",
+          "Outcomes and evidence quality (25 points)",
+          "Budget reasonableness (15 points)",
+          "Community Need and Alignment: 30 points",
+          "Feasibility and Operations: 30 points",
+          "Outcomes and Measurement: 25 points",
+          "Budget Reasonableness: 15 points"
+        ],
+        "disallowed_costs": [
+          "Purchase of real estate",
+          "Political campaign activity",
+          "Funding Opportunity: City of Dublin Youth Workforce Innovation Grant 2026",
+          "Program Overview",
+          "The City invites nonprofit proposals to expand paid career pathways for youth ages 16-24 in underserved neighborhoods.",
+          "Total fund available: EUR 1,200,000. Maximum request per applicant: EUR 180,000.",
+          "Project period: July 1, 2026 to June 30, 2027.",
+          "Required Narrative Questions",
+          "1) Need Statement (max 300 words)",
+          "Describe the local employment barriers for target youth and provide evidence from 2024-2025 program data.",
+          "2) Program Design (max 500 words)",
+          "Explain participant recruitment, employer partnerships, and monthly service model.",
+          "3) Outcomes and Evaluation (max 400 words)",
+          "Define at least three measurable outcomes, collection methods, and reporting cadence.",
+          "4) Sustainability (max 250 words)",
+          "Describe how services continue after grant period.",
+          "Submission Requirements",
+          "Attachment A: Line-item budget with justification",
+          "Attachment B: Organization board list",
+          "Attachment C: Two employer support letters",
+          "Include implementation timeline by quarter",
+          "Scoring Rubric",
+          "Budget Reaso",
+          "Expenses unrelated to direct program delivery",
+          "ters",
+          "Restrictions",
+          "No alcohol, entertainment, or lobbying expenses.",
+          "Equipment purchases above EUR 10,000 require prior approval.",
+          "Indirect costs capped at 12%.",
+          "Alcohol",
+          "Entertainment",
+          "Lobbying expenses",
+          "Equipment purchases above EUR 10,000 without prior approval",
+          "Indirect costs above 12%"
+        ]
+      },
+      "drafts": {
+        "Need Statement": {
+          "draft": {
+            "section_key": "Need Statement",
+            "paragraphs": [
+              {
+                "text": "In the city of Dublin, youth aged 16-24 in underserved neighborhoods face significant employment barriers. According to the 2024 Impact Snapshot from BrightSteps Community Network, 68% of youth completed job-readiness training, yet only 54% were placed into paid internships within 90 days, highlighting a gap in employment opportunities and support systems for this demographic.",
+                "citations": [
+                  {
+                    "doc_id": "rfp.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: City of Dublin Youth Workforce Innovation Grant 2026 Program Overview The City invites nonprofit proposals to expand paid career pathways for youth ages 16-24 in underserved neighborhoods. Total fund available: EUR 1..."
+                  }
+                ],
+                "confidence": 0.9,
+                "unsupported": false
+              },
+              {
+                "text": "Additionally, identified barriers such as limited transportation access for evening shifts and low digital literacy among first-time job seekers exacerbate the challenges faced by these youth. These barriers contribute to a high dropout risk during the first 45 days of placement, as noted in the 2024 Impact Snapshot.",
+                "citations": [
+                  {
+                    "doc_id": "rfp.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: City of Dublin Youth Workforce Innovation Grant 2026 Program Overview The City invites nonprofit proposals to expand paid career pathways for youth ages 16-24 in underserved neighborhoods. Total fund available: EUR 1..."
+                  }
+                ],
+                "confidence": 0.85,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "f150316c-4377-4792-be7a-21445dc0e288",
+            "updated_at": "2026-02-10T12:52:23.964886+00:00",
+            "source": "nova-agents-v1"
+          }
+        },
+        "Program Design": {
+          "draft": {
+            "section_key": "Program Design",
+            "paragraphs": [
+              {
+                "text": "Participant recruitment will leverage existing partnerships with local schools, community centers, and social services to identify and engage youth facing employment barriers. Outreach efforts will include targeted workshops and informational sessions to raise awareness about the program and its benefits. These sessions will be held in accessible locations and times to accommodate the schedules of potential participants. (doc_id: evidence.txt, page: 1, snippet: 'Organization: BrightSteps Community Network 2024 Impact Snapshot - 1,482 youth served across three districts.')",
+                "citations": [
+                  {
+                    "doc_id": "rfp_community_resilience_2026.txt",
+                    "page": 1,
+                    "snippet": "(30 points) - Outcomes and evidence quality (25 points) - Budget reasonableness (15 points) Disallowed costs: - Purchase of real estate - Political campaign activity - Expenses unrelated to direct program delivery"
+                  }
+                ],
+                "confidence": 0.9,
+                "unsupported": false
+              },
+              {
+                "text": "Employer partnerships will be expanded to include additional businesses in retail, logistics, and healthcare sectors, building on the existing network of 24 employer partners. These partnerships will be cultivated through regular meetings and presentations highlighting the benefits of hiring youth from underserved communities. Employers will be provided with tailored onboarding and support to facilitate successful placements and retention of participants. (doc_id: evidence.txt, page: 1, snippet: 'Existing Program Assets - 24 employer partners in retail, logistics, and healthcare support.')",
+                "citations": [
+                  {
+                    "doc_id": "rfp_community_resilience_2026.txt",
+                    "page": 1,
+                    "snippet": "(30 points) - Outcomes and evidence quality (25 points) - Budget reasonableness (15 points) Disallowed costs: - Purchase of real estate - Political campaign activity - Expenses unrelated to direct program delivery"
+                  }
+                ],
+                "confidence": 0.85,
+                "unsupported": false
+              },
+              {
+                "text": "The monthly service model will include ongoing job-readiness training, digital literacy workshops, and transportation support to address identified barriers such as limited access to evening shifts and low digital literacy. Participants will receive bi-weekly check-ins from a mobile coaching team to provide encouragement and address any challenges they may face. Additionally, a case management system will be utilized to track monthly progress and ensure participants remain engaged and supported throughout their placement. (doc_id: evidence.txt, page: 1, snippet: 'Identified Barriers - Limited transportation access for evening shifts. - Low digital literacy among first-time job seekers.')",
+                "citations": [
+                  {
+                    "doc_id": "rfp_community_resilience_2026.txt",
+                    "page": 1,
+                    "snippet": "(30 points) - Outcomes and evidence quality (25 points) - Budget reasonableness (15 points) Disallowed costs: - Purchase of real estate - Political campaign activity - Expenses unrelated to direct program delivery"
+                  }
+                ],
+                "confidence": 0.88,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "d5454385-1008-4648-a138-e15333500e73",
+            "updated_at": "2026-02-10T12:52:28.262286+00:00",
+            "source": "nova-agents-v1"
+          }
+        },
+        "Outcomes and Evaluation": {
+          "draft": {
+            "section_key": "Outcomes and Evaluation",
+            "paragraphs": [
+              {
+                "text": "The primary outcomes of the proposed youth program will be measured through participant surveys and case management records, focusing on improvements in housing stability, access to food resources, and overall well-being. These outcomes align with the City of Portland's emphasis on community resilience and the specific needs identified in the RFP. The evaluation will be conducted in three phases: baseline assessment at enrollment, mid-program assessment at six months, and final evaluation at the end of the program period.",
+                "citations": [
+                  {
+                    "doc_id": "rfp_community_resilience_2026.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi..."
+                  }
+                ],
+                "confidence": 0.85,
+                "unsupported": false
+              },
+              {
+                "text": "The evaluation strategy will incorporate both quantitative and qualitative methods to capture the full impact of the program. Quantitative data will include metrics such as the number of households remaining stably housed, the percentage of participants accessing food resources, and the reduction in reported transportation barriers. Qualitative data will be gathered through participant interviews and focus groups to provide deeper insights into the program's effectiveness and areas for improvement.",
+                "citations": [
+                  {
+                    "doc_id": "rfp_community_resilience_2026.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi..."
+                  }
+                ],
+                "confidence": 0.8,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "6cc32df2-7431-4de5-9122-272ffe78c921",
+            "updated_at": "2026-02-10T12:52:32.422603+00:00",
+            "source": "nova-agents-v1"
+          }
+        },
+        "Sustainability": {
+          "draft": {
+            "section_key": "Sustainability",
+            "paragraphs": [],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "4107fbd5-451e-479f-ba59-7bd6c7a4b26d",
+            "updated_at": "2026-02-10T12:52:34.813257+00:00",
+            "source": "nova-agents-v1"
+          }
+        }
+      },
+      "coverage": {
+        "items": [
+          {
+            "requirement_id": "Q1",
+            "status": "met",
+            "notes": "The draft artifact includes a substantive need statement section.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1",
+              "section_key: Need Statement, paragraph 2, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "Q2",
+            "status": "met",
+            "notes": "The draft artifact includes a substantive program design section.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1",
+              "section_key: Program Design, paragraph 2, citation: rfp_community_resilience_2026.txt:p1",
+              "section_key: Program Design, paragraph 3, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "Q3",
+            "status": "met",
+            "notes": "The draft artifact includes a substantive outcomes and evaluation section.",
+            "evidence_refs": [
+              "section_key: Outcomes and Evaluation, paragraph 1, citation: rfp_community_resilience_2026.txt:p1",
+              "section_key: Outcomes and Evaluation, paragraph 2, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "Q4",
+            "status": "missing",
+            "notes": "Sustainability section is not provided in the draft.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "A1",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "A2",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "A3",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "A4",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 2.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 2, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "E1",
+            "status": "partial",
+            "notes": "Requirement has partial draft coverage in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "E2",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "E3",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Outcomes and Evaluation, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "R1",
+            "status": "partial",
+            "notes": "Requirement has partial draft coverage in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "R2",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "R3",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "R4",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "R5",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "R6",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "R7",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Outcomes and Evaluation, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "R8",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D1",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D2",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D3",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D4",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D5",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D6",
+            "status": "partial",
+            "notes": "Requirement has partial draft coverage in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D7",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D8",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D9",
+            "status": "partial",
+            "notes": "Requirement has partial draft coverage in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D10",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D11",
+            "status": "partial",
+            "notes": "Requirement has partial draft coverage in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D12",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D13",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Outcomes and Evaluation, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D14",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Outcomes and Evaluation, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D15",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D16",
+            "status": "partial",
+            "notes": "Requirement has partial draft coverage in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D17",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D18",
+            "status": "partial",
+            "notes": "Requirement has partial draft coverage in Need Statement, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 1, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D19",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D20",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 2.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 2, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D21",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Need Statement, paragraph 2.",
+            "evidence_refs": [
+              "section_key: Need Statement, paragraph 2, citation: rfp.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D22",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D23",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D24",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Program Design, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Program Design, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D25",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D26",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D27",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D28",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D29",
+            "status": "met",
+            "notes": "Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1.",
+            "evidence_refs": [
+              "section_key: Outcomes and Evaluation, paragraph 1, citation: rfp_community_resilience_2026.txt:p1"
+            ]
+          },
+          {
+            "requirement_id": "D30",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D31",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D32",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D33",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "D34",
+            "status": "missing",
+            "notes": "No meaningful evidence-backed coverage found in generated drafts.",
+            "evidence_refs": []
+          }
+        ]
+      },
+      "missing_evidence": [],
+      "validations": {
+        "requirements": {
+          "present": true
+        },
+        "drafts": {
+          "sections": 4
+        },
+        "coverage": {
+          "present": true
+        }
+      },
+      "summary": {
+        "overall_completion": "59.4%",
+        "coverage_overview": {
+          "met": 28,
+          "partial": 7,
+          "missing": 18
+        },
+        "unsupported_claims_count": 0,
+        "missing_evidence_count": 0,
+        "constraints": {
+          "known": [
+            "deadline: March 15, 2026 at 5:00 PM Pacific",
+            "Q1: 350 words",
+            "Q2: 400 words",
+            "Q3: 300 words",
+            "Q4: 250 words"
+          ],
+          "unknown": []
+        }
+      }
+    },
+    "markdown": {
+      "files": [
+        {
+          "path": "application.md",
+          "content": "# Draft Application\n\n## Need Statement\n\n1. In the city of Dublin, youth aged 16-24 in underserved neighborhoods face significant employment barriers. According to the 2024 Impact Snapshot from BrightSteps Community Network, 68% of youth completed job-readiness training, yet only 54% were placed into paid internships within 90 days, highlighting a gap in employment opportunities and support systems for this demographic.\n2. Additionally, identified barriers such as limited transportation access for evening shifts and low digital literacy among first-time job seekers exacerbate the challenges faced by these youth. These barriers contribute to a high dropout risk during the first 45 days of placement, as noted in the 2024 Impact Snapshot.\n\n### Citations\n- `rfp.txt` p1: Funding Opportunity: City of Dublin Youth Workforce Innovation Grant 2026 Program Overview The City invites nonprofit proposals to expand paid career pathways for youth ages 16-24 in underserved neighborhoods. Total fund available: EUR 1...\n\n## Program Design\n\n1. Participant recruitment will leverage existing partnerships with local schools, community centers, and social services to identify and engage youth facing employment barriers. Outreach efforts will include targeted workshops and informational sessions to raise awareness about the program and its benefits. These sessions will be held in accessible locations and times to accommodate the schedules of potential participants. (doc_id: evidence.txt, page: 1, snippet: 'Organization: BrightSteps Community Network 2024 Impact Snapshot - 1,482 youth served across three districts.')\n2. Employer partnerships will be expanded to include additional businesses in retail, logistics, and healthcare sectors, building on the existing network of 24 employer partners. These partnerships will be cultivated through regular meetings and presentations highlighting the benefits of hiring youth from underserved communities. Employers will be provided with tailored onboarding and support to facilitate successful placements and retention of participants. (doc_id: evidence.txt, page: 1, snippet: 'Existing Program Assets - 24 employer partners in retail, logistics, and healthcare support.')\n3. The monthly service model will include ongoing job-readiness training, digital literacy workshops, and transportation support to address identified barriers such as limited access to evening shifts and low digital literacy. Participants will receive bi-weekly check-ins from a mobile coaching team to provide encouragement and address any challenges they may face. Additionally, a case management system will be utilized to track monthly progress and ensure participants remain engaged and supported throughout their placement. (doc_id: evidence.txt, page: 1, snippet: 'Identified Barriers - Limited transportation access for evening shifts. - Low digital literacy among first-time job seekers.')\n\n### Citations\n- `rfp_community_resilience_2026.txt` p1: (30 points) - Outcomes and evidence quality (25 points) - Budget reasonableness (15 points) Disallowed costs: - Purchase of real estate - Political campaign activity - Expenses unrelated to direct program delivery\n\n## Outcomes and Evaluation\n\n1. The primary outcomes of the proposed youth program will be measured through participant surveys and case management records, focusing on improvements in housing stability, access to food resources, and overall well-being. These outcomes align with the City of Portland's emphasis on community resilience and the specific needs identified in the RFP. The evaluation will be conducted in three phases: baseline assessment at enrollment, mid-program assessment at six months, and final evaluation at the end of the program period.\n2. The evaluation strategy will incorporate both quantitative and qualitative methods to capture the full impact of the program. Quantitative data will include metrics such as the number of households remaining stably housed, the percentage of participants accessing food resources, and the reduction in reported transportation barriers. Qualitative data will be gathered through participant interviews and focus groups to provide deeper insights into the program's effectiveness and areas for improvement.\n\n### Citations\n- `rfp_community_resilience_2026.txt` p1: Funding Opportunity: City of Portland Community Resilience Microgrant 2026 Funder: City of Portland Office of Community Partnerships Deadline: March 15, 2026 at 5:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations wi...\n\n## Sustainability\n\n_No draft paragraphs available._\n\n### Citations\n- None"
+        },
+        {
+          "path": "requirements.md",
+          "content": "# Requirements Matrix\n\n| requirement_id | requirement | status | notes |\n|---|---|---|---|\n| Q1 | Need Statement (350 words max): Describe the specific community need your program addresses and who is most affected. | met | The draft artifact includes a substantive need statement section. |\n| Q2 | Program Design (400 words max): Explain your activities, implementation timeline, and how participants are served. | met | The draft artifact includes a substantive program design section. |\n| Q3 | Outcomes and Evaluation (300 words max): Identify measurable outcomes and how progress will be tracked. | met | The draft artifact includes a substantive outcomes and evaluation section. |\n| Q4 | Sustainability (max 250 words) | missing | Sustainability section is not provided in the draft. |\n| A1 | Attachment A: Project Budget | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| A2 | Attachment B: Program Timeline | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| A3 | Include two letters of community support | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| A4 | implementation timeline by quarter | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 2. |\n| E1 | Applicants must be nonprofit organizations with active 501(c)(3) status. | partial | Requirement has partial draft coverage in Program Design, paragraph 1. |\n| E2 | Applicants must provide services within Portland city limits. | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| E3 | Applicants must have at least one completed program cycle in the last 24 months. | met | Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1. |\n| R1 | Need alignment and urgency (30 points) | partial | Requirement has partial draft coverage in Need Statement, paragraph 1. |\n| R2 | Feasibility and readiness (30 points) | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| R3 | Outcomes and evidence quality (25 points) | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| R4 | Budget reasonableness (15 points) | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| R5 | Community Need and Alignment: 30 points | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| R6 | Feasibility and Operations: 30 points | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| R7 | Outcomes and Measurement: 25 points | met | Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1. |\n| R8 | Budget Reasonableness: 15 points | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D1 | Purchase of real estate | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| D2 | Political campaign activity | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D3 | Funding Opportunity: City of Dublin Youth Workforce Innovation Grant 2026 | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| D4 | Program Overview | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| D5 | The City invites nonprofit proposals to expand paid career pathways for youth ages 16-24 in underserved neighborhoods. | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 1. |\n| D6 | Total fund available: EUR 1,200,000. Maximum request per applicant: EUR 180,000. | partial | Requirement has partial draft coverage in Program Design, paragraph 1. |\n| D7 | Project period: July 1, 2026 to June 30, 2027. | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| D8 | Required Narrative Questions | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D9 | 1) Need Statement (max 300 words) | partial | Requirement has partial draft coverage in Program Design, paragraph 1. |\n| D10 | Describe the local employment barriers for target youth and provide evidence from 2024-2025 program data. | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| D11 | 2) Program Design (max 500 words) | partial | Requirement has partial draft coverage in Program Design, paragraph 1. |\n| D12 | Explain participant recruitment, employer partnerships, and monthly service model. | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| D13 | 3) Outcomes and Evaluation (max 400 words) | met | Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1. |\n| D14 | Define at least three measurable outcomes, collection methods, and reporting cadence. | met | Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1. |\n| D15 | 4) Sustainability (max 250 words) | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D16 | Describe how services continue after grant period. | partial | Requirement has partial draft coverage in Program Design, paragraph 1. |\n| D17 | Submission Requirements | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D18 | Attachment A: Line-item budget with justification | partial | Requirement has partial draft coverage in Need Statement, paragraph 1. |\n| D19 | Attachment B: Organization board list | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| D20 | Attachment C: Two employer support letters | met | Requirement is supported by cited draft evidence in Program Design, paragraph 2. |\n| D21 | Include implementation timeline by quarter | met | Requirement is supported by cited draft evidence in Need Statement, paragraph 2. |\n| D22 | Scoring Rubric | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D23 | Budget Reaso | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D24 | Expenses unrelated to direct program delivery | met | Requirement is supported by cited draft evidence in Program Design, paragraph 1. |\n| D25 | ters | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D26 | Restrictions | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D27 | No alcohol, entertainment, or lobbying expenses. | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D28 | Equipment purchases above EUR 10,000 require prior approval. | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D29 | Indirect costs capped at 12%. | met | Requirement is supported by cited draft evidence in Outcomes and Evaluation, paragraph 1. |\n| D30 | Alcohol | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D31 | Entertainment | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D32 | Lobbying expenses | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D33 | Equipment purchases above EUR 10,000 without prior approval | missing | No meaningful evidence-backed coverage found in generated drafts. |\n| D34 | Indirect costs above 12% | missing | No meaningful evidence-backed coverage found in generated drafts. |"
+        },
+        {
+          "path": "coverage.md",
+          "content": "# Coverage Summary\n\n- Readiness score: 59.4%\n- Completion score: 52.8%\n- Met: 28\n- Partial: 7\n- Missing: 18\n\n## Recommended Next Edits\n- `Q4`: Sustainability section is not provided in the draft.\n- `E1`: Requirement has partial draft coverage in Program Design, paragraph 1.\n- `R1`: Requirement has partial draft coverage in Need Statement, paragraph 1.\n- `R4`: No meaningful evidence-backed coverage found in generated drafts.\n- `R8`: No meaningful evidence-backed coverage found in generated drafts.\n- `D2`: No meaningful evidence-backed coverage found in generated drafts.\n- `D6`: Requirement has partial draft coverage in Program Design, paragraph 1.\n- `D8`: No meaningful evidence-backed coverage found in generated drafts.\n- `D9`: Requirement has partial draft coverage in Program Design, paragraph 1.\n- `D11`: Requirement has partial draft coverage in Program Design, paragraph 1."
+        }
+      ]
+    }
+  },
+  "summary": {
+    "overall_completion": "59.4%",
+    "coverage_overview": {
+      "met": 28,
+      "partial": 7,
+      "missing": 18
+    },
+    "unsupported_claims_count": 0,
+    "missing_evidence_count": 0,
+    "constraints": {
+      "known": [
+        "deadline: March 15, 2026 at 5:00 PM Pacific",
+        "Q1: 350 words",
+        "Q2: 400 words",
+        "Q3: 300 words",
+        "Q4: 250 words"
+      ],
+      "unknown": []
+    }
+  },
+  "quality_gates": {
+    "passed": true,
+    "reasons": [],
+    "warnings": []
+  },
+  "provenance": {
+    "artifacts_used": [
+      {
+        "type": "draft",
+        "id": "f150316c-4377-4792-be7a-21445dc0e288",
+        "updated_at": "2026-02-10T12:52:23.964886+00:00"
+      },
+      {
+        "type": "draft",
+        "id": "6cc32df2-7431-4de5-9122-272ffe78c921",
+        "updated_at": "2026-02-10T12:52:32.422603+00:00"
+      },
+      {
+        "type": "draft",
+        "id": "d5454385-1008-4648-a138-e15333500e73",
+        "updated_at": "2026-02-10T12:52:28.262286+00:00"
+      },
+      {
+        "type": "draft",
+        "id": "4107fbd5-451e-479f-ba59-7bd6c7a4b26d",
+        "updated_at": "2026-02-10T12:52:34.813257+00:00"
+      },
+      {
+        "type": "requirements",
+        "id": "c1833827-f0f3-47e2-8529-b7542c554611",
+        "updated_at": "2026-02-10T12:52:22.221814+00:00"
+      },
+      {
+        "type": "coverage",
+        "id": "eb276dc8-300d-4b05-8046-b8159da79f03",
+        "updated_at": "2026-02-10T12:52:36.371298+00:00"
+      },
+      {
+        "type": "intake",
+        "id": "a11ca2ea-f8b6-4791-8417-678bee5385ee",
+        "updated_at": "2026-02-10T12:52:19.798525+00:00"
+      }
+    ],
+    "run_metadata": {
+      "model_ids": {
+        "primary": "eu.amazon.nova-pro-v1:0",
+        "lite": "eu.amazon.nova-lite-v1:0"
+      },
+      "temperatures": {
+        "agent_temperature": 0.1
+      },
+      "max_tokens": 2048,
+      "retrieval_top_k": 5,
+      "chunking": {
+        "chunk_size_chars": 1200,
+        "chunk_overlap_chars": 200
+      },
+      "request_ids": [
+        "11e9b779-a511-41de-9b93-d3a37b0b2990"
+      ]
+    }
+  }
+}

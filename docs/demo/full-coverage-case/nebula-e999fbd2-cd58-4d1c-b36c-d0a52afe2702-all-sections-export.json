@@ -1,0 +1,472 @@
+{
+  "export_version": "nebula.export.v1",
+  "generated_at": "2026-02-10T12:09:27.106874+00:00",
+  "project": {
+    "id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+    "name": "County Family Stability 2027 Full Coverage Demo"
+  },
+  "bundle": {
+    "json": {
+      "project": {
+        "id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+        "name": "County Family Stability 2027 Full Coverage Demo"
+      },
+      "export_request": {
+        "format": "both",
+        "profile": "submission",
+        "include_debug": false,
+        "sections": null,
+        "output_filename_base": null
+      },
+      "intake": {
+        "country": "United States",
+        "organization_type": "Non-profit (501(c)(3))",
+        "funder_track": "county-family-stability",
+        "funding_goal": "eviction-prevention-and-family-support",
+        "sector_focus": "housing stability, case management, and outcomes measurement"
+      },
+      "documents": [
+        {
+          "id": "74a5a433-a461-451e-84d8-b5fa131853a5",
+          "project_id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+          "file_name": "rfp_county_family_stability_2027.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/e999fbd2-cd58-4d1c-b36c-d0a52afe2702/ec8797e5-81e4-47b2-adc0-f872e99b09c4_rfp_county_family_stability_2027.txt",
+          "size_bytes": 1333,
+          "created_at": "2026-02-10T12:09:10.577579+00:00",
+          "doc_id": "rfp_county_family_stability_2027.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "26452750-b6d3-4e83-9cf0-c2bcdd96f0d8",
+          "project_id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+          "file_name": "evaluation_framework_appendix_c.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/e999fbd2-cd58-4d1c-b36c-d0a52afe2702/747aec34-5eab-48a6-a3b9-ee85dec40b5d_evaluation_framework_appendix_c.txt",
+          "size_bytes": 1043,
+          "created_at": "2026-02-10T12:09:10.584512+00:00",
+          "doc_id": "evaluation_framework_appendix_c.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "54db2d3d-4a95-4c76-92ec-1e311069b5d1",
+          "project_id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+          "file_name": "community_support_letters_excerpt.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/e999fbd2-cd58-4d1c-b36c-d0a52afe2702/21bce471-3924-47bb-b51b-9fb275904e28_community_support_letters_excerpt.txt",
+          "size_bytes": 765,
+          "created_at": "2026-02-10T12:09:10.588844+00:00",
+          "doc_id": "community_support_letters_excerpt.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "66cfdfe7-16f6-4aef-add6-0e71c3c41c3d",
+          "project_id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+          "file_name": "program_timeline_attachment_b.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/e999fbd2-cd58-4d1c-b36c-d0a52afe2702/9ffbb75b-6393-49db-a6d7-8918e78ae2eb_program_timeline_attachment_b.txt",
+          "size_bytes": 960,
+          "created_at": "2026-02-10T12:09:10.592319+00:00",
+          "doc_id": "program_timeline_attachment_b.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "dedd7cfa-9b3a-4667-b6e2-ee8188029bf1",
+          "project_id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+          "file_name": "project_budget_attachment_a.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/e999fbd2-cd58-4d1c-b36c-d0a52afe2702/f26af817-6ae3-4b52-b9fb-18fde0475ef6_project_budget_attachment_a.txt",
+          "size_bytes": 891,
+          "created_at": "2026-02-10T12:09:10.596031+00:00",
+          "doc_id": "project_budget_attachment_a.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        },
+        {
+          "id": "04e0e2c7-db2a-41da-9d4e-f84ff1544cda",
+          "project_id": "e999fbd2-cd58-4d1c-b36c-d0a52afe2702",
+          "file_name": "org_impact_report_2026.txt",
+          "content_type": "text/plain",
+          "storage_path": "data/uploads/e999fbd2-cd58-4d1c-b36c-d0a52afe2702/9e58f653-9194-4838-9921-0ef75c2911d3_org_impact_report_2026.txt",
+          "size_bytes": 1663,
+          "created_at": "2026-02-10T12:09:10.599505+00:00",
+          "doc_id": "org_impact_report_2026.txt",
+          "page_count": 1,
+          "parsed_status": "parsed"
+        }
+      ],
+      "requirements": {
+        "funder": "Multnomah County Family Stability Grant 2027",
+        "deadline": "April 30, 2027 at 4:00 PM Pacific",
+        "eligibility": [
+          "Applicants must be nonprofit organizations with active 501(c)(3) status.",
+          "Applicants must provide direct services within Multnomah County, Oregon.",
+          "Applicants must have completed at least one full 12-month program cycle in the last 24 months."
+        ],
+        "questions": [
+          {
+            "id": "Q1",
+            "prompt": "Need Statement (350 words max): Describe the specific community need your program addresses, who is most affected, and why this need is urgent in your service area.",
+            "limit": {
+              "type": "words",
+              "value": 350
+            }
+          },
+          {
+            "id": "Q2",
+            "prompt": "Program Design (400 words max): Explain core activities, staffing model, implementation timeline, and how participants are served.",
+            "limit": {
+              "type": "words",
+              "value": 400
+            }
+          },
+          {
+            "id": "Q3",
+            "prompt": "Outcomes and Evaluation (300 words max): Identify measurable outcomes, targets, data collection methods, and how progress is tracked and reported.",
+            "limit": {
+              "type": "words",
+              "value": 300
+            }
+          }
+        ],
+        "required_attachments": [
+          "Attachment A: Project Budget",
+          "Attachment B: Program Timeline",
+          "Include two letters of community support"
+        ],
+        "rubric": [
+          "Need alignment and urgency (30 points)",
+          "Feasibility and readiness (30 points)",
+          "Outcomes and evidence quality (25 points)",
+          "community support",
+          "Budget reasonableness (15 points)"
+        ],
+        "disallowed_costs": [
+          "Purchase of real estate",
+          "Political campaign activity",
+          "Expenses unrelated to direct program delivery"
+        ]
+      },
+      "drafts": {
+        "Need Statement": {
+          "draft": {
+            "section_key": "Need Statement",
+            "paragraphs": [
+              {
+                "text": "The Eastside Family Bridge Program addresses a critical need for eviction prevention and family support in East Portland and Gresham. According to the 2026 Impact Report, 57% of enrolled households were at risk of eviction within 60 days at intake, highlighting the urgency of the situation .",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2026.txt",
+                    "page": 1,
+                    "snippet": "Eastside Family Bridge Program Impact Report - 2026 Organization profile: - 501(c)(3) nonprofit providing housing stabilization and family support across East Portland and Gresham. - Completed full program cycles in 2024-2025 and 2025-20..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              },
+              {
+                "text": "The program serves a vulnerable population, with 74% of households including at least one child under age 18 and 49% reporting limited English proficiency, which complicates access to resources and services .",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2026.txt",
+                    "page": 1,
+                    "snippet": "Eastside Family Bridge Program Impact Report - 2026 Organization profile: - 501(c)(3) nonprofit providing housing stabilization and family support across East Portland and Gresham. - Completed full program cycles in 2024-2025 and 2025-20..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              },
+              {
+                "text": "Transportation barriers are a significant issue, with 41% of participants missing at least one appointment due to these challenges, underscoring the need for targeted support .",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2026.txt",
+                    "page": 1,
+                    "snippet": "Eastside Family Bridge Program Impact Report - 2026 Organization profile: - 501(c)(3) nonprofit providing housing stabilization and family support across East Portland and Gresham. - Completed full program cycles in 2024-2025 and 2025-20..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "8da6821b-a4e9-4d53-9e86-76ff0a3a91a5",
+            "updated_at": "2026-02-10T12:09:14.464248+00:00",
+            "source": "nova-agents-v1"
+          }
+        },
+        "Program Design": {
+          "draft": {
+            "section_key": "Program Design",
+            "paragraphs": [
+              {
+                "text": "The Eastside Family Bridge Program is designed to address the urgent need for eviction prevention and family support in Multnomah County, Oregon. The program's core activities include weekly case management, monthly legal aid clinic referrals, and transportation assistance to ensure participants can access necessary services. This model has been successfully implemented in the 2024-2025 and 2025-2026 program cycles, demonstrating its effectiveness in stabilizing housing for at-risk families .",
+                "citations": [
+                  {
+                    "doc_id": "org_impact_report_2026.txt",
+                    "page": 1,
+                    "snippet": "Eastside Family Bridge Program Impact Report - 2026 Organization profile: - 501(c)(3) nonprofit providing housing stabilization and family support across East Portland and Gresham. - Completed full program cycles in 2024-2025 and 2025-20..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              },
+              {
+                "text": "The staffing model for the program includes a Program Manager (0.40 FTE) and two Case Coordinators (0.50 FTE each), ensuring adequate support and supervision for direct service delivery. Additionally, the program allocates resources for transportation assistance vouchers, legal aid clinic contracts, and family stabilization supplies to address specific barriers faced by participants .",
+                "citations": [
+                  {
+                    "doc_id": "project_budget_attachment_a.txt",
+                    "page": 1,
+                    "snippet": "Attachment A: Project Budget Project period: July 1, 2027 - June 30, 2028 Requested amount: $80,000 Budget line items: - Program Manager (0.40 FTE): $26,400 - Two Case Coordinators (0.50 FTE each): $31,000 - Transportation assistance vou..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              },
+              {
+                "text": "The implementation timeline for the program is set for the period from July 1, 2027, to June 30, 2028. The program aims to achieve primary outcomes such as a 75% housing stability rate at 180 days, a 52% increase in monthly income or completion of new benefits enrollment, and a 72% appointment adherence rate. These outcomes will be measured through case management system records, benefits verification logs, and appointment attendance logs .",
+                "citations": [
+                  {
+                    "doc_id": "evaluation_framework_appendix_c.txt",
+                    "page": 1,
+                    "snippet": "Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period: - Housing Stability Rate: target 75% of enrolled households remain stably housed at 180 days. - Income or Benefits Gain: target 52% of enrolled ..."
+                  }
+                ],
+                "confidence": 0.95,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "da19681f-9379-419b-a3f9-7c3b56894719",
+            "updated_at": "2026-02-10T12:09:20.306389+00:00",
+            "source": "nova-agents-v1"
+          }
+        },
+        "Outcomes and Evaluation": {
+          "draft": {
+            "section_key": "Outcomes and Evaluation",
+            "paragraphs": [
+              {
+                "text": "The primary outcomes for the 2027-2028 grant period include a housing stability rate of 75% of enrolled households remaining stably housed at 180 days, an income or benefits gain target of 52% of enrolled households increasing monthly income or completing a new benefits enrollment, and an appointment adherence target of 72% of participants attending at least 80% of scheduled appointments (doc_id: evaluation_framework_appendix_c.txt, page: 1, snippet: 'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...').",
+                "citations": [
+                  {
+                    "doc_id": "rfp_county_family_stability_2027.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: Multnomah County Family Stability Grant 2027 Funder: Multnomah County Department of Human Services Deadline: April 30, 2027 at 4:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations with active 501..."
+                  }
+                ],
+                "confidence": 0.9,
+                "unsupported": false
+              },
+              {
+                "text": "Data sources for measuring these outcomes include case management system records, benefits verification logs, employment follow-up forms, and appointment attendance logs from partner clinics and schools (doc_id: evaluation_framework_appendix_c.txt, page: 1, snippet: 'Data sources: - Case management system records (housing status, service contacts, referrals). - Benefits verification logs and employment follow-up forms. - Appointment attendance logs from partner clinics and schools.').",
+                "citations": [
+                  {
+                    "doc_id": "rfp_county_family_stability_2027.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: Multnomah County Family Stability Grant 2027 Funder: Multnomah County Department of Human Services Deadline: April 30, 2027 at 4:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations with active 501..."
+                  }
+                ],
+                "confidence": 0.9,
+                "unsupported": false
+              },
+              {
+                "text": "The measurement cadence involves baseline assessments at intake, follow-up checks at day 90 and 180, and monthly QA audits reviewing a 10% sample of case files for data quality and service fidelity (doc_id: evaluation_framework_appendix_c.txt, page: 1, snippet: 'Measurement cadence: - Baseline at intake. - Follow-up at day 90 and...').",
+                "citations": [
+                  {
+                    "doc_id": "rfp_county_family_stability_2027.txt",
+                    "page": 1,
+                    "snippet": "Funding Opportunity: Multnomah County Family Stability Grant 2027 Funder: Multnomah County Department of Human Services Deadline: April 30, 2027 at 4:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations with active 501..."
+                  }
+                ],
+                "confidence": 0.9,
+                "unsupported": false
+              }
+            ],
+            "missing_evidence": []
+          },
+          "artifact": {
+            "id": "32691e91-1652-4a6a-9947-e2f65327c78d",
+            "updated_at": "2026-02-10T12:09:25.395736+00:00",
+            "source": "nova-agents-v1"
+          }
+        }
+      },
+      "coverage": {
+        "items": [
+          {
+            "requirement_id": "Q1",
+            "status": "missing",
+            "notes": "No need statement provided in the draft artifact.",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "Q2",
+            "status": "partial",
+            "notes": "Program design is partially described, but lacks details on staffing model and implementation timeline.",
+            "evidence_refs": [
+              "{'doc_id': 'evaluation_framework_appendix_c.txt', 'page': 1, 'snippet': \"'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...'\"}"
+            ]
+          },
+          {
+            "requirement_id": "Q3",
+            "status": "met",
+            "notes": "Outcomes, targets, data collection methods, and progress tracking are clearly described.",
+            "evidence_refs": [
+              "{'doc_id': 'evaluation_framework_appendix_c.txt', 'page': 1, 'snippet': \"'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...'\"}"
+            ]
+          },
+          {
+            "requirement_id": "A1",
+            "status": "missing",
+            "notes": "No coverage item returned for requirement: Attachment A: Project Budget",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "A2",
+            "status": "missing",
+            "notes": "No coverage item returned for requirement: Attachment B: Program Timeline",
+            "evidence_refs": []
+          },
+          {
+            "requirement_id": "A3",
+            "status": "missing",
+            "notes": "No coverage item returned for requirement: Include two letters of community support",
+            "evidence_refs": []
+          }
+        ]
+      },
+      "missing_evidence": [],
+      "validations": {
+        "requirements": {
+          "present": true
+        },
+        "drafts": {
+          "sections": 3
+        },
+        "coverage": {
+          "present": true
+        }
+      },
+      "summary": {
+        "overall_completion": "25.0%",
+        "coverage_overview": {
+          "met": 1,
+          "partial": 1,
+          "missing": 4
+        },
+        "unsupported_claims_count": 0,
+        "missing_evidence_count": 0,
+        "constraints": {
+          "known": [
+            "deadline: April 30, 2027 at 4:00 PM Pacific",
+            "Q1: 350 words",
+            "Q2: 400 words",
+            "Q3: 300 words"
+          ],
+          "unknown": []
+        }
+      }
+    },
+    "markdown": {
+      "files": [
+        {
+          "path": "application.md",
+          "content": "# Draft Application\n\n## Need Statement\n\n1. The Eastside Family Bridge Program addresses a critical need for eviction prevention and family support in East Portland and Gresham. According to the 2026 Impact Report, 57% of enrolled households were at risk of eviction within 60 days at intake, highlighting the urgency of the situation .\n2. The program serves a vulnerable population, with 74% of households including at least one child under age 18 and 49% reporting limited English proficiency, which complicates access to resources and services .\n3. Transportation barriers are a significant issue, with 41% of participants missing at least one appointment due to these challenges, underscoring the need for targeted support .\n\n### Citations\n- `org_impact_report_2026.txt` p1: Eastside Family Bridge Program Impact Report - 2026 Organization profile: - 501(c)(3) nonprofit providing housing stabilization and family support across East Portland and Gresham. - Completed full program cycles in 2024-2025 and 2025-20...\n\n## Program Design\n\n1. The Eastside Family Bridge Program is designed to address the urgent need for eviction prevention and family support in Multnomah County, Oregon. The program's core activities include weekly case management, monthly legal aid clinic referrals, and transportation assistance to ensure participants can access necessary services. This model has been successfully implemented in the 2024-2025 and 2025-2026 program cycles, demonstrating its effectiveness in stabilizing housing for at-risk families .\n2. The staffing model for the program includes a Program Manager (0.40 FTE) and two Case Coordinators (0.50 FTE each), ensuring adequate support and supervision for direct service delivery. Additionally, the program allocates resources for transportation assistance vouchers, legal aid clinic contracts, and family stabilization supplies to address specific barriers faced by participants .\n3. The implementation timeline for the program is set for the period from July 1, 2027, to June 30, 2028. The program aims to achieve primary outcomes such as a 75% housing stability rate at 180 days, a 52% increase in monthly income or completion of new benefits enrollment, and a 72% appointment adherence rate. These outcomes will be measured through case management system records, benefits verification logs, and appointment attendance logs .\n\n### Citations\n- `org_impact_report_2026.txt` p1: Eastside Family Bridge Program Impact Report - 2026 Organization profile: - 501(c)(3) nonprofit providing housing stabilization and family support across East Portland and Gresham. - Completed full program cycles in 2024-2025 and 2025-20...\n- `project_budget_attachment_a.txt` p1: Attachment A: Project Budget Project period: July 1, 2027 - June 30, 2028 Requested amount: $80,000 Budget line items: - Program Manager (0.40 FTE): $26,400 - Two Case Coordinators (0.50 FTE each): $31,000 - Transportation assistance vou...\n- `evaluation_framework_appendix_c.txt` p1: Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period: - Housing Stability Rate: target 75% of enrolled households remain stably housed at 180 days. - Income or Benefits Gain: target 52% of enrolled ...\n\n## Outcomes and Evaluation\n\n1. The primary outcomes for the 2027-2028 grant period include a housing stability rate of 75% of enrolled households remaining stably housed at 180 days, an income or benefits gain target of 52% of enrolled households increasing monthly income or completing a new benefits enrollment, and an appointment adherence target of 72% of participants attending at least 80% of scheduled appointments (doc_id: evaluation_framework_appendix_c.txt, page: 1, snippet: 'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...').\n2. Data sources for measuring these outcomes include case management system records, benefits verification logs, employment follow-up forms, and appointment attendance logs from partner clinics and schools (doc_id: evaluation_framework_appendix_c.txt, page: 1, snippet: 'Data sources: - Case management system records (housing status, service contacts, referrals). - Benefits verification logs and employment follow-up forms. - Appointment attendance logs from partner clinics and schools.').\n3. The measurement cadence involves baseline assessments at intake, follow-up checks at day 90 and 180, and monthly QA audits reviewing a 10% sample of case files for data quality and service fidelity (doc_id: evaluation_framework_appendix_c.txt, page: 1, snippet: 'Measurement cadence: - Baseline at intake. - Follow-up at day 90 and...').\n\n### Citations\n- `rfp_county_family_stability_2027.txt` p1: Funding Opportunity: Multnomah County Family Stability Grant 2027 Funder: Multnomah County Department of Human Services Deadline: April 30, 2027 at 4:00 PM Pacific Eligibility: - Applicants must be nonprofit organizations with active 501..."
+        },
+        {
+          "path": "requirements.md",
+          "content": "# Requirements Matrix\n\n| requirement_id | requirement | status | evidence pointers | notes |\n|---|---|---|---|---|\n| Q1 | Need Statement (350 words max): Describe the specific community need your program addresses, who is most affected, and why this need is urgent in your service area. | missing |  | No need statement provided in the draft artifact. |\n| Q2 | Program Design (400 words max): Explain core activities, staffing model, implementation timeline, and how participants are served. | partial | {'doc_id': 'evaluation_framework_appendix_c.txt', 'page': 1, 'snippet': \"'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...'\"} | Program design is partially described, but lacks details on staffing model and implementation timeline. |\n| Q3 | Outcomes and Evaluation (300 words max): Identify measurable outcomes, targets, data collection methods, and how progress is tracked and reported. | met | {'doc_id': 'evaluation_framework_appendix_c.txt', 'page': 1, 'snippet': \"'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...'\"} | Outcomes, targets, data collection methods, and progress tracking are clearly described. |\n| A1 | Attachment A: Project Budget | missing |  | No coverage item returned for requirement: Attachment A: Project Budget |\n| A2 | Attachment B: Program Timeline | missing |  | No coverage item returned for requirement: Attachment B: Program Timeline |\n| A3 | Include two letters of community support | missing |  | No coverage item returned for requirement: Include two letters of community support |\n| E1 | Applicants must be nonprofit organizations with active 501(c)(3) status. | missing |  | No coverage item returned. |\n| E2 | Applicants must provide direct services within Multnomah County, Oregon. | missing |  | No coverage item returned. |\n| E3 | Applicants must have completed at least one full 12-month program cycle in the last 24 months. | missing |  | No coverage item returned. |\n| R1 | Need alignment and urgency (30 points) | missing |  | No coverage item returned. |\n| R2 | Feasibility and readiness (30 points) | missing |  | No coverage item returned. |\n| R3 | Outcomes and evidence quality (25 points) | missing |  | No coverage item returned. |\n| R4 | community support | missing |  | No coverage item returned. |\n| R5 | Budget reasonableness (15 points) | missing |  | No coverage item returned. |\n| D1 | Purchase of real estate | missing |  | No coverage item returned. |\n| D2 | Political campaign activity | missing |  | No coverage item returned. |\n| D3 | Expenses unrelated to direct program delivery | missing |  | No coverage item returned. |"
+        },
+        {
+          "path": "coverage.md",
+          "content": "# Coverage\n\n- Met: 1\n- Partial: 1\n- Missing: 4\n\n## Top Missing Items\n- `Q1`: No need statement provided in the draft artifact.\n- `A1`: No coverage item returned for requirement: Attachment A: Project Budget\n- `A2`: No coverage item returned for requirement: Attachment B: Program Timeline\n- `A3`: No coverage item returned for requirement: Include two letters of community support\n\n## Items\n\n| requirement_id | status | notes | evidence_refs |\n|---|---|---|---|\n| Q1 | missing | No need statement provided in the draft artifact. |  |\n| Q2 | partial | Program design is partially described, but lacks details on staffing model and implementation timeline. | {'doc_id': 'evaluation_framework_appendix_c.txt', 'page': 1, 'snippet': \"'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...'\"} |\n| Q3 | met | Outcomes, targets, data collection methods, and progress tracking are clearly described. | {'doc_id': 'evaluation_framework_appendix_c.txt', 'page': 1, 'snippet': \"'Evaluation Framework Appendix C Primary outcomes and targets for the 2027-2028 grant period...'\"} |\n| A1 | missing | No coverage item returned for requirement: Attachment A: Project Budget |  |\n| A2 | missing | No coverage item returned for requirement: Attachment B: Program Timeline |  |\n| A3 | missing | No coverage item returned for requirement: Include two letters of community support |  |"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "overall_completion": "25.0%",
+    "coverage_overview": {
+      "met": 1,
+      "partial": 1,
+      "missing": 4
+    },
+    "unsupported_claims_count": 0,
+    "missing_evidence_count": 0,
+    "constraints": {
+      "known": [
+        "deadline: April 30, 2027 at 4:00 PM Pacific",
+        "Q1: 350 words",
+        "Q2: 400 words",
+        "Q3: 300 words"
+      ],
+      "unknown": []
+    }
+  },
+  "quality_gates": {
+    "passed": true,
+    "reasons": [],
+    "warnings": []
+  },
+  "provenance": {
+    "artifacts_used": [
+      {
+        "type": "draft",
+        "id": "8da6821b-a4e9-4d53-9e86-76ff0a3a91a5",
+        "updated_at": "2026-02-10T12:09:14.464248+00:00"
+      },
+      {
+        "type": "draft",
+        "id": "32691e91-1652-4a6a-9947-e2f65327c78d",
+        "updated_at": "2026-02-10T12:09:25.395736+00:00"
+      },
+      {
+        "type": "draft",
+        "id": "da19681f-9379-419b-a3f9-7c3b56894719",
+        "updated_at": "2026-02-10T12:09:20.306389+00:00"
+      },
+      {
+        "type": "requirements",
+        "id": "00ac5d1f-8e8f-4cda-ba78-c437274498fd",
+        "updated_at": "2026-02-10T12:09:12.375310+00:00"
+      },
+      {
+        "type": "coverage",
+        "id": "52a889ed-9981-451d-b2f4-2c47bcbe9cd7",
+        "updated_at": "2026-02-10T12:09:27.098271+00:00"
+      },
+      {
+        "type": "intake",
+        "id": "a7258ef2-1324-4eda-9170-86ce10e41d9e",
+        "updated_at": "2026-02-10T12:09:10.555253+00:00"
+      }
+    ],
+    "run_metadata": {
+      "model_ids": {
+        "primary": "eu.amazon.nova-pro-v1:0",
+        "lite": "eu.amazon.nova-lite-v1:0"
+      },
+      "temperatures": {
+        "agent_temperature": 0.1
+      },
+      "max_tokens": 2048,
+      "retrieval_top_k": 5,
+      "chunking": {
+        "chunk_size_chars": 1200,
+        "chunk_overlap_chars": 200
+      },
+      "request_ids": [
+        "4c9fdfdf-00d6-4c23-bb93-bc747d0e7452"
+      ]
+    }
+  }
+}

@@ -63,6 +63,46 @@ def extract_text_pages(content: bytes, content_type: str, file_name: str) -> lis
     return result
 
 
+def build_parse_report(
+    *,
+    content: bytes,
+    content_type: str,
+    file_name: str,
+    pages: list[ExtractedPage],
+    chunks: list[ChunkPayload],
+) -> dict[str, object]:
+    bytes_in = len(content)
+    chars_extracted = sum(len(page.text) for page in pages)
+    text_extractable = _is_text_file(content_type=content_type, file_name=file_name)
+    text_density = round(chars_extracted / max(1, bytes_in), 3)
+
+    quality = "good"
+    reason = "ok"
+    if not text_extractable:
+        quality = "none"
+        reason = "unsupported_file_type"
+    elif chars_extracted == 0:
+        quality = "none"
+        reason = "no_text_extracted"
+    elif chars_extracted < 120 or len(chunks) == 0:
+        quality = "low"
+        reason = "low_extracted_text"
+    elif text_density < 0.08:
+        quality = "low"
+        reason = "low_text_density"
+
+    return {
+        "quality": quality,
+        "reason": reason,
+        "text_extractable": text_extractable,
+        "bytes_in": bytes_in,
+        "chars_extracted": chars_extracted,
+        "pages_extracted": len(pages),
+        "chunks_indexed": len(chunks),
+        "text_density": text_density,
+    }
+
+
 def chunk_pages(
     pages: list[ExtractedPage],
     chunk_size_chars: int,
@@ -127,4 +167,3 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
     if len(a) != len(b):
         raise ValueError("Vector dimensions do not match")
     return float(sum(x * y for x, y in zip(a, b)))
-

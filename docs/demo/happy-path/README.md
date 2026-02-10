@@ -9,6 +9,14 @@ Suggested upload set:
 - `program_timeline_attachment_b.txt`
 - `community_support_letters_excerpt.txt`
 
+Recommended intake values (UI):
+- Project Name: `Portland Community Resilience 2026 Demo`
+- Country: `United States`
+- Organization Type: `Non-profit (501(c)(3))`
+- Funder Track: `city-community-resilience`
+- Funding Goal: `housing-stability-program`
+- Sector Focus: `housing stability and family support`
+
 Notes:
 - Files are plain text on purpose; the current ingest indexer is text-first.
 - The RFP uses numbered questions and explicit sections so deterministic extraction stays stable.
