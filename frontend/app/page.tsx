@@ -19,53 +19,17 @@ type PipelineRunResult = {
   exportMarkdown: string;
 };
 
-const journeySteps = [
-  {
-    title: "Ingest Source Files",
-    detail: "Upload the RFP and supporting documents. Nebula parses and indexes evidence across files.",
-  },
-  {
-    title: "Generate With Citations",
-    detail: "Nova drafts sections directly from retrieved evidence and attaches traceable references.",
-  },
-  {
-    title: "Validate Before Submit",
-    detail: "Coverage and missing-evidence checks highlight risk before your final submission.",
-  },
-];
-
 const outputCards = [
-  {
-    title: "Clear Requirements",
-    detail: "Structured questions, limits, attachments, and compliance cues extracted from the RFP.",
-  },
-  {
-    title: "Citation-Backed Draft",
-    detail: "Draft sections include evidence pointers so reviewers can verify every major claim.",
-  },
-  {
-    title: "Coverage Matrix",
-    detail: "Requirement-level status shows what is met, partial, or missing across the package.",
-  },
-  {
-    title: "Gap Flags",
-    detail: "Missing evidence is surfaced early so teams can close gaps before submission day.",
-  },
+  "Clear Requirements",
+  "Citation-Backed Draft Sections",
+  "Coverage Matrix",
+  "Missing Evidence Flags",
 ];
 
 const trustSignals = [
-  {
-    title: "Evidence-First By Default",
-    detail: "Drafting is grounded in uploaded sources so claims stay tied to real supporting material.",
-  },
-  {
-    title: "No Last-Minute Compliance Surprises",
-    detail: "Coverage and missing-evidence checks surface partial or missing requirements before final review.",
-  },
-  {
-    title: "Export-Ready Handoff",
-    detail: "Teams leave with one coherent markdown output that is easy to review, copy, and submit.",
-  },
+  "Grounded in uploaded source files",
+  "Coverage checks before final review",
+  "Single export package for submission",
 ];
 
 function asRecord(value: JsonValue): Record<string, unknown> | null {
@@ -425,8 +389,8 @@ export default function HomePage() {
   const [copyState, setCopyState] = useState<"copy" | "copied" | "failed">("copy");
 
   const isRunning = runStatus === "loading";
-  const trustStepRefs = useRef<Array<HTMLElement | null>>([]);
-  const [visibleTrustSteps, setVisibleTrustSteps] = useState<Record<number, boolean>>({});
+  const storyCardRefs = useRef<Array<HTMLElement | null>>([]);
+  const [visibleStoryCards, setVisibleStoryCards] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (showWorkspace) {
@@ -439,19 +403,19 @@ export default function HomePage() {
           if (!entry.isIntersecting) {
             return;
           }
-          const raw = entry.target.getAttribute("data-trust-index");
+          const raw = entry.target.getAttribute("data-card-index");
           const index = raw ? Number.parseInt(raw, 10) : Number.NaN;
           if (Number.isNaN(index)) {
             return;
           }
-          setVisibleTrustSteps((prev) => (prev[index] ? prev : { ...prev, [index]: true }));
+          setVisibleStoryCards((prev) => (prev[index] ? prev : { ...prev, [index]: true }));
           observer.unobserve(entry.target);
         });
       },
       { threshold: 0.55 }
     );
 
-    trustStepRefs.current.forEach((element) => {
+    storyCardRefs.current.forEach((element) => {
       if (element) {
         observer.observe(element);
       }
@@ -702,67 +666,80 @@ export default function HomePage() {
               <h1 className="brand-wordmark">Nebula</h1>
             </div>
             <p className="landing-kicker">Amazon Nova-powered proposal workflow</p>
-            <h2 className="landing-hero-title">From source files to submission-ready grant markdown.</h2>
           </article>
 
           <section id="landing-story" className="landing-story">
-            <article className="story-panel">
-              <header className="story-head">
-                <h2>How Nebula Runs</h2>
-                <p>From intake documents to submission-ready markdown in one guided run.</p>
-              </header>
-              <div className="journey-grid">
-                {journeySteps.map((step, index) => (
-                  <article key={step.title} className="journey-card">
-                    <span className="journey-index">{String(index + 1).padStart(2, "0")}</span>
-                    <h3>{step.title}</h3>
-                    <p>{step.detail}</p>
-                  </article>
-                ))}
-              </div>
+            <article
+              ref={(node) => {
+                storyCardRefs.current[0] = node;
+              }}
+              data-card-index={0}
+              className={`story-card ${visibleStoryCards[0] ? "is-visible" : ""}`}
+            >
+              <h2 className="story-card-title">From source files to submission-ready grant</h2>
             </article>
 
-            <article className="story-panel">
-              <header className="story-head">
-                <h2>What You Get Back</h2>
-                <p>Everything needed for review in one continuous markdown package.</p>
-              </header>
-              <div className="output-grid">
+            <article
+              ref={(node) => {
+                storyCardRefs.current[1] = node;
+              }}
+              data-card-index={1}
+              className={`story-card ${visibleStoryCards[1] ? "is-visible" : ""}`}
+            >
+              <h2 className="story-card-title">How Nebula Runs</h2>
+              <img src="/LANDING.png" alt="Nebula workflow graph" className="landing-flow-image" />
+            </article>
+
+            <article
+              ref={(node) => {
+                storyCardRefs.current[2] = node;
+              }}
+              data-card-index={2}
+              className={`story-card logo-divider ${visibleStoryCards[2] ? "is-visible" : ""}`}
+            >
+              <img src="/aws.svg" alt="AWS logo" className="logo-divider-icon" />
+              <p className="story-section-note">Powered by Amazon Nova</p>
+            </article>
+
+            <article
+              ref={(node) => {
+                storyCardRefs.current[3] = node;
+              }}
+              data-card-index={3}
+              className={`story-card ${visibleStoryCards[3] ? "is-visible" : ""}`}
+            >
+              <h2 className="story-card-title">What You Get Back</h2>
+              <div className="story-list">
                 {outputCards.map((card) => (
-                  <article key={card.title} className="output-card">
-                    <h3>{card.title}</h3>
-                    <p>{card.detail}</p>
-                  </article>
+                  <p key={card} className="story-subsection">{card}</p>
                 ))}
               </div>
             </article>
 
-            <article className="story-panel trust-track">
-              <header className="story-head">
-                <h2>Why Teams Trust It</h2>
-                <p>Nebula keeps evidence traceability front and center throughout drafting and export.</p>
-              </header>
-              <div className="trust-step-list">
-                {trustSignals.map((signal, index) => (
-                  <article
-                    key={signal.title}
-                    ref={(node) => {
-                      trustStepRefs.current[index] = node;
-                    }}
-                    data-trust-index={index}
-                    className={`trust-step ${visibleTrustSteps[index] ? "is-visible" : ""}`}
-                  >
-                    <span className="trust-step-index">{String(index + 1).padStart(2, "0")}</span>
-                    <h3>{signal.title}</h3>
-                    <p>{signal.detail}</p>
-                  </article>
+            <article
+              ref={(node) => {
+                storyCardRefs.current[4] = node;
+              }}
+              data-card-index={4}
+              className={`story-card ${visibleStoryCards[4] ? "is-visible" : ""}`}
+            >
+              <h2 className="story-card-title">Why Teams Trust It</h2>
+              <div className="story-list">
+                {trustSignals.map((signal) => (
+                  <p key={signal} className="story-subsection">{signal}</p>
                 ))}
               </div>
             </article>
 
-            <article className="story-panel final-cta">
-              <h2>Ready To Build Your Draft?</h2>
-              <p>Enter the workspace to upload files, run generation, and export your complete markdown output.</p>
+            <article
+              ref={(node) => {
+                storyCardRefs.current[5] = node;
+              }}
+              data-card-index={5}
+              className={`story-card final-cta ${visibleStoryCards[5] ? "is-visible" : ""}`}
+            >
+              <h2 className="story-card-title">Ready To Build Your Draft?</h2>
+              <p className="story-card-cta-copy">Enter the workspace and run the full workflow</p>
               <button type="button" className="workspace-enter" onClick={() => setShowWorkspace(true)}>
                 Enter Workspace
               </button>

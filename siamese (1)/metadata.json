@@ -1,5 +1,0 @@
-{
-  "name": "Siamese",
-  "description": "A frontend-only incident analysis tool powered by Gemini. Upload logs and artifacts to generate structured incident reports.",
-  "requestFramePermissions": []
-}
