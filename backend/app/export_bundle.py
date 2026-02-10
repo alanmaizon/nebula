@@ -62,6 +62,7 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
     raw_missing_evidence = _as_dict_list(input_payload.get("missing_evidence"))
     artifacts_used = _as_dict_list(input_payload.get("artifacts_used"))
     run_metadata = _as_optional_dict(input_payload.get("run_metadata")) or {}
+    source_selection = _as_optional_dict(input_payload.get("source_selection")) or {}
 
     requested_sections = _coerce_sections(export_request.get("sections"))
     drafts_map = _normalize_drafts(input_payload.get("drafts"))
@@ -83,6 +84,9 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
         )
 
     coverage_items = _as_dict_list((coverage or {}).get("items"))
+    source_ambiguity_count = 1 if bool(source_selection.get("ambiguous")) else 0
+    if source_ambiguity_count > 0:
+        warnings.append("source ambiguity warning")
 
     if requirements is not None and coverage is None:
         quality_reasons.append("Requirements artifact exists but coverage artifact is missing.")
@@ -147,6 +151,7 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
         "uncertainty": {
             "citation_mismatch_count": int(integrity_signals.get("citation_mismatch_count") or 0),
             "source_conflict_count": int(coverage_uncertainty.get("source_conflict_count") or 0),
+            "source_ambiguity_count": source_ambiguity_count,
             "empty_required_sections_count": int(coverage_uncertainty.get("empty_required_sections_count") or 0),
             "unsupported_claims_count": unsupported_claims_count,
         },
@@ -193,6 +198,7 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
             "drafts": exported_drafts,
             "coverage": {"items": reconciled_coverage_items},
             "missing_evidence": merged_missing_evidence,
+            "source_selection": source_selection,
             "validations": validations,
             "summary": summary,
         }
@@ -900,6 +906,9 @@ def _render_coverage_markdown(
         f"- Missing: {missing}",
     ]
     source_conflict_count = _coerce_positive_int(uncertainty.get("source_conflict_count")) or 0
+    source_ambiguity_count = _coerce_positive_int(uncertainty.get("source_ambiguity_count")) or 0
+    if source_ambiguity_count > 0:
+        lines.append(f"- Source ambiguity warnings: {source_ambiguity_count}")
     if source_conflict_count > 0:
         lines.append(f"- Source conflicts detected: {source_conflict_count}")
     if citation_mismatch_count:
@@ -910,6 +919,10 @@ def _render_coverage_markdown(
         lines.append(f"- Unsupported claims detected: {unsupported_claims}")
 
     recommendations: list[str] = []
+    if source_ambiguity_count > 0:
+        recommendations.append(
+            "Resolve source ambiguity warning: select a single primary RFP document for deterministic extraction."
+        )
     if source_conflict_count > 0:
         recommendations.append(
             "Resolve source conflict warning: align contradictory evidence before finalizing scores."

@@ -43,6 +43,7 @@ from app.drafting import (
     validate_with_repair as validate_draft_with_repair,
 )
 from app.export import ExportCompositionError, compose_markdown_report
+from app.export.policy import derive_section_title_from_prompt
 from app.intake import IntakePayload, build_intake_context
 from app.observability import (
     configure_logging,
@@ -76,6 +77,11 @@ class GenerateSectionRequest(BaseModel):
 
 class CoverageComputeRequest(BaseModel):
     section_key: str = Field(default="Need Statement", min_length=1, max_length=120)
+
+
+class GenerateFullDraftRequest(BaseModel):
+    top_k: int | None = Field(default=None, ge=1, le=20)
+    max_revision_rounds: int = Field(default=1, ge=0, le=3)
 
 
 def get_nova_orchestrator() -> BedrockNovaOrchestrator:
@@ -295,6 +301,245 @@ def create_app() -> FastAPI:
         }
         return selected_chunks, metadata
 
+    def build_section_targets_from_requirements(requirements_payload: dict[str, object]) -> list[dict[str, str]]:
+        questions = requirements_payload.get("questions")
+        if not isinstance(questions, list):
+            return [{"requirement_id": "Q1", "prompt": "Need Statement", "section_key": "Need Statement"}]
+
+        targets: list[dict[str, str]] = []
+        seen_section_keys: dict[str, int] = {}
+        for index, question in enumerate(questions, start=1):
+            if not isinstance(question, dict):
+                continue
+            prompt = str(question.get("prompt") or "").strip()
+            if not prompt:
+                continue
+            requirement_id = str(question.get("id") or f"Q{index}").strip() or f"Q{index}"
+            base_section_key = derive_section_title_from_prompt(prompt).strip() or f"Section {index}"
+            count = seen_section_keys.get(base_section_key, 0) + 1
+            seen_section_keys[base_section_key] = count
+            if count == 1:
+                section_key = base_section_key
+            else:
+                section_key = f"{base_section_key} {count}"
+            section_key = section_key[:120].strip() or f"Section {index}"
+            targets.append(
+                {
+                    "requirement_id": requirement_id,
+                    "prompt": prompt,
+                    "section_key": section_key,
+                }
+            )
+
+        return targets or [{"requirement_id": "Q1", "prompt": "Need Statement", "section_key": "Need Statement"}]
+
+    def run_requirements_extraction_for_batch(
+        *,
+        project_id: str,
+        selected_batch_id: str | None,
+    ) -> dict[str, object]:
+        chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
+        if not chunks:
+            raise HTTPException(
+                status_code=400,
+                detail="No indexed chunks found. Upload text documents before extracting requirements.",
+            )
+
+        requirement_candidates = select_requirement_chunks(chunks)
+        requirement_chunks, rfp_selection = select_primary_rfp_document(requirement_candidates)
+        deterministic_payload = extract_requirements_payload(requirement_chunks)
+        extracted_payload = deterministic_payload
+        extraction_mode = "deterministic-only"
+        nova_error: str | None = None
+        nova_question_count = 0
+        try:
+            nova_payload = get_nova_orchestrator().extract_requirements(requirement_chunks)
+            nova_question_count = len(nova_payload.get("questions", [])) if isinstance(nova_payload, dict) else 0
+            if isinstance(nova_payload, dict):
+                extracted_payload = merge_requirements_payload(deterministic_payload, nova_payload)
+                extraction_mode = "deterministic+nova"
+        except NovaRuntimeError as exc:
+            nova_error = str(exc)
+
+        validated, repaired, validation_errors = validate_requirements_with_repair(extracted_payload)
+        if validated is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Requirements extraction failed validation.",
+                    "errors": validation_errors,
+                },
+            )
+
+        artifact_meta = create_requirements_artifact(
+            project_id=project_id,
+            payload=validated.model_dump(),
+            source="nova-agents-v1",
+            upload_batch_id=selected_batch_id,
+        )
+        return {
+            "requirements": validated.model_dump(),
+            "artifact": artifact_meta,
+            "validation": {
+                "repaired": repaired,
+                "errors": validation_errors,
+            },
+            "extraction": {
+                "mode": extraction_mode,
+                "chunks_total": len(chunks),
+                "chunks_considered": len(requirement_chunks),
+                "deterministic_question_count": len(deterministic_payload.get("questions", [])),
+                "nova_question_count": nova_question_count,
+                "nova_error": nova_error,
+                "rfp_selection": rfp_selection,
+            },
+            "chunks": chunks,
+        }
+
+    def compute_validated_coverage_payload(
+        *,
+        requirements_payload: dict[str, object],
+        draft_payload: dict[str, object],
+    ) -> tuple[dict[str, object], bool, list[str]]:
+        try:
+            coverage_payload = get_nova_orchestrator().compute_coverage(
+                requirements=requirements_payload,
+                draft=draft_payload,
+            )
+        except NovaRuntimeError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={"message": "Nova coverage computation failed.", "error": str(exc)},
+            ) from exc
+        coverage_payload = normalize_coverage_payload(
+            requirements=requirements_payload,
+            payload=coverage_payload,
+        )
+        validated, repaired, validation_errors = validate_coverage_with_repair(coverage_payload)
+        if validated is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Coverage computation failed validation.",
+                    "errors": validation_errors,
+                },
+            )
+        return validated.model_dump(), repaired, validation_errors
+
+    def generate_validated_section_draft(
+        *,
+        project_id: str,
+        selected_batch_id: str | None,
+        section_key: str,
+        query_text: str,
+        requested_top_k: int | None,
+        max_revision_rounds: int,
+        force_retry: bool,
+    ) -> dict[str, object]:
+        chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
+        intake_context: dict[str, str] | None = None
+        latest_intake = get_latest_intake_artifact(project_id)
+        if latest_intake is not None and isinstance(latest_intake.get("payload"), dict):
+            intake_payload = IntakePayload.model_validate(latest_intake["payload"])
+            intake_context = build_intake_context(intake_payload)
+
+        default_top_k = requested_top_k or settings.retrieval_top_k_default
+        ranked_all = rank_chunks_by_query(chunks, query_text, min(20, len(chunks))) if chunks else []
+
+        top_k = default_top_k
+        retry_on_missing = False
+        if settings.enable_agentic_orchestration_pilot and ranked_all:
+            try:
+                plan = get_nova_orchestrator().plan_section_generation(
+                    section_key=section_key,
+                    requested_top_k=default_top_k,
+                    available_chunk_count=len(ranked_all),
+                )
+                top_k = int(plan["retrieval_top_k"])
+                retry_on_missing = bool(plan.get("retry_on_missing_evidence", False))
+            except (NovaRuntimeError, KeyError, TypeError, ValueError):
+                top_k = default_top_k
+
+        if ranked_all:
+            top_k = max(1, min(len(ranked_all), top_k))
+        else:
+            top_k = max(1, top_k)
+
+        retries_allowed = max_revision_rounds if force_retry else 0
+        if not force_retry and settings.enable_agentic_orchestration_pilot and retry_on_missing:
+            retries_allowed = max(retries_allowed, 1)
+        if not force_retry and not settings.enable_agentic_orchestration_pilot:
+            retries_allowed = 0
+
+        best_result: dict[str, object] | None = None
+        attempts = 0
+        current_top_k = top_k
+
+        while True:
+            attempts += 1
+            ranked_chunks = ranked_all[:current_top_k] if ranked_all else []
+            if ranked_chunks:
+                try:
+                    draft_payload = get_nova_orchestrator().generate_section(
+                        section_key,
+                        ranked_chunks,
+                        intake_context=intake_context,
+                    )
+                except NovaRuntimeError as exc:
+                    raise HTTPException(
+                        status_code=502,
+                        detail={"message": "Nova draft generation failed.", "error": str(exc)},
+                    ) from exc
+            else:
+                draft_payload = build_draft_payload(section_key, ranked_chunks)
+
+            if isinstance(draft_payload, dict):
+                draft_payload = normalize_draft_section_key(draft_payload, section_key)
+            draft_payload, grounding_stats = ground_draft_payload(draft_payload, ranked_chunks)
+            validated, repaired, validation_errors = validate_draft_with_repair(draft_payload)
+            if validated is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "message": "Draft generation failed validation.",
+                        "errors": validation_errors,
+                    },
+                )
+
+            missing_count = len(validated.missing_evidence)
+            if best_result is None or missing_count < int(best_result["missing_count"]):
+                best_result = {
+                    "draft": validated.model_dump(),
+                    "validation": {
+                        "repaired": repaired,
+                        "errors": validation_errors,
+                    },
+                    "grounding": grounding_stats,
+                    "retrieval": ranked_chunks,
+                    "top_k_used": current_top_k,
+                    "missing_count": missing_count,
+                }
+
+            can_retry = (
+                attempts <= retries_allowed
+                and missing_count > 0
+                and bool(ranked_all)
+                and current_top_k < len(ranked_all)
+            )
+            if not can_retry:
+                break
+            current_top_k = min(len(ranked_all), current_top_k + 2)
+
+        if best_result is None:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": "Draft generation failed validation.", "errors": ["Unable to produce draft payload."]},
+            )
+        return {
+            **best_result,
+            "attempts": attempts,
+        }
+
     def build_export_documents(
         project_id: str,
         documents: list[dict[str, object]],
@@ -421,6 +666,208 @@ def create_app() -> FastAPI:
             written_files.append(str(relative_path))
 
         return written_files
+
+    def assemble_export_bundle_for_project(
+        *,
+        request: Request,
+        project_id: str,
+        project: dict[str, object],
+        selected_batch_id: str | None,
+        requested_sections: list[str],
+        profile: str,
+        include_debug: bool,
+        output_filename_base: str | None,
+        use_agent: bool,
+    ) -> dict[str, object]:
+        requirements_artifact = get_latest_requirements_artifact(project_id, upload_batch_id=selected_batch_id)
+        draft_artifacts = list_latest_draft_artifacts(project_id, upload_batch_id=selected_batch_id)
+        coverage_artifact = get_latest_coverage_artifact(project_id, upload_batch_id=selected_batch_id)
+        intake_artifact = get_latest_intake_artifact(project_id)
+        documents = list_documents(project_id, upload_batch_id=selected_batch_id)
+
+        drafts: dict[str, dict[str, object]] = {}
+        artifacts_used: list[dict[str, object]] = []
+        artifact_timestamps: list[str] = []
+        for artifact in draft_artifacts:
+            section_name = str(artifact.get("section_key", "")).strip()
+            if requested_sections and section_name not in requested_sections:
+                continue
+            drafts[section_name] = {
+                "draft": artifact["payload"],
+                "artifact": {
+                    "id": artifact["id"],
+                    "source": artifact["source"],
+                    "updated_at": artifact["created_at"],
+                },
+            }
+            artifacts_used.append(
+                {
+                    "type": "draft",
+                    "id": artifact["id"],
+                    "updated_at": artifact["created_at"],
+                }
+            )
+            artifact_timestamps.append(str(artifact["created_at"]))
+
+        requirements_payload = requirements_artifact["payload"] if requirements_artifact else None
+        coverage_payload = coverage_artifact["payload"] if coverage_artifact else None
+        intake_payload = intake_artifact["payload"] if intake_artifact else None
+        documents_payload = build_export_documents(project_id, documents, upload_batch_id=selected_batch_id)
+
+        if requirements_artifact:
+            artifacts_used.append(
+                {
+                    "type": "requirements",
+                    "id": requirements_artifact["id"],
+                    "updated_at": requirements_artifact["created_at"],
+                }
+            )
+            artifact_timestamps.append(str(requirements_artifact["created_at"]))
+        if coverage_artifact:
+            artifacts_used.append(
+                {
+                    "type": "coverage",
+                    "id": coverage_artifact["id"],
+                    "updated_at": coverage_artifact["created_at"],
+                }
+            )
+            artifact_timestamps.append(str(coverage_artifact["created_at"]))
+        if intake_artifact:
+            artifacts_used.append(
+                {
+                    "type": "intake",
+                    "id": intake_artifact["id"],
+                    "updated_at": intake_artifact["created_at"],
+                }
+            )
+            artifact_timestamps.append(str(intake_artifact["created_at"]))
+
+        project_updated_at = project.get("created_at")
+        if artifact_timestamps:
+            project_updated_at = max([str(project.get("created_at", "")), *artifact_timestamps])
+
+        validations: dict[str, object] = {
+            "requirements": {"present": requirements_payload is not None},
+            "drafts": {"sections": len(drafts)},
+            "coverage": {"present": coverage_payload is not None},
+        }
+
+        missing_evidence: list[dict[str, object]] = []
+        for section_name, entry in drafts.items():
+            payload = entry.get("draft")
+            if not isinstance(payload, dict):
+                continue
+            items = payload.get("missing_evidence")
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict):
+                    missing_evidence.append(
+                        {
+                            **item,
+                            "affected_sections": [section_name],
+                        }
+                    )
+
+        source_selection: dict[str, object] = {
+            "selected_document_id": None,
+            "selected_file_name": None,
+            "ambiguous": False,
+            "candidates": [],
+        }
+        requirement_chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
+        if requirement_chunks:
+            _, source_selection = select_primary_rfp_document(select_requirement_chunks(requirement_chunks))
+
+        export_input = {
+            "project": {
+                "id": project.get("id"),
+                "name": project.get("name"),
+                "created_at": project.get("created_at"),
+                "updated_at": project_updated_at,
+            },
+            "export_request": {
+                "format": "both",
+                "profile": profile,
+                "include_debug": include_debug,
+                "sections": requested_sections or None,
+                "output_filename_base": output_filename_base,
+                "upload_batch_id": selected_batch_id,
+            },
+            "intake": intake_payload,
+            "documents": documents_payload,
+            "requirements": requirements_payload,
+            "drafts": drafts,
+            "coverage": coverage_payload,
+            "validations": validations,
+            "missing_evidence": missing_evidence,
+            "source_selection": source_selection,
+            "run_metadata": {
+                "model_ids": {
+                    "primary": settings.bedrock_model_id,
+                    "lite": settings.bedrock_lite_model_id,
+                },
+                "temperatures": {"agent_temperature": settings.agent_temperature},
+                "max_tokens": settings.agent_max_tokens,
+                "retrieval_top_k": settings.retrieval_top_k_default,
+                "chunking": {
+                    "chunk_size_chars": settings.chunk_size_chars,
+                    "chunk_overlap_chars": settings.chunk_overlap_chars,
+                },
+                "request_ids": [getattr(request.state, "request_id", None)],
+            },
+            "artifacts_used": artifacts_used,
+        }
+
+        export_bundle = build_export_bundle(export_input)
+
+        if use_agent:
+            orchestrator = get_nova_orchestrator()
+            package_export_bundle = getattr(orchestrator, "package_export_bundle", None)
+            if callable(package_export_bundle):
+                try:
+                    candidate_bundle = package_export_bundle(export_input)
+                    if looks_like_export_bundle(
+                        candidate_bundle,
+                        require_json_bundle=True,
+                        require_markdown_bundle=True,
+                    ):
+                        export_bundle = candidate_bundle
+                    else:
+                        append_export_warning(
+                            export_bundle,
+                            "Fell back to deterministic export: model output schema invalid.",
+                        )
+                except Exception as exc:  # pragma: no cover - depends on runtime integration
+                    append_export_warning(
+                        export_bundle,
+                        f"Fell back to deterministic export: final-stage agent unavailable ({exc}).",
+                    )
+
+        markdown_files = extract_markdown_files(export_bundle)
+        try:
+            written_files = write_markdown_export_files(project_id, markdown_files)
+            logger.info(
+                "export_files_written",
+                extra={
+                    "event": "export_files_written",
+                    "request_id": getattr(request.state, "request_id", None),
+                    "project_id": project_id,
+                    "files_written": len(written_files),
+                },
+            )
+            if markdown_files and not written_files:
+                append_export_warning(
+                    export_bundle,
+                    "Markdown bundle existed but no files were written to disk.",
+                )
+        except OSError as exc:
+            append_export_warning(
+                export_bundle,
+                f"Automatic markdown file write failed: {exc}",
+            )
+
+        return export_bundle
 
     @app.get("/")
     def root() -> dict[str, str]:
@@ -616,63 +1063,17 @@ def create_app() -> FastAPI:
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
         )
-        chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
-        if not chunks:
-            raise HTTPException(
-                status_code=400,
-                detail="No indexed chunks found. Upload text documents before extracting requirements.",
-            )
-
-        requirement_candidates = select_requirement_chunks(chunks)
-        requirement_chunks, rfp_selection = select_primary_rfp_document(requirement_candidates)
-        deterministic_payload = extract_requirements_payload(requirement_chunks)
-        extracted_payload = deterministic_payload
-        extraction_mode = "deterministic-only"
-        nova_error: str | None = None
-        nova_question_count = 0
-        try:
-            nova_payload = get_nova_orchestrator().extract_requirements(requirement_chunks)
-            nova_question_count = len(nova_payload.get("questions", [])) if isinstance(nova_payload, dict) else 0
-            if isinstance(nova_payload, dict):
-                extracted_payload = merge_requirements_payload(deterministic_payload, nova_payload)
-                extraction_mode = "deterministic+nova"
-        except NovaRuntimeError as exc:
-            nova_error = str(exc)
-
-        validated, repaired, validation_errors = validate_requirements_with_repair(extracted_payload)
-        if validated is None:
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "message": "Requirements extraction failed validation.",
-                    "errors": validation_errors,
-                },
-            )
-
-        artifact_meta = create_requirements_artifact(
+        extraction_result = run_requirements_extraction_for_batch(
             project_id=project_id,
-            payload=validated.model_dump(),
-            source="nova-agents-v1",
-            upload_batch_id=selected_batch_id,
+            selected_batch_id=selected_batch_id,
         )
         return {
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
-            "requirements": validated.model_dump(),
-            "artifact": artifact_meta,
-            "validation": {
-                "repaired": repaired,
-                "errors": validation_errors,
-            },
-            "extraction": {
-                "mode": extraction_mode,
-                "chunks_total": len(chunks),
-                "chunks_considered": len(requirement_chunks),
-                "deterministic_question_count": len(deterministic_payload.get("questions", [])),
-                "nova_question_count": nova_question_count,
-                "nova_error": nova_error,
-                "rfp_selection": rfp_selection,
-            },
+            "requirements": extraction_result["requirements"],
+            "artifact": extraction_result["artifact"],
+            "validation": extraction_result["validation"],
+            "extraction": extraction_result["extraction"],
         }
 
     @app.post("/projects/{project_id}/generate-section")
@@ -691,101 +1092,30 @@ def create_app() -> FastAPI:
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
         )
-        chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
-        intake_context: dict[str, str] | None = None
-        latest_intake = get_latest_intake_artifact(project_id)
-        if latest_intake is not None and isinstance(latest_intake.get("payload"), dict):
-            intake_payload = IntakePayload.model_validate(latest_intake["payload"])
-            intake_context = build_intake_context(intake_payload)
-
-        default_top_k = payload.top_k or settings.retrieval_top_k_default
-        ranked_all = rank_chunks_by_query(chunks, payload.section_key, min(20, len(chunks))) if chunks else []
-        top_k = default_top_k
-        retry_on_missing = False
-        if settings.enable_agentic_orchestration_pilot and ranked_all:
-            try:
-                plan = get_nova_orchestrator().plan_section_generation(
-                    section_key=payload.section_key,
-                    requested_top_k=default_top_k,
-                    available_chunk_count=len(ranked_all),
-                )
-                top_k = int(plan["retrieval_top_k"])
-                retry_on_missing = bool(plan.get("retry_on_missing_evidence", False))
-            except (NovaRuntimeError, KeyError, ValueError):
-                top_k = default_top_k
-        top_k = max(1, min(len(ranked_all), top_k)) if ranked_all else top_k
-        ranked_chunks = ranked_all[:top_k] if ranked_all else []
-        if ranked_chunks:
-            try:
-                draft_payload = get_nova_orchestrator().generate_section(
-                    payload.section_key,
-                    ranked_chunks,
-                    intake_context=intake_context,
-                )
-            except NovaRuntimeError as exc:
-                raise HTTPException(
-                    status_code=502,
-                    detail={"message": "Nova draft generation failed.", "error": str(exc)},
-                ) from exc
-        else:
-            draft_payload = build_draft_payload(payload.section_key, ranked_chunks)
-        if isinstance(draft_payload, dict):
-            draft_payload = normalize_draft_section_key(draft_payload, payload.section_key)
-        draft_payload, grounding_stats = ground_draft_payload(draft_payload, ranked_chunks)
-        validated, repaired, validation_errors = validate_draft_with_repair(draft_payload)
-        if (
-            settings.enable_agentic_orchestration_pilot
-            and retry_on_missing
-            and validated is not None
-            and len(validated.missing_evidence) > 0
-            and len(ranked_all) > top_k
-        ):
-            retry_top_k = min(len(ranked_all), top_k + 2)
-            retry_chunks = ranked_all[:retry_top_k]
-            try:
-                retry_payload = get_nova_orchestrator().generate_section(
-                    payload.section_key,
-                    retry_chunks,
-                    intake_context=intake_context,
-                )
-            except NovaRuntimeError:
-                retry_payload = None
-            if retry_payload is not None:
-                if isinstance(retry_payload, dict):
-                    retry_payload = normalize_draft_section_key(retry_payload, payload.section_key)
-                retry_payload, retry_grounding_stats = ground_draft_payload(retry_payload, retry_chunks)
-                retry_validated, retry_repaired, retry_errors = validate_draft_with_repair(retry_payload)
-                if retry_validated is not None and len(retry_validated.missing_evidence) < len(validated.missing_evidence):
-                    validated = retry_validated
-                    repaired = retry_repaired
-                    validation_errors = retry_errors
-                    grounding_stats = retry_grounding_stats
-        if validated is None:
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "message": "Draft generation failed validation.",
-                    "errors": validation_errors,
-                },
-            )
+        draft_result = generate_validated_section_draft(
+            project_id=project_id,
+            selected_batch_id=selected_batch_id,
+            section_key=payload.section_key,
+            query_text=payload.section_key,
+            requested_top_k=payload.top_k,
+            max_revision_rounds=1,
+            force_retry=False,
+        )
 
         artifact_meta = create_draft_artifact(
             project_id=project_id,
             section_key=payload.section_key,
-            payload=validated.model_dump(),
+            payload=draft_result["draft"],
             source="nova-agents-v1",
             upload_batch_id=selected_batch_id,
         )
         return {
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
-            "draft": validated.model_dump(),
+            "draft": draft_result["draft"],
             "artifact": artifact_meta,
-            "validation": {
-                "repaired": repaired,
-                "errors": validation_errors,
-            },
-            "grounding": grounding_stats,
+            "validation": draft_result["validation"],
+            "grounding": draft_result["grounding"],
         }
 
     @app.get("/projects/{project_id}/drafts/{section_key}/latest")
@@ -849,33 +1179,14 @@ def create_app() -> FastAPI:
         if draft_artifact is None:
             raise HTTPException(status_code=404, detail="No draft artifact found for project/section")
 
-        try:
-            coverage_payload = get_nova_orchestrator().compute_coverage(
-                requirements=requirements_artifact["payload"],
-                draft=draft_artifact["payload"],
-            )
-        except NovaRuntimeError as exc:
-            raise HTTPException(
-                status_code=502,
-                detail={"message": "Nova coverage computation failed.", "error": str(exc)},
-            ) from exc
-        coverage_payload = normalize_coverage_payload(
-            requirements=requirements_artifact["payload"],
-            payload=coverage_payload,
+        coverage_payload, repaired, validation_errors = compute_validated_coverage_payload(
+            requirements_payload=requirements_artifact["payload"],
+            draft_payload=draft_artifact["payload"],
         )
-        validated, repaired, validation_errors = validate_coverage_with_repair(coverage_payload)
-        if validated is None:
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "message": "Coverage computation failed validation.",
-                    "errors": validation_errors,
-                },
-            )
 
         artifact_meta = create_coverage_artifact(
             project_id=project_id,
-            payload=validated.model_dump(),
+            payload=coverage_payload,
             source="nova-agents-v1",
             upload_batch_id=selected_batch_id,
         )
@@ -883,7 +1194,7 @@ def create_app() -> FastAPI:
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
             "section_key": payload.section_key,
-            "coverage": validated.model_dump(),
+            "coverage": coverage_payload,
             "artifact": artifact_meta,
             "validation": {
                 "repaired": repaired,
@@ -918,6 +1229,165 @@ def create_app() -> FastAPI:
                 "id": latest["id"],
                 "source": latest["source"],
                 "created_at": latest["created_at"],
+            },
+        }
+
+    @app.post("/projects/{project_id}/generate-full-draft")
+    def generate_full_draft(
+        request: Request,
+        project_id: str,
+        payload: GenerateFullDraftRequest,
+        profile: str = Query(default="submission", pattern="^(hackathon|submission|internal)$"),
+        include_debug: bool = Query(default=False),
+        document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
+        upload_batch_id: str | None = Query(default=None),
+    ) -> dict[str, object]:
+        project = get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        selected_batch_id = resolve_upload_batch_scope(
+            project_id=project_id,
+            document_scope=document_scope,
+            upload_batch_id=upload_batch_id,
+        )
+
+        extraction_result = run_requirements_extraction_for_batch(
+            project_id=project_id,
+            selected_batch_id=selected_batch_id,
+        )
+        requirements_payload = extraction_result["requirements"]
+        section_targets = build_section_targets_from_requirements(requirements_payload)
+
+        section_runs: list[dict[str, object]] = []
+        combined_paragraphs: list[dict[str, object]] = []
+        combined_missing_evidence: list[dict[str, object]] = []
+
+        for target in section_targets:
+            section_key = str(target["section_key"])
+            prompt = str(target["prompt"])
+            requirement_id = str(target["requirement_id"])
+
+            draft_result = generate_validated_section_draft(
+                project_id=project_id,
+                selected_batch_id=selected_batch_id,
+                section_key=section_key,
+                query_text=prompt,
+                requested_top_k=payload.top_k,
+                max_revision_rounds=payload.max_revision_rounds,
+                force_retry=True,
+            )
+            draft_payload = draft_result["draft"]
+
+            artifact_meta = create_draft_artifact(
+                project_id=project_id,
+                section_key=section_key,
+                payload=draft_payload,
+                source="nova-agents-v1",
+                upload_batch_id=selected_batch_id,
+            )
+
+            section_coverage, section_repaired, section_validation_errors = compute_validated_coverage_payload(
+                requirements_payload=requirements_payload,
+                draft_payload=draft_payload,
+            )
+
+            paragraphs = draft_payload.get("paragraphs")
+            if isinstance(paragraphs, list):
+                for paragraph in paragraphs:
+                    if isinstance(paragraph, dict):
+                        combined_paragraphs.append(paragraph)
+            missing_items = draft_payload.get("missing_evidence")
+            if isinstance(missing_items, list):
+                for item in missing_items:
+                    if isinstance(item, dict):
+                        combined_missing_evidence.append(
+                            {
+                                **item,
+                                "affected_sections": [section_key],
+                            }
+                        )
+
+            section_runs.append(
+                {
+                    "requirement_id": requirement_id,
+                    "section_key": section_key,
+                    "prompt": prompt,
+                    "retrieval": draft_result["retrieval"],
+                    "draft": draft_payload,
+                    "draft_artifact": artifact_meta,
+                    "grounding": draft_result["grounding"],
+                    "coverage": section_coverage,
+                    "coverage_validation": {
+                        "repaired": section_repaired,
+                        "errors": section_validation_errors,
+                    },
+                    "attempts": draft_result["attempts"],
+                    "top_k_used": draft_result["top_k_used"],
+                }
+            )
+
+        combined_draft_payload = {
+            "section_key": "Draft Application",
+            "paragraphs": combined_paragraphs,
+            "missing_evidence": combined_missing_evidence,
+        }
+        final_coverage_payload, coverage_repaired, coverage_validation_errors = compute_validated_coverage_payload(
+            requirements_payload=requirements_payload,
+            draft_payload=combined_draft_payload,
+        )
+        coverage_artifact = create_coverage_artifact(
+            project_id=project_id,
+            payload=final_coverage_payload,
+            source="nova-agents-v1",
+            upload_batch_id=selected_batch_id,
+        )
+
+        requested_sections = [str(target["section_key"]) for target in section_targets]
+        export_bundle = assemble_export_bundle_for_project(
+            request=request,
+            project_id=project_id,
+            project=project,
+            selected_batch_id=selected_batch_id,
+            requested_sections=requested_sections,
+            profile=profile,
+            include_debug=include_debug,
+            output_filename_base=None,
+            use_agent=False,
+        )
+
+        unresolved: list[dict[str, object]] = []
+        coverage_items = final_coverage_payload.get("items")
+        if isinstance(coverage_items, list):
+            for item in coverage_items:
+                if not isinstance(item, dict):
+                    continue
+                status = str(item.get("status") or "").strip().lower()
+                if status in {"partial", "missing"}:
+                    unresolved.append(item)
+
+        return {
+            "project_id": project_id,
+            "upload_batch_id": selected_batch_id,
+            "requirements": requirements_payload,
+            "requirements_artifact": extraction_result["artifact"],
+            "requirements_validation": extraction_result["validation"],
+            "extraction": extraction_result["extraction"],
+            "section_runs": section_runs,
+            "coverage": final_coverage_payload,
+            "coverage_artifact": coverage_artifact,
+            "coverage_validation": {
+                "repaired": coverage_repaired,
+                "errors": coverage_validation_errors,
+            },
+            "unresolved_gaps": unresolved,
+            "export": export_bundle,
+            "run_summary": {
+                "status": "complete",
+                "sections_total": len(section_targets),
+                "sections_completed": len(section_runs),
+                "max_revision_rounds": payload.max_revision_rounds,
+                "unresolved_count": len(unresolved),
             },
         }
 
@@ -1099,6 +1569,16 @@ def create_app() -> FastAPI:
                         }
                     )
 
+        source_selection: dict[str, object] = {
+            "selected_document_id": None,
+            "selected_file_name": None,
+            "ambiguous": False,
+            "candidates": [],
+        }
+        requirement_chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
+        if requirement_chunks:
+            _, source_selection = select_primary_rfp_document(select_requirement_chunks(requirement_chunks))
+
         export_input = {
             "project": {
                 "id": project.get("id"),
@@ -1121,6 +1601,7 @@ def create_app() -> FastAPI:
             "coverage": coverage_payload,
             "validations": validations,
             "missing_evidence": missing_evidence,
+            "source_selection": source_selection,
             "run_metadata": {
                 "model_ids": {
                     "primary": settings.bedrock_model_id,

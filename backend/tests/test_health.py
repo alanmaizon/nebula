@@ -572,3 +572,112 @@ def test_agentic_orchestration_pilot_retries_missing_evidence(tmp_path: Path, mo
             assert len(on_draft["paragraphs"][0]["citations"]) >= 1
     finally:
         settings.enable_agentic_orchestration_pilot = previous_flag
+
+
+def test_export_surfaces_source_ambiguity_warning(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 220
+    settings.chunk_overlap_chars = 40
+    settings.embedding_dim = 64
+
+    rfp_a = b"""
+Funding Opportunity: City Community Fund
+Required Narrative Questions:
+Question 1: Need Statement (300 words max): Describe need.
+"""
+    rfp_b = b"""
+Funding Opportunity: County Community Fund
+Required Narrative Questions:
+Question 1: Need Statement (300 words max): Describe need.
+"""
+    evidence = b"Need Statement evidence about households and service outcomes."
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Ambiguous RFP Export"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[
+                ("files", ("rfp_a.txt", rfp_a, "text/plain")),
+                ("files", ("rfp_b.txt", rfp_b, "text/plain")),
+                ("files", ("evidence.txt", evidence, "text/plain")),
+            ],
+        )
+        assert upload.status_code == 200
+
+        assert client.post(f"/projects/{project_id}/extract-requirements").status_code == 200
+        assert (
+            client.post(
+                f"/projects/{project_id}/generate-section",
+                json={"section_key": "Need Statement"},
+            ).status_code
+            == 200
+        )
+        assert (
+            client.post(
+                f"/projects/{project_id}/coverage",
+                json={"section_key": "Need Statement"},
+            ).status_code
+            == 200
+        )
+
+        export_json = client.get(f"/projects/{project_id}/export?format=json&section_key=Need Statement")
+        assert export_json.status_code == 200
+        payload = export_json.json()
+
+        assert "source ambiguity warning" in payload["quality_gates"]["warnings"]
+        assert payload["summary"]["uncertainty"]["source_ambiguity_count"] == 1
+
+
+def test_generate_full_draft_endpoint_runs_all_sections_and_exports(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 220
+    settings.chunk_overlap_chars = 40
+    settings.embedding_dim = 64
+
+    rfp_text = b"""
+Funder: City Community Fund
+Question 1: Need Statement (300 words max): Describe the local need.
+Question 2: Program Design (400 words max): Explain activities and timeline.
+"""
+    evidence_text = b"""
+Need Statement evidence: 1240 households served in 2024.
+Program Design evidence: monthly coaching, employer partnerships, quarterly milestones.
+"""
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Full Run"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[
+                ("files", ("rfp.txt", rfp_text, "text/plain")),
+                ("files", ("evidence.txt", evidence_text, "text/plain")),
+            ],
+        )
+        assert upload.status_code == 200
+
+        run_response = client.post(
+            f"/projects/{project_id}/generate-full-draft",
+            json={"top_k": 4, "max_revision_rounds": 1},
+        )
+        assert run_response.status_code == 200
+        payload = run_response.json()
+
+        assert payload["project_id"] == project_id
+        assert payload["run_summary"]["status"] == "complete"
+        assert payload["run_summary"]["sections_total"] >= 2
+        assert payload["run_summary"]["sections_completed"] == payload["run_summary"]["sections_total"]
+        assert len(payload["section_runs"]) == payload["run_summary"]["sections_total"]
+
+        section_keys = {item["section_key"] for item in payload["section_runs"]}
+        assert "Need Statement" in section_keys
+        assert "Program Design" in section_keys
+
+        assert payload["coverage"]["items"]
+        assert payload["export"]["bundle"]["json"] is not None
+        assert payload["export"]["bundle"]["markdown"] is not None
+
+        latest_coverage = client.get(f"/projects/{project_id}/coverage/latest")
+        assert latest_coverage.status_code == 200
+        assert len(latest_coverage.json()["coverage"]["items"]) >= 1

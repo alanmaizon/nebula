@@ -312,3 +312,24 @@ def test_build_export_bundle_warns_for_empty_required_sections() -> None:
     quality = payload["quality_gates"]
     assert "empty required section warning" in quality["warnings"]
     assert payload["summary"]["uncertainty"]["empty_required_sections_count"] >= 1
+
+
+def test_build_export_bundle_surfaces_source_ambiguity_in_warnings_and_markdown() -> None:
+    test_input = _base_input()
+    test_input["source_selection"] = {
+        "selected_document_id": "doc-1",
+        "selected_file_name": "rfp-1.txt",
+        "ambiguous": True,
+        "candidates": [
+            {"document_id": "doc-1", "file_name": "rfp-1.txt", "score": 8},
+            {"document_id": "doc-2", "file_name": "rfp-2.txt", "score": 8},
+        ],
+    }
+
+    payload = build_export_bundle(test_input)
+    assert "source ambiguity warning" in payload["quality_gates"]["warnings"]
+    assert payload["summary"]["uncertainty"]["source_ambiguity_count"] == 1
+
+    files = payload["bundle"]["markdown"]["files"]
+    coverage = next(file for file in files if file["path"] in {"COVERAGE.md", "coverage.md"})
+    assert "Source ambiguity warnings: 1" in coverage["content"]
