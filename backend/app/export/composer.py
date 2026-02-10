@@ -48,7 +48,6 @@ class ExportCompositionError(ValueError):
 def compose_markdown_report(
     *,
     project_name: str,
-    intake: dict[str, object] | None,
     documents: list[dict[str, object]],
     requirements: dict[str, object] | None,
     drafts: dict[str, dict[str, object]],
@@ -56,7 +55,6 @@ def compose_markdown_report(
     missing_evidence: list[dict[str, object]] | None,
     validations: dict[str, object] | None,
 ) -> str:
-    del intake
     del validations
 
     missing_evidence = missing_evidence or []

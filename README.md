@@ -21,7 +21,7 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 - Current milestone: `Step 7 - Export and UX (active polish)`
 
 ### Done This Week
-- Simplified pre-ingest intake to context-only fields used directly during drafting
+- Removed required intake step and replaced it with optional advanced context briefing
 - Removed template-gated pipeline friction and kept summary/json toggles across artifacts
 
 ### Next Up
@@ -48,8 +48,8 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 - **Cited Drafting** → sections generated with citations (doc_id, page, snippet)
 - **Coverage Matrix** → requirement status: met / partial / missing, with pointers
 - **Validation** → JSON schema validation + basic numeric consistency checks
-- **Pre-Ingest Intake Wizard** → project setup context captured before ingest
-- **Context-Aware Drafting** → saved intake context is passed into section drafting prompts
+- **Optional Context Brief** → optional advanced guidance to steer drafting tone/focus
+- **Context-Aware Drafting** → optional context brief is passed into section drafting prompts
 
 ### Stretch goals
 - **Reviewer Mode** → rubric-aligned critique + score estimate
@@ -59,7 +59,7 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 ---
 
 ## Architecture (high level)
-- **Frontend:** Next.js (landing, intake wizard, workflow controls, artifact review)
+- **Frontend:** Next.js (landing, workflow controls, artifact review)
 - **Backend:** FastAPI (ingestion, parsing, orchestration)
 - **Storage (current default):** local filesystem + SQLite
 - **Storage (target options):** S3 for uploads, managed metadata store
@@ -223,8 +223,6 @@ Deployment note:
 * `POST /projects` → create a project
 * `POST /projects/{id}/upload` → upload one or more source files
 * `GET /projects/{id}/documents` → list uploaded document metadata
-* `POST /projects/{id}/intake` → persist pre-ingest intake payload
-* `GET /projects/{id}/intake` → fetch latest intake payload
 * `POST /projects/{id}/retrieve` → semantic retrieval over indexed chunks
 * `POST /projects/{id}/extract-requirements` → generate validated `requirements` artifact
 * `GET /projects/{id}/requirements/latest` → fetch latest requirements artifact

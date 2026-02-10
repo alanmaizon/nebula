@@ -74,7 +74,6 @@ def _section_with_two_supported_paragraphs(section_key: str) -> dict[str, object
 def test_empty_missing_evidence_omits_missing_evidence_section() -> None:
     report = compose_markdown_report(
         project_name="Nebula Demo",
-        intake=None,
         documents=_documents(),
         requirements=_requirements(),
         drafts={"Need Statement": _section_with_two_supported_paragraphs("Need Statement")},
@@ -91,7 +90,6 @@ def test_empty_missing_evidence_omits_missing_evidence_section() -> None:
 def test_q1_reconciliation_sets_status_not_missing_when_need_statement_exists() -> None:
     report = compose_markdown_report(
         project_name="Nebula Demo",
-        intake=None,
         documents=_documents(),
         requirements=_requirements(),
         drafts={"Need Statement": _section_with_two_supported_paragraphs("Need Statement")},
@@ -144,7 +142,6 @@ def test_boilerplate_paragraph_without_citations_is_removed() -> None:
 
     report = compose_markdown_report(
         project_name="Nebula Demo",
-        intake=None,
         documents=_documents(),
         requirements=_requirements(),
         drafts=drafts,
@@ -181,7 +178,6 @@ def test_word_limit_trimming_applies_for_q1_350_words_max() -> None:
 
     report = compose_markdown_report(
         project_name="Nebula Demo",
-        intake=None,
         documents=_documents(),
         requirements=_requirements(),
         drafts={"Need Statement": long_need_statement},

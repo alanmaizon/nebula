@@ -21,12 +21,10 @@ from app.db import (
     create_coverage_artifact,
     create_document,
     create_draft_artifact,
-    create_intake_artifact,
     create_project,
     create_requirements_artifact,
     get_latest_coverage_artifact,
     get_latest_draft_artifact,
-    get_latest_intake_artifact,
     get_latest_requirements_artifact,
     get_latest_upload_batch_id,
     get_project,
@@ -44,7 +42,6 @@ from app.drafting import (
 )
 from app.export import ExportCompositionError, compose_markdown_report
 from app.export.policy import derive_section_title_from_prompt
-from app.intake import IntakePayload, build_intake_context
 from app.observability import (
     configure_logging,
     normalize_request_id,
@@ -82,6 +79,7 @@ class CoverageComputeRequest(BaseModel):
 class GenerateFullDraftRequest(BaseModel):
     top_k: int | None = Field(default=None, ge=1, le=20)
     max_revision_rounds: int = Field(default=1, ge=0, le=3)
+    context_brief: str | None = Field(default=None, max_length=2000)
 
 
 def get_nova_orchestrator() -> BedrockNovaOrchestrator:
@@ -435,13 +433,14 @@ def create_app() -> FastAPI:
         requested_top_k: int | None,
         max_revision_rounds: int,
         force_retry: bool,
+        context_brief: str | None = None,
     ) -> dict[str, object]:
         chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
-        intake_context: dict[str, str] | None = None
-        latest_intake = get_latest_intake_artifact(project_id)
-        if latest_intake is not None and isinstance(latest_intake.get("payload"), dict):
-            intake_payload = IntakePayload.model_validate(latest_intake["payload"])
-            intake_context = build_intake_context(intake_payload)
+        prompt_context: dict[str, str] | None = None
+        if context_brief:
+            trimmed = context_brief.strip()
+            if trimmed:
+                prompt_context = {"context_brief": trimmed}
 
         default_top_k = requested_top_k or settings.retrieval_top_k_default
         ranked_all = rank_chunks_by_query(chunks, query_text, min(20, len(chunks))) if chunks else []
@@ -483,7 +482,7 @@ def create_app() -> FastAPI:
                     draft_payload = get_nova_orchestrator().generate_section(
                         section_key,
                         ranked_chunks,
-                        intake_context=intake_context,
+                        prompt_context=prompt_context,
                     )
                 except NovaRuntimeError as exc:
                     raise HTTPException(
@@ -682,7 +681,6 @@ def create_app() -> FastAPI:
         requirements_artifact = get_latest_requirements_artifact(project_id, upload_batch_id=selected_batch_id)
         draft_artifacts = list_latest_draft_artifacts(project_id, upload_batch_id=selected_batch_id)
         coverage_artifact = get_latest_coverage_artifact(project_id, upload_batch_id=selected_batch_id)
-        intake_artifact = get_latest_intake_artifact(project_id)
         documents = list_documents(project_id, upload_batch_id=selected_batch_id)
 
         drafts: dict[str, dict[str, object]] = {}
@@ -711,7 +709,6 @@ def create_app() -> FastAPI:
 
         requirements_payload = requirements_artifact["payload"] if requirements_artifact else None
         coverage_payload = coverage_artifact["payload"] if coverage_artifact else None
-        intake_payload = intake_artifact["payload"] if intake_artifact else None
         documents_payload = build_export_documents(project_id, documents, upload_batch_id=selected_batch_id)
 
         if requirements_artifact:
@@ -732,15 +729,6 @@ def create_app() -> FastAPI:
                 }
             )
             artifact_timestamps.append(str(coverage_artifact["created_at"]))
-        if intake_artifact:
-            artifacts_used.append(
-                {
-                    "type": "intake",
-                    "id": intake_artifact["id"],
-                    "updated_at": intake_artifact["created_at"],
-                }
-            )
-            artifact_timestamps.append(str(intake_artifact["created_at"]))
 
         project_updated_at = project.get("created_at")
         if artifact_timestamps:
@@ -794,7 +782,6 @@ def create_app() -> FastAPI:
                 "output_filename_base": output_filename_base,
                 "upload_batch_id": selected_batch_id,
             },
-            "intake": intake_payload,
             "documents": documents_payload,
             "requirements": requirements_payload,
             "drafts": drafts,
@@ -985,43 +972,6 @@ def create_app() -> FastAPI:
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
             "documents": list_documents(project_id, upload_batch_id=selected_batch_id),
-        }
-
-    @app.post("/projects/{project_id}/intake")
-    def save_intake(project_id: str, payload: IntakePayload) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        artifact_meta = create_intake_artifact(
-            project_id=project_id,
-            payload=payload.model_dump(),
-            source="ui-intake-v1",
-        )
-        return {
-            "project_id": project_id,
-            "intake": payload.model_dump(),
-            "artifact": artifact_meta,
-        }
-
-    @app.get("/projects/{project_id}/intake")
-    def get_latest_intake(project_id: str) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        latest = get_latest_intake_artifact(project_id)
-        if latest is None:
-            raise HTTPException(status_code=404, detail="No intake artifact found for project")
-
-        return {
-            "project_id": project_id,
-            "intake": latest["payload"],
-            "artifact": {
-                "id": latest["id"],
-                "source": latest["source"],
-                "created_at": latest["created_at"],
-            },
         }
 
     @app.post("/projects/{project_id}/retrieve")
@@ -1257,6 +1207,7 @@ def create_app() -> FastAPI:
             selected_batch_id=selected_batch_id,
         )
         requirements_payload = extraction_result["requirements"]
+        context_brief = payload.context_brief.strip() if payload.context_brief else None
         section_targets = build_section_targets_from_requirements(requirements_payload)
 
         section_runs: list[dict[str, object]] = []
@@ -1276,6 +1227,7 @@ def create_app() -> FastAPI:
                 requested_top_k=payload.top_k,
                 max_revision_rounds=payload.max_revision_rounds,
                 force_retry=True,
+                context_brief=context_brief,
             )
             draft_payload = draft_result["draft"]
 
@@ -1419,7 +1371,6 @@ def create_app() -> FastAPI:
         requirements_artifact = get_latest_requirements_artifact(project_id, upload_batch_id=selected_batch_id)
         draft_artifacts = list_latest_draft_artifacts(project_id, upload_batch_id=selected_batch_id)
         coverage_artifact = get_latest_coverage_artifact(project_id, upload_batch_id=selected_batch_id)
-        intake_artifact = get_latest_intake_artifact(project_id)
         documents = list_documents(project_id, upload_batch_id=selected_batch_id)
 
         requested_sections = parse_requested_sections(sections, section_key)
@@ -1450,7 +1401,6 @@ def create_app() -> FastAPI:
 
         requirements_payload = requirements_artifact["payload"] if requirements_artifact else None
         coverage_payload = coverage_artifact["payload"] if coverage_artifact else None
-        intake_payload = intake_artifact["payload"] if intake_artifact else None
         documents_payload = build_export_documents(project_id, documents, upload_batch_id=selected_batch_id)
 
         if requirements_artifact:
@@ -1471,15 +1421,6 @@ def create_app() -> FastAPI:
                 }
             )
             artifact_timestamps.append(str(coverage_artifact["created_at"]))
-        if intake_artifact:
-            artifacts_used.append(
-                {
-                    "type": "intake",
-                    "id": intake_artifact["id"],
-                    "updated_at": intake_artifact["created_at"],
-                }
-            )
-            artifact_timestamps.append(str(intake_artifact["created_at"]))
 
         if requested_format == "markdown" and profile == "hackathon":
             draft_payloads: dict[str, dict[str, object]] = {}
@@ -1505,7 +1446,6 @@ def create_app() -> FastAPI:
             try:
                 markdown_report = compose_markdown_report(
                     project_name=str(project.get("name") or ""),
-                    intake=intake_payload if isinstance(intake_payload, dict) else None,
                     documents=documents_payload,
                     requirements=requirements_payload if isinstance(requirements_payload, dict) else None,
                     drafts=draft_payloads,
@@ -1594,7 +1534,6 @@ def create_app() -> FastAPI:
                 "output_filename_base": output_filename_base,
                 "upload_batch_id": selected_batch_id,
             },
-            "intake": intake_payload,
             "documents": documents_payload,
             "requirements": requirements_payload,
             "drafts": drafts,

@@ -18,7 +18,6 @@ def _base_input() -> dict[str, object]:
             "sections": ["Need Statement"],
             "output_filename_base": "demo",
         },
-        "intake": {"country": "United States"},
         "documents": [
             {
                 "id": "doc-db-1",
@@ -139,6 +138,7 @@ def test_build_export_bundle_outputs_expected_schema_and_files() -> None:
 
     bundle = payload["bundle"]
     assert bundle["json"] is not None
+    assert "intake" not in bundle["json"]
     assert bundle["markdown"] is not None
     files = bundle["markdown"]["files"]
     paths = {file["path"] for file in files}

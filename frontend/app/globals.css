@@ -191,14 +191,13 @@ input {
   display: grid;
   grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
   gap: 0;
-  align-items: stretch;
+  align-items: start;
 }
 
 .workspace-left,
 .workspace-right {
   display: grid;
   gap: 12px;
-  min-height: 0;
 }
 
 .workspace-left {
@@ -252,12 +251,6 @@ input {
   gap: 14px;
 }
 
-.form-grid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr;
-}
-
 .field {
   display: grid;
   gap: 6px;
@@ -284,6 +277,31 @@ input {
   outline: none;
   border-color: #9b72ff;
   box-shadow: 0 0 0 3px rgba(155, 114, 255, 0.18);
+}
+
+.context-textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.advanced-panel {
+  border: 1px solid #d7cec2;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.advanced-panel > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5f564a;
+}
+
+.advanced-panel[open] {
+  display: grid;
+  gap: 8px;
 }
 
 .dropzone {
@@ -456,9 +474,8 @@ input {
 
 .workspace-output {
   min-height: 540px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  align-content: start;
   gap: 14px;
 }
 
@@ -514,17 +531,8 @@ input {
 }
 
 .result-shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 12px;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.result-shell .markdown-viewer {
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: none;
 }
 
 .typing-dot {
@@ -1032,7 +1040,6 @@ input {
 
   .workspace-grid {
     grid-template-columns: 1fr;
-    align-items: start;
   }
 
   .workspace-left {
@@ -1059,10 +1066,6 @@ input {
 @media (max-width: 780px) {
   .workspace-main {
     padding: 14px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
   }
 
   .segmented {

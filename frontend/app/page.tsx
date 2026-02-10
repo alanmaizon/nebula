@@ -7,14 +7,6 @@ const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
 type RunStatus = "idle" | "loading" | "success" | "error";
 
-type IntakeContext = {
-  country: string;
-  organization_type: string;
-  funder_track: string;
-  funding_goal: string;
-  sector_focus: string;
-};
-
 type PipelineRunResult = {
   projectId: string;
   documentsIndexed: number;
@@ -372,17 +364,10 @@ export default function HomePage() {
   const [showWorkspace, setShowWorkspace] = useState(false);
 
   const [projectName, setProjectName] = useState("Nebula Grant Draft");
+  const [contextBrief, setContextBrief] = useState("");
   const [projectId, setProjectId] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
-
-  const [intake, setIntake] = useState<IntakeContext>({
-    country: "United States",
-    organization_type: "Non-profit (501(c)(3))",
-    funder_track: "community-grants",
-    funding_goal: "submission-ready grant package",
-    sector_focus: "community impact",
-  });
 
   const [runStatus, setRunStatus] = useState<RunStatus>("idle");
   const [runError, setRunError] = useState<string | null>(null);
@@ -425,15 +410,6 @@ export default function HomePage() {
     const created = String(payload.id);
     setProjectId(created);
     return created;
-  }
-
-  async function saveIntakeContext(currentProjectId: string) {
-    const response = await fetch(`${apiBase}/projects/${currentProjectId}/intake`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(intake),
-    });
-    await parseJsonResponse(response);
   }
 
   async function ensureIndexedDocuments(currentProjectId: string): Promise<number> {
@@ -479,18 +455,20 @@ export default function HomePage() {
       const currentProjectId = await ensureProject();
       appendLog(`Project ready: ${currentProjectId}`);
 
-      await saveIntakeContext(currentProjectId);
-      appendLog("Saved intake context.");
-
       const documentsIndexed = await ensureIndexedDocuments(currentProjectId);
       appendLog("Running complete Nova workflow...");
+      const requestPayload: Record<string, unknown> = { top_k: 6, max_revision_rounds: 1 };
+      const trimmedContext = contextBrief.trim();
+      if (trimmedContext) {
+        requestPayload.context_brief = trimmedContext;
+      }
 
       const runResponse = await fetch(
         `${apiBase}/projects/${currentProjectId}/generate-full-draft?profile=submission`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ top_k: 6, max_revision_rounds: 1 }),
+          body: JSON.stringify(requestPayload),
         }
       );
       const runPayload = await parseJsonResponse(runResponse);
@@ -678,58 +656,19 @@ export default function HomePage() {
               />
             </div>
 
-            <div className="form-grid">
+            <details className="advanced-panel">
+              <summary>Advanced</summary>
               <div className="field">
-                <label htmlFor="country">Country</label>
-                <input
-                  id="country"
-                  value={intake.country}
-                  onChange={(e) => setIntake((prev) => ({ ...prev, country: e.target.value }))}
-                  placeholder="e.g., Ireland"
-                  className="input"
+                <label htmlFor="context-brief">Context Brief (Optional)</label>
+                <textarea
+                  id="context-brief"
+                  value={contextBrief}
+                  onChange={(e) => setContextBrief(e.target.value)}
+                  placeholder="Optional context to steer drafting tone/focus."
+                  className="input context-textarea"
                 />
               </div>
-              <div className="field">
-                <label htmlFor="org-type">Organization Type</label>
-                <input
-                  id="org-type"
-                  value={intake.organization_type}
-                  onChange={(e) => setIntake((prev) => ({ ...prev, organization_type: e.target.value }))}
-                  placeholder="e.g., Non-profit"
-                  className="input"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="funder-track">Funder Track</label>
-                <input
-                  id="funder-track"
-                  value={intake.funder_track}
-                  onChange={(e) => setIntake((prev) => ({ ...prev, funder_track: e.target.value }))}
-                  placeholder="e.g., city grants"
-                  className="input"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="funding-goal">Funding Goal</label>
-                <input
-                  id="funding-goal"
-                  value={intake.funding_goal}
-                  onChange={(e) => setIntake((prev) => ({ ...prev, funding_goal: e.target.value }))}
-                  placeholder="e.g., complete submission"
-                  className="input"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="sector-focus">Sector Focus</label>
-                <input
-                  id="sector-focus"
-                  value={intake.sector_focus}
-                  onChange={(e) => setIntake((prev) => ({ ...prev, sector_focus: e.target.value }))}
-                  placeholder="e.g., youth employment"
-                  className="input"
-                />
-              </div>
-            </div>
+            </details>
 
             <div className="field">
               <label htmlFor="docs-upload">Documents</label>

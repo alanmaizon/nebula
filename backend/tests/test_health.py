@@ -31,7 +31,7 @@ def mock_nova_orchestrator(monkeypatch: pytest.MonkeyPatch):
             section_key: str,
             ranked_chunks: list[dict[str, object]],
             *,
-            intake_context: dict[str, str] | None = None,
+            prompt_context: dict[str, str] | None = None,
         ) -> dict[str, object]:
             return build_draft_payload(section_key, ranked_chunks)
 
@@ -490,7 +490,7 @@ def test_agentic_orchestration_pilot_retries_missing_evidence(tmp_path: Path, mo
             section_key: str,
             ranked_chunks: list[dict[str, object]],
             *,
-            intake_context: dict[str, str] | None = None,
+            prompt_context: dict[str, str] | None = None,
         ) -> dict[str, object]:
             if len(ranked_chunks) < 2:
                 return {
@@ -681,3 +681,78 @@ Program Design evidence: monthly coaching, employer partnerships, quarterly mile
         latest_coverage = client.get(f"/projects/{project_id}/coverage/latest")
         assert latest_coverage.status_code == 200
         assert len(latest_coverage.json()["coverage"]["items"]) >= 1
+
+
+def test_generate_full_draft_passes_optional_context_brief(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured_contexts: list[dict[str, str] | None] = []
+
+    class ContextAwareOrchestrator:
+        def plan_section_generation(
+            self, section_key: str, requested_top_k: int, available_chunk_count: int
+        ) -> dict[str, object]:
+            bounded = max(1, min(requested_top_k, available_chunk_count))
+            return {
+                "retrieval_top_k": bounded,
+                "retry_on_missing_evidence": True,
+                "rationale": "context-brief-pass-through",
+            }
+
+        def extract_requirements(self, chunks: list[dict[str, object]]) -> dict[str, object]:
+            return extract_requirements_payload(chunks)
+
+        def generate_section(
+            self,
+            section_key: str,
+            ranked_chunks: list[dict[str, object]],
+            *,
+            prompt_context: dict[str, str] | None = None,
+        ) -> dict[str, object]:
+            captured_contexts.append(prompt_context)
+            return build_draft_payload(section_key, ranked_chunks)
+
+        def compute_coverage(
+            self, requirements: dict[str, object], draft: dict[str, object]
+        ) -> dict[str, object]:
+            return build_coverage_payload(requirements, draft)
+
+    monkeypatch.setattr("app.main.get_nova_orchestrator", lambda: ContextAwareOrchestrator())
+
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 220
+    settings.chunk_overlap_chars = 40
+    settings.embedding_dim = 64
+
+    rfp_text = b"""
+Question 1: Need Statement (300 words max): Describe the local need.
+"""
+    evidence_text = b"""
+Need Statement evidence: 1240 households served in 2024.
+"""
+    context_brief = "Focus on outcomes for first-time job seekers."
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Context Brief Run"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[
+                ("files", ("rfp.txt", rfp_text, "text/plain")),
+                ("files", ("evidence.txt", evidence_text, "text/plain")),
+            ],
+        )
+        assert upload.status_code == 200
+
+        run_response = client.post(
+            f"/projects/{project_id}/generate-full-draft",
+            json={
+                "top_k": 4,
+                "max_revision_rounds": 1,
+                "context_brief": context_brief,
+            },
+        )
+        assert run_response.status_code == 200
+
+    assert captured_contexts
+    assert all(context == {"context_brief": context_brief} for context in captured_contexts)

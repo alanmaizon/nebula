@@ -80,7 +80,7 @@ class BedrockNovaOrchestrator:
         section_key: str,
         ranked_chunks: list[dict[str, object]],
         *,
-        intake_context: dict[str, str] | None = None,
+        prompt_context: dict[str, str] | None = None,
     ) -> dict[str, object]:
         context = self._render_ranked_context(
             ranked_chunks,
@@ -92,9 +92,9 @@ class BedrockNovaOrchestrator:
             "You are a grant writer. Produce strict JSON only. "
             "Every paragraph must include at least one citation grounded in provided evidence."
         )
-        intake_block = (
-            f"Application context:\n{json.dumps(intake_context, ensure_ascii=True)}\n\n"
-            if intake_context
+        context_block = (
+            f"Application context:\n{json.dumps(prompt_context, ensure_ascii=True)}\n\n"
+            if prompt_context
             else ""
         )
         user_prompt = (
@@ -103,7 +103,7 @@ class BedrockNovaOrchestrator:
             "citations must be objects with keys doc_id, page, snippet. "
             "If evidence is insufficient, return an empty paragraphs array and one missing_evidence item.\n\n"
             f"Target section: {section_key}\n\n"
-            f"{intake_block}"
+            f"{context_block}"
             f"Evidence:\n{context}"
         )
         return self._invoke_json_model(self._settings.bedrock_model_id, system_prompt, user_prompt)

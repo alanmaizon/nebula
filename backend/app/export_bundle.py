@@ -58,7 +58,6 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
     requirements = _as_optional_dict(input_payload.get("requirements"))
     coverage = _as_optional_dict(input_payload.get("coverage"))
     validations = _as_optional_dict(input_payload.get("validations")) or {}
-    intake = _as_optional_dict(input_payload.get("intake"))
     raw_missing_evidence = _as_dict_list(input_payload.get("missing_evidence"))
     artifacts_used = _as_dict_list(input_payload.get("artifacts_used"))
     run_metadata = _as_optional_dict(input_payload.get("run_metadata")) or {}
@@ -168,7 +167,6 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
             include_debug=include_debug,
             project=project,
             export_request=export_request,
-            intake=intake,
             documents=documents,
             requirements=requirements,
             drafts=exported_drafts,
@@ -192,7 +190,6 @@ def build_export_bundle(input_payload: dict[str, object]) -> dict[str, object]:
                 "name": str(project.get("name") or ""),
             },
             "export_request": export_request,
-            "intake": intake,
             "documents": documents,
             "requirements": requirements,
             "drafts": exported_drafts,
@@ -678,7 +675,6 @@ def _build_markdown_files(
     include_debug: bool,
     project: dict[str, object],
     export_request: dict[str, object],
-    intake: dict[str, object] | None,
     documents: list[dict[str, object]],
     requirements: dict[str, object] | None,
     drafts: dict[str, dict[str, object]],
@@ -709,7 +705,6 @@ def _build_markdown_files(
                     export_request=export_request,
                     summary=summary,
                     documents=documents,
-                    intake=intake,
                 ),
             }
         )
@@ -758,7 +753,6 @@ def _render_hackathon_readme(
     export_request: dict[str, object],
     summary: dict[str, object],
     documents: list[dict[str, object]],
-    intake: dict[str, object] | None,
 ) -> str:
     lines = [
         "# Nebula Export Bundle",
@@ -780,7 +774,6 @@ def _render_hackathon_readme(
         "",
         "## Inputs",
         f"- Documents: {len(documents)}",
-        f"- Intake present: {'yes' if intake else 'no'}",
         "",
         "## Files",
         "- `REQUIREMENTS_MATRIX.md`",
