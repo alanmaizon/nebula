@@ -4,7 +4,7 @@ Last updated: `2026-02-11`
 Source of truth: `docs/status.yml` and `docs/wiki/DEVELOPMENT_PLAN.md`
 
 ## Execution Snapshot
-- Overall completion: `90%`
+- Overall completion: `95%`
 - Current phase: `Submission Asset Packaging` (`In progress`)
 
 ## Delivery Timeline (By Day)
@@ -12,10 +12,12 @@ Source of truth: `docs/status.yml` and `docs/wiki/DEVELOPMENT_PLAN.md`
 - `2026-02-08`: Deterministic CI reliability gate validated and documented (`docs/wiki/CI-Reliability-2026-02-08.md`).
 - `2026-02-11`: Full-workflow demo freeze run passed (`docs/wiki/Demo-Freeze-2026-02-11.md`).
 - `2026-02-11`: Patch release `v0.1.1` published with docs sync/check fix and wiki cleanup (`docs/wiki/Release-Notes-v0.1.1.md`).
+- `2026-02-11`: Public demo video published (`docs/wiki/Demo-Video-2026-02-11.md`).
+- `2026-02-11`: Final release `v1.0.0` published (`docs/wiki/Release-Notes-v1.0.0.md`).
 
 ## Current Priorities (Now)
-- Produce and publish the 3-minute demo video with `#AmazonNova` and functional footage.
 - Prepare public demo/test access instructions and fallback credentials path.
+- Keep demo and submission assets consistent while judging access remains open.
 
 ## Next Milestones (Date-Based)
 ### By `2026-03-16 17:00 PT`

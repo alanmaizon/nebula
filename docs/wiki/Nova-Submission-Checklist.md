@@ -9,8 +9,8 @@ Use this checklist before final Devpost submission to verify Nova compliance, de
 | NOVA-C02 | Submission model IDs are explicit. | `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`, `BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0` in docs/config guidance. | PASS | N/A |
 | NOVA-C03 | Deploy/run consistency is proven. | Full-workflow demo freeze run evidence in `docs/wiki/Demo-Freeze-2026-02-11.md`. | PASS | N/A |
 | NOVA-C04 | Judges have working test access path. | Public test URL or repo-based test instructions with credentials path if private. | PASS | N/A |
-| NOVA-C05 | Demo video is approximately 3 minutes and shows real functionality. | Draft video checklist + runtime proof aligned to demo script. | PENDING | N/A |
-| NOVA-C06 | Video includes hashtag `#AmazonNova` and is publicly visible (YouTube/Vimeo/Youku). | Published video link captured in submission notes. | PENDING | N/A |
+| NOVA-C05 | Demo video is approximately 3 minutes and shows real functionality. | Published Vimeo demo link in `docs/wiki/Demo-Video-2026-02-11.md`. | PASS | N/A |
+| NOVA-C06 | Video includes hashtag `#AmazonNova` and is publicly visible (YouTube/Vimeo/Youku). | Public Vimeo link captured in submission notes (`docs/wiki/Demo-Video-2026-02-11.md`); hashtag presence to be confirmed in final Devpost review pass. | PARTIAL | N/A |
 | NOVA-C07 | Repository access is valid for judges. | Public repo or private share to `testing@devpost.com` and `Amazon-Nova-hackathon@amazon.com`. | PASS | N/A |
 | NOVA-C08 | Submission materials are consistent with deployed behavior. | Devpost text, screenshots, and video match current runtime outputs. | PENDING | N/A |
 
@@ -18,6 +18,7 @@ Use this checklist before final Devpost submission to verify Nova compliance, de
 | Date (PT) | Owner | Result | Notes |
 |---|---|---|---|
 | `2026-02-08` | `@alanmaizon` | Partial (`4 PASS / 1 PARTIAL / 3 PENDING`) | NOVA-C01 has implemented runtime path + test evidence; pending live Bedrock-credential validation tracked in issue [#24](https://github.com/alanmaizon/nebula/issues/24). |
+| `2026-02-11` | `@alanmaizon` | Improved (`5 PASS / 2 PARTIAL / 1 PENDING`) | Demo video link published; remaining partial/pending items are live Bedrock credential evidence and final submission-material consistency check. |
 
 ## Required Submission Assets
 - Devpost narrative aligned to `Agentic AI` primary and `Multimodal Understanding` secondary positioning.

@@ -7,6 +7,18 @@ All notable changes to this project are documented in this file.
 ### Changed
 - No unreleased changes yet.
 
+## [1.0.0] - 2026-02-11
+
+### Added
+- Final release documentation set for roadmap close-out and release traceability.
+- Wiki release notes for `v1.0.0` at `docs/wiki/Release-Notes-v1.0.0.md`.
+- Public demo video evidence page at `docs/wiki/Demo-Video-2026-02-11.md`.
+
+### Changed
+- Roadmap updated with final release milestone and explicit remaining submission operations.
+- Wiki home/release navigation updated for the final release series.
+- Submission checklist and submission narrative updated with the published Vimeo demo link.
+
 ## [0.1.1] - 2026-02-11
 
 ### Changed
@@ -36,6 +48,7 @@ All notable changes to this project are documented in this file.
 ### Notes
 - Detailed release notes: `docs/wiki/Release-Notes-v0.1.0.md`
 
-[Unreleased]: https://github.com/alanmaizon/nebula/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/alanmaizon/nebula/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/alanmaizon/nebula/compare/v0.1.1...v1.0.0
 [0.1.1]: https://github.com/alanmaizon/nebula/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/alanmaizon/nebula/tree/v0.1.0
