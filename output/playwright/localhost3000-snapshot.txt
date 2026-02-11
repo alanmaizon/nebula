@@ -1,5 +1,0 @@
-### Page
-- Page URL: http://localhost:3000/
-- Page Title: Nebula
-### Snapshot
-- [Snapshot](.playwright-cli/page-2026-02-09T08-03-01-682Z.yml)
