@@ -8,7 +8,7 @@ Nebula `v1.0.0` is the final submission-oriented release for the current roadmap
 - Deterministic CI reliability evidence and demo-freeze evidence.
 - Backup/restore runbook with executed restore drill evidence.
 - Published public demo video reference:
-  - `https://vimeo.com/1163998408?share=copy&fl=sv&fe=ci`
+  - `https://vimeo.com/1163998408`
 
 ## Submission Operations (Still Active)
 - Maintain judge access path and fallback credentials process through judging.

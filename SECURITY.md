@@ -6,8 +6,9 @@ Security updates are currently provided for:
 
 | Version | Supported |
 | --- | --- |
-| `main` (unreleased MVP) | Yes |
-| Tagged pre-MVP snapshots | Best effort |
+| `v1.0.x` | Yes |
+| `main` (next changes) | Best effort |
+| `v0.x` snapshots | Best effort |
 
 ## Reporting a Vulnerability
 
