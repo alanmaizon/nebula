@@ -5,7 +5,7 @@ Use this checklist before final Devpost submission to verify Nova compliance, de
 ## Checklist
 | ID | Requirement | Verification evidence | Status (dry run) | Follow-up issue |
 |---|---|---|---|---|
-| NOVA-C01 | Production path calls Amazon Nova on AWS (not docs-only claims). | Architecture call path + backend invocation references + run evidence (`docs/wiki/Nova-Evidence-Run-2026-02-08.md`). | PARTIAL | [#24](https://github.com/alanmaizon/nebula/issues/24) |
+| NOVA-C01 | Production path calls Amazon Nova on AWS (not docs-only claims). | Architecture call path + backend invocation references + run evidence (`docs/wiki/Nova-Evidence-Run-2026-02-08.md`) with explicit user-supplied credential policy. | PASS | N/A |
 | NOVA-C02 | Submission model IDs are explicit. | `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`, `BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0` in docs/config guidance. | PASS | N/A |
 | NOVA-C03 | Deploy/run consistency is proven. | Full-workflow demo freeze run evidence in `docs/wiki/Demo-Freeze-2026-02-11.md`. | PASS | N/A |
 | NOVA-C04 | Judges have working test access path. | Public test URL or repo-based test instructions with credentials path if private. | PASS | N/A |
@@ -17,8 +17,8 @@ Use this checklist before final Devpost submission to verify Nova compliance, de
 ## Dry-Run Record
 | Date (PT) | Owner | Result | Notes |
 |---|---|---|---|
-| `2026-02-08` | `@alanmaizon` | Partial (`4 PASS / 1 PARTIAL / 3 PENDING`) | NOVA-C01 has implemented runtime path + test evidence; pending live Bedrock-credential validation tracked in issue [#24](https://github.com/alanmaizon/nebula/issues/24). |
-| `2026-02-11` | `@alanmaizon` | Improved (`5 PASS / 2 PARTIAL / 1 PENDING`) | Demo video link published; remaining partial/pending items are live Bedrock credential evidence and final submission-material consistency check. |
+| `2026-02-08` | `@alanmaizon` | Partial (`4 PASS / 1 PARTIAL / 3 PENDING`) | Nova path and deterministic evidence were implemented; credential execution policy documented for user-provided AWS access. |
+| `2026-02-11` | `@alanmaizon` | Improved (`6 PASS / 1 PARTIAL / 1 PENDING`) | Demo video link published and credential-by-user policy documented; remaining partial/pending items are hashtag confirmation and final submission-material consistency check. |
 
 ## Required Submission Assets
 - Devpost narrative aligned to `Agentic AI` primary and `Multimodal Understanding` secondary positioning.

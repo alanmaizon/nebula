@@ -31,7 +31,7 @@ Source of truth: `docs/status.yml` and `docs/wiki/DEVELOPMENT_PLAN.md`
 - Prepare concise issue-response playbook for judge clarification requests.
 
 ## Risk Watch
-- Need one credentialed Bedrock runtime evidence run in addition to deterministic/mocked evidence.
+- Judges may need extra setup time because live Bedrock execution uses user-supplied AWS credentials.
 - Prevent demo/video drift from deployed behavior near deadline.
 - Strengthen measurable impact + innovation narrative against judging criteria.
 

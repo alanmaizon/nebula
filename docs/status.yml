@@ -114,8 +114,8 @@
   ],
   "high_risks": [
     {
-      "risk": "Submission may still under-demonstrate live credentialed Bedrock execution despite code-path evidence",
-      "mitigation": "Capture one credentialed environment run artifact in addition to mocked deterministic evidence"
+      "risk": "Judges may have setup friction when using their own AWS credentials for live Bedrock execution",
+      "mitigation": "Keep credential setup instructions explicit and provide fallback test-access guidance without sharing keys"
     },
     {
       "risk": "Demo/video and deployed runtime behavior may diverge near deadline",

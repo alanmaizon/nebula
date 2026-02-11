@@ -65,7 +65,7 @@ Current intelligence path uses Amazon Nova via Bedrock through a deterministic o
 Near term:
 - demo video published: `https://vimeo.com/1163998408`
 - finalize external judge testing access instructions and fallback credential path
-- capture one credentialed Bedrock run artifact to complement deterministic mocked evidence
+- keep credential-by-user policy explicit (no shared keys; operators use their own AWS credentials)
 - lock submission package links and final narrative consistency across Devpost assets
 
 Post-submission:

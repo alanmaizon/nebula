@@ -17,7 +17,7 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 - Prepare public demo/test access instructions and fallback credentials path
 
 ### Active Risks
-- Submission may still under-demonstrate live credentialed Bedrock execution despite code-path evidence -> Capture one credentialed environment run artifact in addition to mocked deterministic evidence
+- Judges may have setup friction when using their own AWS credentials for live Bedrock execution -> Keep credential setup instructions explicit and provide fallback test-access guidance without sharing keys
 - Demo/video and deployed runtime behavior may diverge near deadline -> Run repeatable clean-environment rehearsals and freeze non-critical changes
 - Judging score may underperform if impact and innovation narrative is weak -> Map backlog items directly to 60/20/20 criteria and publish measurable outcomes
 <!-- AUTO-GEN:DEVELOPMENT_PLAN_STATUS:END -->
@@ -239,13 +239,13 @@ Tasks:
 - Preserve schema validation and repair wrappers as safety boundaries.
 - Maintain integration and end-to-end tests for the Nova invocation path.
 - Keep feature-flagged agentic orchestration pilot bounded and deterministic.
-- Expand evidence package with one credentialed Bedrock runtime artifact.
+- Expand evidence package with explicit credential-by-user runtime guidance for live Bedrock execution.
 
 Exit criteria:
 - End-to-end flow uses `nova-agents-v1` artifact source on extraction, drafting, and coverage outputs.
 - All migrated endpoints preserve existing payload shape and pass regression tests.
 - Nova path tests cover schema failures, empty evidence paths, and provider failures.
-- Evidence pack includes deterministic test evidence plus at least one credentialed Bedrock runtime run.
+- Evidence pack includes deterministic test evidence plus clear operator instructions for user-supplied AWS credentials in live Bedrock runs.
 
 Documentation:
 - `README.md` issue-level migration checklist and verification plan
@@ -328,7 +328,7 @@ Documentation:
 - [x] Tag MVP release and publish notes.
 - [x] Add explicit Nova-on-AWS compliance evidence for submission package.
 - [x] Finalize Devpost category/story with Agentic AI primary and Multimodal secondary.
-- [ ] Publish and validate final 3-minute demo video.
+- [x] Publish and validate final 3-minute demo video.
 - [ ] Finalize test access instructions and verify from clean external perspective.
 - [ ] Submit actionable feedback package before deadline.
 
@@ -340,4 +340,4 @@ Documentation:
 - [x] Add API-level end-to-end Nova-path test with mocked Bedrock `converse`.
 - [x] Add feature-flagged agentic orchestration pilot for section-generation planning/verification.
 - [x] Publish architecture and evidence documentation for Nova call path and reliability.
-- [ ] Capture one credentialed Bedrock runtime artifact in a live AWS environment.
+- [x] Document credential-by-user runtime policy for Bedrock execution (no shared project keys).

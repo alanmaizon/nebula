@@ -26,4 +26,5 @@ Record reproducible evidence that Nebula's core extraction, drafting, and covera
 
 ## Notes
 - CI/unit evidence uses mocked Bedrock client behavior for deterministic testing.
-- Production runtime still requires valid AWS credentials and Bedrock model access in the target region.
+- Production runtime requires valid AWS credentials and Bedrock model access in the target region.
+- Credential policy: Nebula does not provide shared AWS credentials or embedded keys. Each operator/judge must run with their own AWS account credentials and Bedrock access.
