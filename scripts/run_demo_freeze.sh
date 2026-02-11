@@ -10,7 +10,6 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="/tmp/nebula-demo-freeze/${RUN_LABEL}"
 API_BASE="${API_BASE:-http://localhost:8000}"
-SECTION_KEY="${SECTION_KEY:-Need Statement}"
 
 mkdir -p "${OUT_DIR}"
 
@@ -71,54 +70,46 @@ upload_status="$(curl -sS -o "${OUT_DIR}/upload.json" -w '%{http_code}' -X POST 
   -F "files=@${OUT_DIR}/rfp.txt;type=text/plain" \
   -F "files=@${OUT_DIR}/impact.txt;type=text/plain")"
 
-extract_status="$(curl -sS -o "${OUT_DIR}/extract.json" -w '%{http_code}' -X POST \
-  "${API_BASE}/projects/${project_id}/extract-requirements")"
-
-generate_status="$(curl -sS -o "${OUT_DIR}/generate.json" -w '%{http_code}' -X POST \
-  "${API_BASE}/projects/${project_id}/generate-section" \
+full_draft_status="$(curl -sS -o "${OUT_DIR}/full_draft.json" -w '%{http_code}' -X POST \
+  "${API_BASE}/projects/${project_id}/generate-full-draft?profile=submission" \
   -H "Content-Type: application/json" \
-  -d "{\"section_key\":\"${SECTION_KEY}\",\"top_k\":3}")"
-
-coverage_status="$(curl -sS -o "${OUT_DIR}/coverage.json" -w '%{http_code}' -X POST \
-  "${API_BASE}/projects/${project_id}/coverage" \
-  -H "Content-Type: application/json" \
-  -d "{\"section_key\":\"${SECTION_KEY}\"}")"
+  -d "{\"top_k\":3,\"max_revision_rounds\":1}")"
 
 export_json_status="$(curl -sS -o "${OUT_DIR}/export.json" -w '%{http_code}' \
-  "${API_BASE}/projects/${project_id}/export?format=json&section_key=${SECTION_KEY// /%20}")"
+  "${API_BASE}/projects/${project_id}/export?format=json&profile=submission")"
 
 export_md_status="$(curl -sS -o "${OUT_DIR}/export.md" -w '%{http_code}' \
-  "${API_BASE}/projects/${project_id}/export?format=markdown&section_key=${SECTION_KEY// /%20}")"
+  "${API_BASE}/projects/${project_id}/export?format=markdown&profile=submission")"
 
-if [ "${upload_status}" != "200" ] || [ "${extract_status}" != "200" ] || [ "${generate_status}" != "200" ] || [ "${coverage_status}" != "200" ] || [ "${export_json_status}" != "200" ] || [ "${export_md_status}" != "200" ]; then
-  echo "pipeline status failure: upload=${upload_status} extract=${extract_status} generate=${generate_status} coverage=${coverage_status} export_json=${export_json_status} export_md=${export_md_status}" >&2
+if [ "${upload_status}" != "200" ] || [ "${full_draft_status}" != "200" ] || [ "${export_json_status}" != "200" ] || [ "${export_md_status}" != "200" ]; then
+  echo "pipeline status failure: upload=${upload_status} full_draft=${full_draft_status} export_json=${export_json_status} export_md=${export_md_status}" >&2
   exit 1
 fi
 
-python3 - <<'PY' "${OUT_DIR}/extract.json" "${OUT_DIR}/generate.json" "${OUT_DIR}/coverage.json" "${OUT_DIR}/export.json"
+python3 - <<'PY' "${OUT_DIR}/full_draft.json" "${OUT_DIR}/export.json"
 import json
 import sys
-extract_path, generate_path, coverage_path, export_path = sys.argv[1:5]
-extract = json.load(open(extract_path, "r", encoding="utf-8"))
-generate = json.load(open(generate_path, "r", encoding="utf-8"))
-coverage = json.load(open(coverage_path, "r", encoding="utf-8"))
+full_draft_path, export_path = sys.argv[1:3]
+full = json.load(open(full_draft_path, "r", encoding="utf-8"))
 export_payload = json.load(open(export_path, "r", encoding="utf-8"))
 
-assert len(extract["requirements"]["questions"]) >= 2
-assert len(generate["draft"]["paragraphs"]) >= 1
-assert len(coverage["coverage"]["items"]) >= 1
-assert export_payload["requirements"] is not None
-assert export_payload["draft"] is not None
-assert export_payload["coverage"] is not None
+assert full["requirements"] is not None
+assert len(full["section_runs"]) >= 1
+assert full["coverage"] is not None
+assert len(full["coverage"]["items"]) >= 1
+assert full["export"] is not None
+assert export_payload["export_version"] == "nebula.export.v1"
+assert export_payload["bundle"]["json"]["requirements"] is not None
+assert export_payload["bundle"]["json"]["drafts"] is not None
+assert export_payload["bundle"]["json"]["coverage"] is not None
+assert len(export_payload["bundle"]["markdown"]["files"]) >= 1
 PY
 
 cat > "${OUT_DIR}/summary.txt" <<EOF
 run_label=${RUN_LABEL}
 project_id=${project_id}
 upload_status=${upload_status}
-extract_status=${extract_status}
-generate_status=${generate_status}
-coverage_status=${coverage_status}
+full_draft_status=${full_draft_status}
 export_json_status=${export_json_status}
 export_md_status=${export_md_status}
 artifact_dir=${OUT_DIR}

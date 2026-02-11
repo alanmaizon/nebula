@@ -1,5 +1,7 @@
 # Demo Freeze Evidence - 2026-02-08
 
+> Superseded by `docs/wiki/Demo-Freeze-2026-02-11.md` for the current full-draft workflow.
+
 ## Objective
 Validate the end-to-end MVP demo flow twice from clean startup before release tagging.
 

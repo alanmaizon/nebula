@@ -15,6 +15,7 @@ Welcome to the Nebula engineering wiki. This space tracks delivery execution, ar
 - [Devpost Testing Instructions 2026-02-08](Devpost-Testing-Instructions-2026-02-08)
 - [Operations Runbook](Operations-Runbook)
 - [Release Checklist](Release-Checklist)
+- [Demo Freeze 2026-02-11](Demo-Freeze-2026-02-11)
 - [Demo Freeze 2026-02-08](Demo-Freeze-2026-02-08)
 - [Release Notes v0.1.0](Release-Notes-v0.1.0)
 
