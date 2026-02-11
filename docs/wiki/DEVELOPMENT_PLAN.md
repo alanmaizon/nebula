@@ -14,7 +14,6 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 | Week 6 | Feedback Bonus and Judging Readiness | Not started |
 
 ### Current Week Priorities
-- Produce and publish the 3-minute demo video with #AmazonNova and functional footage
 - Prepare public demo/test access instructions and fallback credentials path
 
 ### Active Risks

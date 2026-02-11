@@ -1,7 +1,7 @@
 {
   "project": "Nebula",
   "last_updated": "2026-02-11",
-  "overall_completion_pct": 90,
+  "overall_completion_pct": 95,
   "current_week": 4,
   "weeks": [
     {
@@ -78,10 +78,11 @@
         "Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices",
         "Hardened backend/frontend security posture and local artifact hygiene",
         "Refactored export and endpoint assembly flow in backend main API module",
-        "Updated README and CONTRIBUTING guidance for current developer workflow"
+        "Updated README and CONTRIBUTING guidance for current developer workflow",
+        "Published public Vimeo demo video for submission evidence",
+        "Cut v1.0.0 final release tag with synchronized wiki release notes"
       ],
       "next": [
-        "Produce and publish the 3-minute demo video with #AmazonNova and functional footage",
         "Prepare public demo/test access instructions and fallback credentials path"
       ],
       "blockers": []
