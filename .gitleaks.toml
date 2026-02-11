@@ -1,0 +1,10 @@
+title = "Nebula gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Intentional fake secrets in observability redaction tests"
+paths = [
+  '''backend/tests/test_observability.py''',
+]
