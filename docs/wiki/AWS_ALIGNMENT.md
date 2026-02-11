@@ -95,11 +95,11 @@ flowchart TB
 - Add budget alarms and per-tenant usage metering.
 
 ## Month-1 Implementation Tie-In
-Link these items to `DEVELOPMENT_PLAN.md` week plan:
-- Week 1: Platform baseline and secure configuration foundations.
-- Week 2: Governance and schema enforcement for requirements extraction.
-- Week 3: Reliability and traceability in cited drafting and coverage.
-- Week 4: Operational readiness, exports, runbooks, and demo hardening.
+Link these items to `DEVELOPMENT_PLAN.md` phase plan:
+- Foundations: platform baseline and secure configuration foundations.
+- Nova Compliance and Category Positioning: governance and schema enforcement for requirements extraction.
+- Judging Optimization (60/20/20): reliability and traceability in cited drafting and coverage.
+- Submission Asset Packaging: operational readiness, exports, runbooks, and demo hardening.
 
 ## Acceptance Criteria for “AWS-Aligned MVP”
 - Every generated claim has a citation to indexed evidence.

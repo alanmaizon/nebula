@@ -7,6 +7,17 @@ All notable changes to this project are documented in this file.
 ### Changed
 - No unreleased changes yet.
 
+## [1.0.1] - 2026-02-11
+
+### Added
+- Secret scanning workflow via `gitleaks` (`.github/workflows/secret-scan.yml`) with targeted test-file allowlist (`.gitleaks.toml`).
+- Wiki release notes for `v1.0.1` at `docs/wiki/Release-Notes-v1.0.1.md`.
+
+### Changed
+- Reconciled status tracking to `100%` completion in `docs/status.yml`.
+- Updated roadmap and wiki navigation for final `v1.0.1` close-out.
+- Removed legacy cycle-based wording from generated status sections (`README.md`, `docs/wiki/DEVELOPMENT_PLAN.md`).
+
 ## [1.0.0] - 2026-02-11
 
 ### Added
@@ -48,7 +59,8 @@ All notable changes to this project are documented in this file.
 ### Notes
 - Detailed release notes: `docs/wiki/Release-Notes-v0.1.0.md`
 
-[Unreleased]: https://github.com/alanmaizon/nebula/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/alanmaizon/nebula/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/alanmaizon/nebula/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/alanmaizon/nebula/compare/v0.1.1...v1.0.0
 [0.1.1]: https://github.com/alanmaizon/nebula/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/alanmaizon/nebula/tree/v0.1.0

@@ -4,22 +4,20 @@ This is the execution source of truth for building Nebula from zero to a demo-re
 
 ## Execution Status
 <!-- AUTO-GEN:DEVELOPMENT_PLAN_STATUS:START -->
-| Week | Focus | Status |
-|---|---|---|
-| Week 1 | Foundations | Done |
-| Week 2 | Nova Compliance and Category Positioning | Done |
-| Week 3 | Judging Optimization (60/20/20) | Done |
-| Week 4 | Submission Asset Packaging | In progress |
-| Week 5 | Final QA and Deadline Buffer | Not started |
-| Week 6 | Feedback Bonus and Judging Readiness | Not started |
+| Focus | Status |
+|---|---|
+| Foundations | Done |
+| Nova Compliance and Category Positioning | Done |
+| Judging Optimization (60/20/20) | Done |
+| Submission Asset Packaging | Done |
+| Final QA and Deadline Buffer | Done |
+| Feedback Bonus and Judging Readiness | Done |
 
-### Current Week Priorities
-- Prepare public demo/test access instructions and fallback credentials path
+### Current Priorities
+- No open actions
 
 ### Active Risks
-- Judges may have setup friction when using their own AWS credentials for live Bedrock execution -> Keep credential setup instructions explicit and provide fallback test-access guidance without sharing keys
-- Demo/video and deployed runtime behavior may diverge near deadline -> Run repeatable clean-environment rehearsals and freeze non-critical changes
-- Judging score may underperform if impact and innovation narrative is weak -> Map backlog items directly to 60/20/20 criteria and publish measurable outcomes
+- No active risks recorded.
 <!-- AUTO-GEN:DEVELOPMENT_PLAN_STATUS:END -->
 
 ## Execution Rules
@@ -270,7 +268,7 @@ Documentation:
 - This backlog is living and updated at least weekly.
 - GitHub Issues are the execution source of truth.
 - `DEVELOPMENT_PLAN.md` captures plan-level backlog by step.
-- `docs/status.yml` captures current-week progress snapshot.
+- `docs/status.yml` captures current-phase progress snapshot.
 
 ## Step Backlog
 

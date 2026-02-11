@@ -1,7 +1,7 @@
 # CI Reliability Summary - 2026-02-08
 
 ## Scope
-Week 3 reliability hardening for submission-critical backend behavior.
+Reliability hardening phase for submission-critical backend behavior.
 
 Deterministic test set:
 - `test_create_project_and_upload`

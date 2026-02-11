@@ -41,13 +41,28 @@ def _load_status() -> dict:
         raise SystemExit(f"Invalid JSON in {STATUS_PATH}: {exc}") from exc
 
 
-def _pick_current_week(status: dict) -> dict:
-    weeks = status.get("weeks", [])
+def _phase_rows(status: dict) -> list[dict]:
+    phases = status.get("phases")
+    if phases:
+        return phases
+    return status.get("weeks", [])
+
+
+def _pick_current_phase(status: dict) -> dict:
+    phases = _phase_rows(status)
+    current_phase = status.get("current_phase")
+    if current_phase:
+        for phase in phases:
+            if phase.get("id") == current_phase:
+                return phase
+
+    # Backward compatibility for numeric current_week status files.
     current_week = status.get("current_week")
-    for week in weeks:
-        if week.get("week") == current_week:
-            return week
-    return weeks[0] if weeks else {}
+    if current_week is not None:
+        for phase in phases:
+            if phase.get("week") == current_week:
+                return phase
+    return phases[0] if phases else {}
 
 
 def _render_list(title: str, items: list[str], empty_text: str) -> list[str]:
@@ -60,21 +75,21 @@ def _render_list(title: str, items: list[str], empty_text: str) -> list[str]:
 
 
 def render_readme_status(status: dict) -> str:
-    current = _pick_current_week(status)
+    current = _pick_current_phase(status)
     lines = [
         f"- Last updated: `{status.get('last_updated', 'unknown')}`",
         f"- Overall completion: `{status.get('overall_completion_pct', 0)}%`",
     ]
     if current:
         lines.append(
-            f"- Current milestone: `Week {current.get('week')} - "
-            f"{current.get('focus', 'Unknown')} ({_label(current.get('status', 'not_started'))})`"
+            f"- Current phase: `{current.get('focus', 'Unknown')} "
+            f"({_label(current.get('status', 'not_started'))})`"
         )
 
     lines.append("")
     lines.extend(
         _render_list(
-            "Done This Week",
+            "Done Recently",
             current.get("done", []),
             "No completed items recorded yet.",
         )
@@ -99,22 +114,22 @@ def render_readme_status(status: dict) -> str:
 
 
 def render_development_status(status: dict) -> str:
-    weeks = status.get("weeks", [])
+    phases = _phase_rows(status)
     lines = [
-        "| Week | Focus | Status |",
-        "|---|---|---|",
+        "| Focus | Status |",
+        "|---|---|",
     ]
-    for week in weeks:
+    for phase in phases:
         lines.append(
-            f"| Week {week.get('week')} | {week.get('focus', 'Unknown')} | "
-            f"{_label(week.get('status', 'not_started'))} |"
+            f"| {phase.get('focus', 'Unknown')} | "
+            f"{_label(phase.get('status', 'not_started'))} |"
         )
 
-    current = _pick_current_week(status)
+    current = _pick_current_phase(status)
     lines.append("")
     lines.extend(
         _render_list(
-            "Current Week Priorities",
+            "Current Priorities",
             current.get("next", []),
             "No priorities recorded.",
         )
