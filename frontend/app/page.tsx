@@ -695,18 +695,7 @@ export default function HomePage() {
                 storyCardRefs.current[2] = node;
               }}
               data-card-index={2}
-              className={`story-card logo-divider ${visibleStoryCards[2] ? "is-visible" : ""}`}
-            >
-              <img src="/aws.svg" alt="AWS logo" className="logo-divider-icon" />
-              <p className="story-section-note">Powered by Amazon Nova</p>
-            </article>
-
-            <article
-              ref={(node) => {
-                storyCardRefs.current[3] = node;
-              }}
-              data-card-index={3}
-              className={`story-card ${visibleStoryCards[3] ? "is-visible" : ""}`}
+              className={`story-card ${visibleStoryCards[2] ? "is-visible" : ""}`}
             >
               <h2 className="story-card-title">What You Get Back</h2>
               <div className="story-list">
@@ -718,10 +707,10 @@ export default function HomePage() {
 
             <article
               ref={(node) => {
-                storyCardRefs.current[4] = node;
+                storyCardRefs.current[3] = node;
               }}
-              data-card-index={4}
-              className={`story-card ${visibleStoryCards[4] ? "is-visible" : ""}`}
+              data-card-index={3}
+              className={`story-card ${visibleStoryCards[3] ? "is-visible" : ""}`}
             >
               <h2 className="story-card-title">Why Teams Trust It</h2>
               <div className="story-list">
@@ -733,16 +722,27 @@ export default function HomePage() {
 
             <article
               ref={(node) => {
-                storyCardRefs.current[5] = node;
+                storyCardRefs.current[4] = node;
               }}
-              data-card-index={5}
-              className={`story-card final-cta ${visibleStoryCards[5] ? "is-visible" : ""}`}
+              data-card-index={4}
+              className={`story-card final-cta ${visibleStoryCards[4] ? "is-visible" : ""}`}
             >
               <h2 className="story-card-title">Ready To Build Your Draft?</h2>
               <p className="story-card-cta-copy">Enter the workspace and run the full workflow</p>
               <button type="button" className="workspace-enter" onClick={() => setShowWorkspace(true)}>
                 Enter Workspace
               </button>
+            </article>
+
+            <article
+              ref={(node) => {
+                storyCardRefs.current[5] = node;
+              }}
+              data-card-index={5}
+              className={`story-card logo-divider ${visibleStoryCards[5] ? "is-visible" : ""}`}
+            >
+              <img src="/aws.svg" alt="AWS logo" className="logo-divider-icon" />
+              <p className="story-section-note">Powered by Amazon Nova</p>
             </article>
           </section>
         </section>
@@ -827,7 +827,7 @@ export default function HomePage() {
             )}
 
             <button type="button" className="primary-button" onClick={runWorkspacePipeline} disabled={isRunning}>
-              {isRunning ? "Generating..." : "Generate Complete Draft"}
+              {isRunning ? "Generating..." : "Generate"}
             </button>
 
             <div className="meta-row">

@@ -590,7 +590,7 @@ input {
 }
 
 .workspace-output {
-  min-height: 540px;
+  min-height: 680px;
   display: grid;
   align-content: start;
   gap: 14px;
@@ -717,7 +717,7 @@ input {
   font-family: "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
   font-size: 12px;
   overflow: auto;
-  max-height: 420px;
+  max-height: 620px;
 }
 
 .markdown-viewer {
@@ -730,7 +730,7 @@ input {
   font-size: 13px;
   line-height: 1.5;
   overflow: auto;
-  max-height: 420px;
+  max-height: 620px;
 }
 
 .markdown-viewer.is-empty {
