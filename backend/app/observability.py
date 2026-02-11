@@ -22,7 +22,11 @@ SENSITIVE_KEY_NAMES = {
     "secret",
     "api_key",
     "apikey",
+    "x_api_key",
     "access_key",
+    "aws_secret_access_key",
+    "aws_session_token",
+    "session_token",
     "client_secret",
     "private_key",
     "ssn",
@@ -43,7 +47,10 @@ EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
 PHONE_PATTERN = re.compile(r"\b(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}\b")
 SSN_PATTERN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
 BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-._~+/]+=*\b")
-AWS_ACCESS_KEY_PATTERN = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
+AWS_ACCESS_KEY_PATTERN = re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")
+AWS_SECRET_INLINE_PATTERN = re.compile(
+    r"(?i)\b(aws_secret_access_key|secret_access_key)(\s*[:=]\s*)([A-Za-z0-9/+=]{16,})\b"
+)
 
 
 def normalize_request_id(candidate: str | None) -> str:
@@ -77,6 +84,7 @@ def _redact_string(value: str, *, max_length: int) -> str:
     redacted = value
     redacted = BEARER_PATTERN.sub("Bearer [REDACTED]", redacted)
     redacted = AWS_ACCESS_KEY_PATTERN.sub("[REDACTED_AWS_ACCESS_KEY]", redacted)
+    redacted = AWS_SECRET_INLINE_PATTERN.sub(r"\1\2[REDACTED]", redacted)
     redacted = EMAIL_PATTERN.sub("[REDACTED_EMAIL]", redacted)
     redacted = PHONE_PATTERN.sub("[REDACTED_PHONE]", redacted)
     redacted = SSN_PATTERN.sub("[REDACTED_SSN]", redacted)

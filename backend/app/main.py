@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import re
 import time
+from typing import Mapping
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -97,13 +98,17 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
+    cors_origins = settings.cors_origins_list
+    if settings.cors_allow_credentials and any(origin == "*" for origin in cors_origins):
+        raise RuntimeError("Invalid CORS_ORIGINS: wildcard '*' is not allowed when credentials are enabled.")
+
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=cors_origins,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type", settings.request_id_header],
     )
 
     @app.middleware("http")
@@ -195,6 +200,19 @@ def create_app() -> FastAPI:
             seen.add(key)
             deduped.append(key)
         return deduped
+
+    def serialize_document_for_api(document: Mapping[str, object]) -> dict[str, object]:
+        return {
+            "id": str(document.get("id", "")),
+            "project_id": str(document.get("project_id", "")),
+            "file_name": str(document.get("file_name", "")),
+            "content_type": str(document.get("content_type", "")),
+            "size_bytes": int(document.get("size_bytes", 0) or 0),
+            "upload_batch_id": (
+                str(document.get("upload_batch_id", "")).strip() if document.get("upload_batch_id") is not None else None
+            ),
+            "created_at": str(document.get("created_at", "")),
+        }
 
     def parse_requested_sections(sections_csv: str | None, section_key: str | None) -> list[str]:
         requested: list[str] = []
@@ -559,9 +577,10 @@ def create_app() -> FastAPI:
             file_name = str(document.get("file_name", "")).strip()
             pages = pages_by_doc.get(doc_id, set())
             page_count = len(pages)
+            public_document = serialize_document_for_api(document)
             exported.append(
                 {
-                    **document,
+                    **public_document,
                     "doc_id": file_name or doc_id,
                     "page_count": page_count if page_count > 0 else None,
                     "parsed_status": "parsed" if page_count > 0 else "unknown",
@@ -878,16 +897,38 @@ def create_app() -> FastAPI:
         if project is None:
             raise HTTPException(status_code=404, detail="Project not found")
 
+        if len(files) > settings.max_upload_files:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Too many files in one upload batch (max {settings.max_upload_files}).",
+            )
+
         upload_batch_id = str(uuid4())
         saved_documents: list[dict[str, object]] = []
         quality_counts: dict[str, int] = {"good": 0, "low": 0, "none": 0}
         project_folder = Path(settings.storage_root) / project_id
         project_folder.mkdir(parents=True, exist_ok=True)
 
+        buffered_uploads: list[tuple[UploadFile, str, bytes]] = []
+        total_bytes = 0
         for upload in files:
             incoming_name = upload.filename or "upload.bin"
-            safe_name = Path(incoming_name).name
-            content = await upload.read()
+            safe_name = Path(incoming_name).name or "upload.bin"
+            content = await upload.read(settings.max_upload_file_bytes + 1)
+            if len(content) > settings.max_upload_file_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File '{safe_name}' exceeds max size of {settings.max_upload_file_bytes} bytes.",
+                )
+            total_bytes += len(content)
+            if total_bytes > settings.max_upload_batch_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Upload batch exceeds max size of {settings.max_upload_batch_bytes} bytes.",
+                )
+            buffered_uploads.append((upload, safe_name, content))
+
+        for upload, safe_name, content in buffered_uploads:
             destination = project_folder / f"{uuid4()}_{safe_name}"
             destination.write_bytes(content)
 
@@ -935,9 +976,10 @@ def create_app() -> FastAPI:
                     for chunk in chunks
                 ],
             )
+            public_document = serialize_document_for_api(document)
             saved_documents.append(
                 {
-                    **document,
+                    **public_document,
                     "pages_extracted": len(pages),
                     "chunks_indexed": len(chunks),
                     "parse_report": parse_report,
@@ -971,7 +1013,10 @@ def create_app() -> FastAPI:
         return {
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
-            "documents": list_documents(project_id, upload_batch_id=selected_batch_id),
+            "documents": [
+                serialize_document_for_api(document)
+                for document in list_documents(project_id, upload_batch_id=selected_batch_id)
+            ],
         }
 
     @app.post("/projects/{project_id}/retrieve")
@@ -1482,129 +1527,18 @@ def create_app() -> FastAPI:
                 headers={"X-Export-Report-Path": str(report_path)},
             )
 
-        project_updated_at = project.get("created_at")
-        if artifact_timestamps:
-            project_updated_at = max([str(project.get("created_at", "")), *artifact_timestamps])
-
-        validations: dict[str, object] = {
-            "requirements": {"present": requirements_payload is not None},
-            "drafts": {"sections": len(drafts)},
-            "coverage": {"present": coverage_payload is not None},
-        }
-
-        missing_evidence: list[dict[str, object]] = []
-        for section_name, entry in drafts.items():
-            payload = entry.get("draft")
-            if not isinstance(payload, dict):
-                continue
-            items = payload.get("missing_evidence")
-            if not isinstance(items, list):
-                continue
-            for item in items:
-                if isinstance(item, dict):
-                    missing_evidence.append(
-                        {
-                            **item,
-                            "affected_sections": [section_name],
-                        }
-                    )
-
-        source_selection: dict[str, object] = {
-            "selected_document_id": None,
-            "selected_file_name": None,
-            "ambiguous": False,
-            "candidates": [],
-        }
-        requirement_chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
-        if requirement_chunks:
-            _, source_selection = select_primary_rfp_document(select_requirement_chunks(requirement_chunks))
-
-        export_input = {
-            "project": {
-                "id": project.get("id"),
-                "name": project.get("name"),
-                "created_at": project.get("created_at"),
-                "updated_at": project_updated_at,
-            },
-            "export_request": {
-                "format": "both",
-                "profile": profile,
-                "include_debug": include_debug,
-                "sections": requested_sections or None,
-                "output_filename_base": output_filename_base,
-                "upload_batch_id": selected_batch_id,
-            },
-            "documents": documents_payload,
-            "requirements": requirements_payload,
-            "drafts": drafts,
-            "coverage": coverage_payload,
-            "validations": validations,
-            "missing_evidence": missing_evidence,
-            "source_selection": source_selection,
-            "run_metadata": {
-                "model_ids": {
-                    "primary": settings.bedrock_model_id,
-                    "lite": settings.bedrock_lite_model_id,
-                },
-                "temperatures": {"agent_temperature": settings.agent_temperature},
-                "max_tokens": settings.agent_max_tokens,
-                "retrieval_top_k": settings.retrieval_top_k_default,
-                "chunking": {
-                    "chunk_size_chars": settings.chunk_size_chars,
-                    "chunk_overlap_chars": settings.chunk_overlap_chars,
-                },
-                "request_ids": [getattr(request.state, "request_id", None)],
-            },
-            "artifacts_used": artifacts_used,
-        }
-
-        export_bundle = build_export_bundle(export_input)
-
-        if use_agent:
-            orchestrator = get_nova_orchestrator()
-            package_export_bundle = getattr(orchestrator, "package_export_bundle", None)
-            if callable(package_export_bundle):
-                try:
-                    candidate_bundle = package_export_bundle(export_input)
-                    if looks_like_export_bundle(
-                        candidate_bundle,
-                        require_json_bundle=True,
-                        require_markdown_bundle=True,
-                    ):
-                        export_bundle = candidate_bundle
-                    else:
-                        append_export_warning(
-                            export_bundle,
-                            "Fell back to deterministic export: model output schema invalid.",
-                        )
-                except Exception as exc:  # pragma: no cover - depends on runtime integration
-                    append_export_warning(
-                        export_bundle,
-                        f"Fell back to deterministic export: final-stage agent unavailable ({exc}).",
-                    )
-
+        export_bundle = assemble_export_bundle_for_project(
+            request=request,
+            project_id=project_id,
+            project=project,
+            selected_batch_id=selected_batch_id,
+            requested_sections=requested_sections,
+            profile=profile,
+            include_debug=include_debug,
+            output_filename_base=output_filename_base,
+            use_agent=use_agent,
+        )
         markdown_files = extract_markdown_files(export_bundle)
-        try:
-            written_files = write_markdown_export_files(project_id, markdown_files)
-            logger.info(
-                "export_files_written",
-                extra={
-                    "event": "export_files_written",
-                    "request_id": getattr(request.state, "request_id", None),
-                    "project_id": project_id,
-                    "files_written": len(written_files),
-                },
-            )
-            if markdown_files and not written_files:
-                append_export_warning(
-                    export_bundle,
-                    "Markdown bundle existed but no files were written to disk.",
-                )
-        except OSError as exc:
-            append_export_warning(
-                export_bundle,
-                f"Automatic markdown file write failed: {exc}",
-            )
 
         if requested_format == "markdown":
             markdown_content = combine_markdown_files(markdown_files)

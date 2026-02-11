@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     cors_origins: str = "http://localhost:3000"
+    cors_allow_credentials: bool = True
     log_level: str = "INFO"
     request_id_header: str = "X-Request-ID"
 
@@ -24,6 +25,9 @@ class Settings(BaseSettings):
     chunk_overlap_chars: int = 200
     embedding_dim: int = 128
     retrieval_top_k_default: int = 5
+    max_upload_files: int = 20
+    max_upload_file_bytes: int = 10 * 1024 * 1024
+    max_upload_batch_bytes: int = 25 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

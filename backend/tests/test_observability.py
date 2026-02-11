@@ -43,7 +43,9 @@ def test_sanitize_for_logging_redacts_common_sensitive_patterns() -> None:
     payload = {
         "notes": (
             "Contact user@example.org or +1 (415) 555-0101, "
-            "SSN 123-45-6789, token Bearer abc123, key AKIAABCDEFGHIJKLMNOP."
+            "SSN 123-45-6789, token Bearer abc123, "
+            "keys AKIAABCDEFGHIJKLMNOP and ASIAABCDEFGHIJKLMNOP, "
+            "aws_secret_access_key=abcd1234abcd1234abcd1234abcd1234abcd1234."
         ),
         "api_key": "plain-value",
     }
@@ -58,4 +60,5 @@ def test_sanitize_for_logging_redacts_common_sensitive_patterns() -> None:
     assert "[REDACTED_SSN]" in notes
     assert "Bearer [REDACTED]" in notes
     assert "[REDACTED_AWS_ACCESS_KEY]" in notes
+    assert "aws_secret_access_key=[REDACTED]" in notes
     assert sanitized["api_key"] == "[REDACTED]"

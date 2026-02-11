@@ -58,6 +58,27 @@ function formatDisplayDate(value: string | null | undefined): string {
   });
 }
 
+function sanitizeMarkdownHref(rawHref: string): string | null {
+  const candidate = rawHref.trim();
+  if (!candidate) {
+    return null;
+  }
+  const hasScheme = /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(candidate);
+  if (!hasScheme) {
+    return candidate;
+  }
+  try {
+    const parsed = new URL(candidate);
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol === "http:" || protocol === "https:" || protocol === "mailto:") {
+      return candidate;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function parseInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
   const pattern = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
   const fragments = text.split(pattern).filter((fragment) => fragment.length > 0);
@@ -65,8 +86,12 @@ function parseInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
     const key = `${keyPrefix}-${index}`;
     const linkMatch = fragment.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (linkMatch) {
+      const safeHref = sanitizeMarkdownHref(linkMatch[2]);
+      if (!safeHref) {
+        return <span key={key}>{linkMatch[1]}</span>;
+      }
       return (
-        <a key={key} href={linkMatch[2]} target="_blank" rel="noreferrer">
+        <a key={key} href={safeHref} target="_blank" rel="noopener noreferrer">
           {linkMatch[1]}
         </a>
       );

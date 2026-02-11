@@ -78,6 +78,7 @@ def test_create_project_and_upload(tmp_path: Path) -> None:
         assert payload["project_id"] == project_id
         assert len(payload["documents"]) == 1
         assert payload["documents"][0]["file_name"] == "rfp.txt"
+        assert "storage_path" not in payload["documents"][0]
         assert payload["documents"][0]["chunks_indexed"] >= 1
         assert payload["documents"][0]["parse_report"]["quality"] in {"good", "low", "none"}
         assert payload["parse_report"]["documents_total"] == 1
@@ -85,6 +86,7 @@ def test_create_project_and_upload(tmp_path: Path) -> None:
         list_response = scoped_client.get(f"/projects/{project_id}/documents")
         assert list_response.status_code == 200
         assert len(list_response.json()["documents"]) == 1
+        assert "storage_path" not in list_response.json()["documents"][0]
 
 
 def test_upload_parse_report_marks_unsupported_file_types(tmp_path: Path) -> None:
@@ -108,6 +110,25 @@ def test_upload_parse_report_marks_unsupported_file_types(tmp_path: Path) -> Non
         assert report["quality"] == "none"
         assert report["reason"] == "unsupported_file_type"
         assert report["chunks_indexed"] == 0
+
+
+def test_upload_rejects_oversized_file(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    previous_limit = settings.max_upload_file_bytes
+    settings.max_upload_file_bytes = 8
+
+    try:
+        with TestClient(app) as client:
+            project_id = client.post("/projects", json={"name": "Upload Limits"}).json()["id"]
+            upload_response = client.post(
+                f"/projects/{project_id}/upload",
+                files=[("files", ("too-large.txt", b"123456789", "text/plain"))],
+            )
+            assert upload_response.status_code == 413
+            assert "exceeds max size" in str(upload_response.json()["detail"])
+    finally:
+        settings.max_upload_file_bytes = previous_limit
 
 
 def test_retrieve_is_project_scoped(tmp_path: Path) -> None:

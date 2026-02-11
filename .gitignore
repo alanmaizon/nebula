@@ -9,6 +9,7 @@ backend/.venv/
 node_modules/
 frontend/node_modules/
 frontend/.next/
+*.tsbuildinfo
 
 # Local env files
 .env
@@ -16,6 +17,7 @@ frontend/.next/
 !.env.example
 backend/.env
 frontend/.env.local
+nebula.db
 backend/nebula.db
 backend/data/uploads/
 
