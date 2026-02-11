@@ -262,12 +262,6 @@ input {
   padding-bottom: 0;
 }
 
-.logo-divider-icon {
-  width: clamp(92px, 13vw, 166px);
-  height: auto;
-  display: block;
-}
-
 .final-cta {
   min-height: 54vh;
   gap: 38px;

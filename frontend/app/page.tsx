@@ -741,8 +741,7 @@ export default function HomePage() {
               data-card-index={5}
               className={`story-card logo-divider ${visibleStoryCards[5] ? "is-visible" : ""}`}
             >
-              <img src="/aws.svg" alt="AWS logo" className="logo-divider-icon" />
-              <p className="story-section-note">Powered by Amazon Nova</p>
+              <p className="story-section-note">Powered by Amazon Nova on AWS</p>
             </article>
           </section>
         </section>
