@@ -14,6 +14,6 @@ Use this checklist before tagging a release.
 
 ## Notes
 - Deferred item: frontend citation click-through panel (tracked in backlog as post-`v0.1.0`).
-- Demo-freeze evidence: `docs/wiki/Demo-Freeze-2026-02-08.md`.
+- Demo-freeze evidence: `docs/wiki/Demo-Freeze-2026-02-11.md`.
 - Submission checklist: `docs/wiki/Nova-Submission-Checklist.md`.
 - Release notes: `docs/wiki/Release-Notes-v0.1.0.md`.

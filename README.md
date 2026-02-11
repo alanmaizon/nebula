@@ -16,6 +16,26 @@ It turns source documents into cited draft sections, requirement coverage, and e
 - Storage: SQLite + local filesystem
 - Models: Amazon Nova via Bedrock
 
+## Execution Status
+<!-- AUTO-GEN:README_STATUS:START -->
+- Last updated: `2026-02-11`
+- Overall completion: `90%`
+- Current milestone: `Week 4 - Submission Asset Packaging (In progress)`
+
+### Done This Week
+- Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices
+- Hardened backend/frontend security posture and local artifact hygiene
+- Refactored export and endpoint assembly flow in backend main API module
+- Updated README and CONTRIBUTING guidance for current developer workflow
+
+### Next Up
+- Produce and publish the 3-minute demo video with #AmazonNova and functional footage
+- Prepare public demo/test access instructions and fallback credentials path
+
+### Current Blockers
+- No blockers recorded.
+<!-- AUTO-GEN:README_STATUS:END -->
+
 ## Quick Start
 1. Copy env files:
 ```bash

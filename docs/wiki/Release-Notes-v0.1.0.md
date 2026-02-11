@@ -17,7 +17,7 @@ Nebula `v0.1.0` is the first demo-ready MVP release for RFP ingestion, requireme
 
 ## Freeze Validation
 - Demo flow passed twice from clean startup.
-- Evidence: `docs/wiki/Demo-Freeze-2026-02-08.md`
+- Evidence (superseded by full-workflow freeze): `docs/wiki/Demo-Freeze-2026-02-11.md`
 - Restore evidence: `docs/wiki/Restore-Drill-2026-02-07.md`
 
 ## Known Limitations (Deferred)
