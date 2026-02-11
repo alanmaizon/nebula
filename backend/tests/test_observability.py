@@ -45,12 +45,15 @@ def test_sanitize_for_logging_redacts_common_sensitive_patterns() -> None:
             "Contact user@example.org or +1 (415) 555-0101, "
             "SSN 123-45-6789, token Bearer abc123, "
             "keys AKIAABCDEFGHIJKLMNOP and ASIAABCDEFGHIJKLMNOP, "
-            "aws_secret_access_key=abcd1234abcd1234abcd1234abcd1234abcd1234."
+            "aws_secret_access_key=abcd1234abcd1234abcd1234abcd1234abcd1234, "
+            "aws_access_key_id=AKIAABCDEFGHIJKLMNOP, "
+            "aws_session_token=IQoJb3JpZ2luX2VjEJf//////////wEaCXVzLWVhc3QtMSJHMEUCIBTESTTOKEN12345, "
+            "x-amz-security-token: FQoGZXIvYXdzEJr//////////wEaDGV1LXdlc3QtMSJIMEYCIQCiTESTTOKEN67890."
         ),
         "api_key": "plain-value",
     }
 
-    sanitized = sanitize_for_logging(payload)
+    sanitized = sanitize_for_logging(payload, max_string_length=2000)
     notes = sanitized["notes"]
     assert "user@example.org" not in notes
     assert "415" not in notes
@@ -61,4 +64,21 @@ def test_sanitize_for_logging_redacts_common_sensitive_patterns() -> None:
     assert "Bearer [REDACTED]" in notes
     assert "[REDACTED_AWS_ACCESS_KEY]" in notes
     assert "aws_secret_access_key=[REDACTED]" in notes
+    assert "aws_access_key_id=[REDACTED_AWS_ACCESS_KEY]" in notes
+    assert "aws_session_token=[REDACTED]" in notes
+    assert "x-amz-security-token: [REDACTED]" in notes
     assert sanitized["api_key"] == "[REDACTED]"
+
+
+def test_sanitize_for_logging_redacts_sensitive_aws_header_keys() -> None:
+    payload = {
+        "x-amz-security-token": "FQoGZXIvYXdzEJr//////////wEaDGV1LXdlc3QtMSJIMEYCIQCiTESTTOKEN67890",
+        "x-amz-credential": "AKIAABCDEFGHIJKLMNOP/20260211/us-east-1/bedrock/aws4_request",
+        "x-amz-signature": "deadbeefcafebabe",
+        "x-amz-date": "20260211T000000Z",
+    }
+    sanitized = sanitize_for_logging(payload)
+    assert sanitized["x-amz-security-token"] == "[REDACTED]"
+    assert sanitized["x-amz-credential"] == "[REDACTED]"
+    assert sanitized["x-amz-signature"] == "[REDACTED]"
+    assert sanitized["x-amz-date"] == "20260211T000000Z"

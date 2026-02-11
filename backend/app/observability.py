@@ -25,8 +25,12 @@ SENSITIVE_KEY_NAMES = {
     "x_api_key",
     "access_key",
     "aws_secret_access_key",
+    "aws_access_key_id",
     "aws_session_token",
     "session_token",
+    "x_amz_security_token",
+    "x_amz_credential",
+    "x_amz_signature",
     "client_secret",
     "private_key",
     "ssn",
@@ -50,6 +54,15 @@ BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-._~+/]+=*\b")
 AWS_ACCESS_KEY_PATTERN = re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")
 AWS_SECRET_INLINE_PATTERN = re.compile(
     r"(?i)\b(aws_secret_access_key|secret_access_key)(\s*[:=]\s*)([A-Za-z0-9/+=]{16,})\b"
+)
+AWS_ACCESS_KEY_ID_INLINE_PATTERN = re.compile(
+    r"(?i)\b(aws_access_key_id)(\s*[:=]\s*)([A-Z0-9]{16,})\b"
+)
+AWS_SESSION_TOKEN_INLINE_PATTERN = re.compile(
+    r"(?i)\b(aws_session_token|session_token)(\s*[:=]\s*)([A-Za-z0-9/+=._-]{8,})\b"
+)
+X_AMZ_SECURITY_TOKEN_INLINE_PATTERN = re.compile(
+    r"(?i)\b(x-amz-security-token)(\s*[:=]\s*)([A-Za-z0-9/+=._-]{8,})\b"
 )
 
 
@@ -85,6 +98,9 @@ def _redact_string(value: str, *, max_length: int) -> str:
     redacted = BEARER_PATTERN.sub("Bearer [REDACTED]", redacted)
     redacted = AWS_ACCESS_KEY_PATTERN.sub("[REDACTED_AWS_ACCESS_KEY]", redacted)
     redacted = AWS_SECRET_INLINE_PATTERN.sub(r"\1\2[REDACTED]", redacted)
+    redacted = AWS_ACCESS_KEY_ID_INLINE_PATTERN.sub(r"\1\2[REDACTED]", redacted)
+    redacted = AWS_SESSION_TOKEN_INLINE_PATTERN.sub(r"\1\2[REDACTED]", redacted)
+    redacted = X_AMZ_SECURITY_TOKEN_INLINE_PATTERN.sub(r"\1\2[REDACTED]", redacted)
     redacted = EMAIL_PATTERN.sub("[REDACTED_EMAIL]", redacted)
     redacted = PHONE_PATTERN.sub("[REDACTED_PHONE]", redacted)
     redacted = SSN_PATTERN.sub("[REDACTED_SSN]", redacted)
