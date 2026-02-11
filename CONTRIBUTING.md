@@ -1,167 +1,87 @@
-# Contributor & Agent Instructions
+# Contributing
 
-This repository is built for fast iteration with agents. Follow these rules to keep changes safe, reviewable, and demo-ready.
+This project is optimized for fast, reviewable changes. Use this guide to keep pull requests predictable and safe.
 
-## Goals (what “done” means)
-1. Nebula can ingest an RFP + nonprofit docs.
-2. It produces:
-   - `requirements.json` (structured extraction)
-   - a cited draft section (`draft.json`)
-   - a coverage matrix (met/partial/missing)
-   - a list of missing evidence items
-3. All model outputs are validated against schemas and are deterministic enough for a demo.
+## Development setup
 
-## Non-goals (don’t waste time)
-- Full grant portal integration unless clearly scoped as a stretch goal
-- Building a full rich-text editor (use a simple markdown editor + preview)
-- Perfect PDF parsing for every edge case (optimize for demo docs)
-
----
-
-## Working style
-- Prefer small PR-sized changes.
-- Always include:
-  - what you changed
-  - how to run it
-  - what to click in the demo
-- If you introduce new env vars, update README + `.env.example`.
-
-## Repo conventions
-- TypeScript in `frontend/`
-- Python in `backend/`
-- Shared JSON schemas in `docs/schemas/`
-- Prompts in `docs/prompts/`
-
----
-
-## Bedrock / Nova usage rules
-- **Always** request structured outputs (JSON) for core flows.
-- Enforce a strict schema per task:
-  - requirements extraction schema
-  - section draft schema (with citations)
-  - review schema (optional)
-- Set conservative token limits for demo stability.
-- Never fabricate citations: every citation must correspond to retrieved evidence.
-
-### “Text only” principle
-Only send:
-- the RFP requirement text chunks needed
-- the retrieved evidence chunks used for drafting
-Do **not** send raw files.
-
----
-
-## Output contracts (must not break)
-
-### 1) Requirements extraction (`requirements.json`)
-Must include:
-- `funder`, `deadline`, `eligibility[]`
-- `questions[]` with `id`, `prompt`, `limit` (words/chars if known)
-- `required_attachments[]`
-- `rubric[]` (if available)
-- `disallowed_costs[]` (if available)
-
-### 2) Draft section (`draft.json`)
-Each paragraph must contain:
-- `text`
-- `citations[]` (doc_id, page, snippet)
-- `confidence` (0–1)
-Also include:
-- `missing_evidence[]` with `claim` + `suggested_upload`
-
-### 3) Coverage matrix
-List of requirements with:
-- `status`: `met | partial | missing`
-- `notes`
-- `evidence_refs[]` (citations or doc pointers)
-
----
-
-## Prompts (how to write them)
-- Put prompts in `docs/prompts/` as files.
-- Prompts must:
-  - instruct “return valid JSON only”
-  - include the schema (or a concise field list)
-  - include grounding rules: “use only provided context”
-  - require citations from retrieved evidence IDs/pages
-
-### Example grounding rule block
-- Use only the context provided below.
-- If a claim cannot be supported, mark it unsupported and add it to `missing_evidence`.
-- Do not invent numbers, dates, locations, outcomes, or partners.
-
----
-
-## Validation & testing
-- Add a schema validator on every model response.
-- If validation fails:
-  - retry once with a “fix JSON to match schema” prompt
-  - otherwise return a clear error to the UI
-- Add lightweight tests for:
-  - schema validation
-  - requirements parser on sample RFP
-- section generation produces citations + no empty fields
-
-## Documentation automation
-- Use `docs/status.yml` as the source of truth for delivery status.
-- Run `python scripts/sync_docs.py` after updating status.
-- Generated blocks are maintained in:
-  - `README.md`
-  - `DEVELOPMENT_PLAN.md`
-  - `AWS_ALIGNMENT.md`
-- CI will fail if generated docs are stale (`python scripts/sync_docs.py --check`).
-
----
-
-## UI demo requirements
-The UI must show:
-1. Uploaded documents list
-2. Extracted requirements table
-3. Generated section with clickable citations
-4. Missing evidence list
-5. Export buttons (JSON + Markdown)
-
-Keep the UI minimal: one-page flow is fine.
-
----
-
-## What Codex should do when asked to implement a feature
-1. Identify the relevant schema(s) and update if needed.
-2. Implement backend endpoint first.
-3. Add validation + one test.
-4. Wire frontend to endpoint with clear loading/error states.
-5. Update README if run steps or env vars change.
-
----
-
-## “Stop and ask” conditions
-If any of these are unclear, propose a default and proceed (don’t stall):
-- Which vector store to use → default: local FAISS for demo
-- Which DB → default: SQLite for backend demo
-- Which export format → default: JSON + Markdown
-
----
-
-## Security / compliance notes
-- Do not store secrets in git.
-- Never log full document contents in production mode.
-- Prefer redacting PII in logs and model payloads.
-
----
-
-## Quick commands (expected to work)
+1. Copy env files:
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+```
+2. Start local stack (recommended):
 ```bash
 docker compose up --build
-````
-
+```
+3. Or run services separately:
 ```bash
-cd backend && pytest
+cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
+cd frontend && npm install && npm run dev
 ```
 
-```bash
-cd frontend && npm test
-```
+## Pull request expectations
+
+- Keep PRs focused and small enough to review quickly.
+- Fill out `.github/PULL_REQUEST_TEMPLATE.md`.
+- If behavior changes, include API/UI verification steps.
+- If setup or contracts change, update docs in the same PR.
+
+## Required local checks before opening a PR
 
 ```bash
-python scripts/sync_docs.py
+cd backend && PYTHONPATH=. pytest
+scripts/run_deterministic_backend_tests.sh
+cd frontend && npm run typecheck && npm run build
+python scripts/sync_docs.py --check
 ```
+
+CI runs the same core gates:
+- backend tests
+- deterministic backend reliability checks
+- frontend typecheck/build
+- docker smoke validation
+
+## Documentation sync contract
+
+`docs/status.yml` is the source of truth for delivery status.
+
+When status changes:
+1. Update `docs/status.yml`.
+2. Run `python scripts/sync_docs.py`.
+3. Commit generated updates in:
+   - `README.md`
+   - `docs/wiki/DEVELOPMENT_PLAN.md`
+   - `docs/wiki/AWS_ALIGNMENT.md`
+
+Do not hand-edit generated `AUTO-GEN` blocks unless you also update `docs/status.yml`.
+
+## Backend/API contracts
+
+- Keep model outputs structured and schema-validated.
+- Do not relax citation grounding requirements.
+- Preserve contract semantics for:
+  - requirements extraction
+  - draft generation (`citations[]`, `missing_evidence[]`)
+  - coverage status (`met | partial | missing`)
+  - export bundle shape
+
+If you intentionally change a contract, update:
+- `README.md` key endpoints/behavior
+- related schema/docs in `docs/`
+- tests covering the changed behavior
+
+## Security and secrets
+
+- Never commit credentials, tokens, or `.env` files.
+- Do not log raw sensitive document text in production paths.
+- Keep log redaction behavior intact when modifying observability code.
+- Review dependency additions for necessity and security impact.
+
+## Generated and local-only files
+
+Do not commit local runtime artifacts. Common examples:
+- `nebula.db`
+- `frontend/tsconfig.tsbuildinfo`
+- local exports in `output/`
+
+If a local artifact is accidentally tracked, remove it from git history/index in the PR and keep ignore rules updated.

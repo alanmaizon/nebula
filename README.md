@@ -6,22 +6,27 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 **Core differentiator:** *Cite-first drafting* — every paragraph is backed by page/snippet references.
 
 ## Documentation
-- Architecture: `ARCHITECTURE.md`
-- Development plan: `DEVELOPMENT_PLAN.md`
-- AWS alignment: `AWS_ALIGNMENT.md`
+- Architecture: `docs/wiki/ARCHITECTURE.md`
+- Development plan: `docs/wiki/DEVELOPMENT_PLAN.md`
+- AWS alignment: `docs/wiki/AWS_ALIGNMENT.md`
 - Category strategy: `docs/wiki/Category-Strategy.md`
 - Submission checklist: `docs/wiki/Nova-Submission-Checklist.md`
+- Security policy: `SECURITY.md`
+- Changelog: `CHANGELOG.md`
 - Contributor guide: `CONTRIBUTING.md`
 - Status source: `docs/status.yml` (sync with `python scripts/sync_docs.py`)
 
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
-- Last updated: `2026-02-08`
-- Overall completion: `88%`
+- Last updated: `2026-02-11`
+- Overall completion: `90%`
 - Current milestone: `Week 4 - Submission Asset Packaging (In progress)`
 
 ### Done This Week
 - Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices
+- Hardened backend/frontend security posture and local artifact hygiene
+- Refactored export and endpoint assembly flow in backend main API module
+- Updated README and CONTRIBUTING guidance for current developer workflow
 
 ### Next Up
 - Produce and publish the 3-minute demo video with #AmazonNova and functional footage
@@ -84,8 +89,9 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 .
 ├── backend/                 # FastAPI API
 ├── frontend/                # Next.js UI
-├── docs/                    # prompts, JSON schemas, demo assets
+├── docs/                    # prompts, schemas, wiki docs, demo assets
 ├── scripts/                 # automation scripts
+├── .github/workflows/       # CI/CD workflows
 ├── docker-compose.yml
 ├── README.md
 └── CONTRIBUTING.md
@@ -182,6 +188,13 @@ npm install
 npm run dev
 ```
 
+### Contributor pre-PR checks
+```bash
+cd backend && PYTHONPATH=. pytest
+cd frontend && npm run typecheck && npm run build
+python scripts/sync_docs.py --check
+```
+
 ## CI/CD (Docker-first)
 
 - CI workflow: `.github/workflows/ci.yml`
@@ -229,6 +242,7 @@ Deployment note:
 * `POST /projects/{id}/extract-requirements` → generate validated `requirements` artifact
 * `GET /projects/{id}/requirements/latest` → fetch latest requirements artifact
 * `POST /projects/{id}/generate-section` → generate cited section draft artifact
+* `POST /projects/{id}/generate-full-draft` → run full multi-section draft + coverage + export flow
 * `GET /projects/{id}/drafts/{section_key}/latest` → fetch latest section draft artifact
 * `POST /projects/{id}/coverage` → compute coverage matrix from latest requirements + draft
 * `GET /projects/{id}/coverage/latest` → fetch latest coverage artifact
@@ -257,6 +271,12 @@ If a claim cannot be supported, Nebula must:
 
 ---
 
+## Contributing
+
+See `CONTRIBUTING.md` for branch/PR rules, required local checks, and documentation sync requirements.
+
+---
+
 ## Safety & privacy
 
 * Only the minimum necessary text is sent to the model.
@@ -265,9 +285,3 @@ If a claim cannot be supported, Nebula must:
 * Structured logs include correlation IDs and redact sensitive fields/patterns.
 
 ---
-
-## Hackathon notes
-
-* Demo video target: ~3 minutes
-* Include: requirements extraction → cited drafting → missing evidence → export
-* Highlight: structured outputs, validation, traceability, and real-world impact

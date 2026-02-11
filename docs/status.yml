@@ -1,7 +1,7 @@
 {
   "project": "Nebula",
-  "last_updated": "2026-02-08",
-  "overall_completion_pct": 88,
+  "last_updated": "2026-02-11",
+  "overall_completion_pct": 90,
   "current_week": 4,
   "weeks": [
     {
@@ -75,7 +75,10 @@
       "focus": "Submission Asset Packaging",
       "status": "in_progress",
       "done": [
-        "Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices"
+        "Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices",
+        "Hardened backend/frontend security posture and local artifact hygiene",
+        "Refactored export and endpoint assembly flow in backend main API module",
+        "Updated README and CONTRIBUTING guidance for current developer workflow"
       ],
       "next": [
         "Produce and publish the 3-minute demo video with #AmazonNova and functional footage",
