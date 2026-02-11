@@ -504,7 +504,9 @@ export default function HomePage() {
     }
 
     appendLog("Checking existing indexed documents...");
-    const docsResponse = await fetch(`${apiBase}/projects/${currentProjectId}/documents`);
+    const docsResponse = await fetch(
+      `${apiBase}/projects/${currentProjectId}/documents?document_scope=latest`
+    );
     const docsPayload = await parseJsonResponse(docsResponse);
     const docs = Array.isArray(docsPayload.documents)
       ? docsPayload.documents.filter((item) => !!item && typeof item === "object")

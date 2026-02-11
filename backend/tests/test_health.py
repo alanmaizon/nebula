@@ -228,6 +228,75 @@ def test_retrieve_defaults_to_latest_upload_batch(tmp_path: Path) -> None:
         assert all_payload["results"][0]["file_name"] == "old.txt"
 
 
+def test_retrieve_handles_embedding_dimension_drift(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 80
+    settings.chunk_overlap_chars = 20
+    settings.embedding_dim = 64
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Embedding Drift"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("impact.txt", b"Households received rent support.", "text/plain"))],
+        )
+        assert upload.status_code == 200
+
+        previous_dim = settings.embedding_dim
+        try:
+            settings.embedding_dim = 128
+            retrieve = client.post(
+                f"/projects/{project_id}/retrieve",
+                json={"query": "rent support households", "top_k": 3},
+            )
+            assert retrieve.status_code == 200
+            payload = retrieve.json()
+            assert len(payload["results"]) >= 1
+            assert payload["results"][0]["file_name"] == "impact.txt"
+            warnings = payload.get("warnings")
+            assert isinstance(warnings, list)
+            assert any(item.get("code") == "embedding_dim_drift" for item in warnings if isinstance(item, dict))
+        finally:
+            settings.embedding_dim = previous_dim
+
+
+def test_generate_section_surfaces_embedding_dimension_drift_warning(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 120
+    settings.chunk_overlap_chars = 20
+    settings.embedding_dim = 64
+
+    source_text = b"""
+Question 1: Describe the need statement.
+Need Statement evidence with outcomes and household counts.
+"""
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Draft Drift Warning"}).json()["id"]
+        upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("impact.txt", source_text, "text/plain"))],
+        )
+        assert upload.status_code == 200
+
+        previous_dim = settings.embedding_dim
+        try:
+            settings.embedding_dim = 128
+            generate = client.post(
+                f"/projects/{project_id}/generate-section",
+                json={"section_key": "Need Statement", "top_k": 2},
+            )
+            assert generate.status_code == 200
+            payload = generate.json()
+            warnings = payload.get("warnings")
+            assert isinstance(warnings, list)
+            assert any(item.get("code") == "embedding_dim_drift" for item in warnings if isinstance(item, dict))
+        finally:
+            settings.embedding_dim = previous_dim
+
+
 def test_extract_requirements_defaults_to_latest_upload_batch(tmp_path: Path) -> None:
     settings.database_url = f"sqlite:///{tmp_path}/test.db"
     settings.storage_root = str(tmp_path / "uploads")

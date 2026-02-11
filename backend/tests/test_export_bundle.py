@@ -260,6 +260,25 @@ def test_build_export_bundle_flags_citation_mismatch_and_downgrades_scores() -> 
     assert payload["summary"]["overall_completion"] != "100.0%"
 
 
+def test_build_export_bundle_blank_doc_id_citation_is_unsupported() -> None:
+    test_input = _base_input()
+    test_input["drafts"]["Need Statement"]["draft"]["paragraphs"][0]["citations"] = [
+        {
+            "doc_id": "",
+            "page": 1,
+            "snippet": "Need and outcomes are documented.",
+        }
+    ]
+
+    payload = build_export_bundle(test_input)
+    draft = payload["bundle"]["json"]["drafts"]["Need Statement"]["draft"]
+    paragraph = draft["paragraphs"][0]
+
+    assert paragraph["unsupported"] is True
+    assert payload["summary"]["unsupported_claims_count"] >= 1
+    assert "citation mismatch warning" in payload["quality_gates"]["warnings"]
+
+
 def test_build_export_bundle_attachment_requirements_need_attachment_grounded_evidence() -> None:
     test_input = _base_input()
     test_input["coverage"]["items"] = [

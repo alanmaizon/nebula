@@ -173,10 +173,40 @@ def create_app() -> FastAPI:
 
     def rank_chunks_by_query(
         chunks: list[dict[str, object]], query: str, top_k: int
-    ) -> list[dict[str, object]]:
-        query_embedding = embed_text(query, settings.embedding_dim)
-        scored_results: list[dict[str, object]] = []
+    ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+        if top_k < 1 or not chunks:
+            return [], []
+
+        dims: dict[int, int] = {}
         for chunk in chunks:
+            embedding = chunk.get("embedding")
+            if isinstance(embedding, list) and embedding:
+                dims[len(embedding)] = dims.get(len(embedding), 0) + 1
+
+        if not dims:
+            return [], []
+
+        target_dim = settings.embedding_dim
+        if target_dim not in dims:
+            target_dim = max(dims.items(), key=lambda item: item[1])[0]
+            logger.warning(
+                "embedding_dim_mismatch_detected",
+                extra={
+                    "event": "embedding_dim_mismatch_detected",
+                    "configured_dim": settings.embedding_dim,
+                    "target_dim": target_dim,
+                    "available_dims": sorted(dims.keys()),
+                },
+            )
+
+        query_embedding = embed_text(query, target_dim)
+        scored_results: list[dict[str, object]] = []
+        skipped_chunks = 0
+        for chunk in chunks:
+            embedding = chunk.get("embedding")
+            if not isinstance(embedding, list) or len(embedding) != target_dim:
+                skipped_chunks += 1
+                continue
             scored_results.append(
                 {
                     "chunk_id": chunk["id"],
@@ -184,11 +214,36 @@ def create_app() -> FastAPI:
                     "file_name": chunk["file_name"],
                     "page": chunk["page"],
                     "text": chunk["text"],
-                    "score": cosine_similarity(query_embedding, chunk["embedding"]),
+                    "score": cosine_similarity(query_embedding, embedding),
+                }
+            )
+        if skipped_chunks > 0:
+            logger.warning(
+                "embedding_dim_chunks_skipped",
+                extra={
+                    "event": "embedding_dim_chunks_skipped",
+                    "target_dim": target_dim,
+                    "skipped_chunks": skipped_chunks,
+                    "total_chunks": len(chunks),
+                },
+            )
+        warnings: list[dict[str, object]] = []
+        if target_dim != settings.embedding_dim or skipped_chunks > 0:
+            warnings.append(
+                {
+                    "code": "embedding_dim_drift",
+                    "message": "Embedding dimension drift detected. Re-index project documents for stable retrieval.",
+                    "details": {
+                        "configured_dim": settings.embedding_dim,
+                        "target_dim": target_dim,
+                        "available_dims": sorted(dims.keys()),
+                        "skipped_chunks": skipped_chunks,
+                        "total_chunks": len(chunks),
+                    },
                 }
             )
         scored_results.sort(key=lambda item: float(item["score"]), reverse=True)
-        return scored_results[:top_k]
+        return scored_results[:top_k], warnings
 
     def select_requirement_chunks(chunks: list[dict[str, object]]) -> list[dict[str, object]]:
         pattern = re.compile(r"(rfp|grant|funding|guideline|solicitation|notice)", re.IGNORECASE)
@@ -497,7 +552,9 @@ def create_app() -> FastAPI:
                 prompt_context = {"context_brief": trimmed}
 
         default_top_k = requested_top_k or settings.retrieval_top_k_default
-        ranked_all = rank_chunks_by_query(chunks, query_text, min(20, len(chunks))) if chunks else []
+        ranked_all, ranking_warnings = (
+            rank_chunks_by_query(chunks, query_text, min(20, len(chunks))) if chunks else ([], [])
+        )
 
         top_k = default_top_k
         retry_on_missing = False
@@ -591,6 +648,7 @@ def create_app() -> FastAPI:
         return {
             **best_result,
             "attempts": attempts,
+            "warnings": ranking_warnings,
         }
 
     def build_export_documents(
@@ -1174,8 +1232,16 @@ def create_app() -> FastAPI:
             return {"project_id": project_id, "upload_batch_id": selected_batch_id, "query": payload.query, "results": []}
 
         top_k = payload.top_k or settings.retrieval_top_k_default
-        results = rank_chunks_by_query(chunks, payload.query, top_k)
-        return {"project_id": project_id, "upload_batch_id": selected_batch_id, "query": payload.query, "results": results}
+        results, ranking_warnings = rank_chunks_by_query(chunks, payload.query, top_k)
+        response: dict[str, object] = {
+            "project_id": project_id,
+            "upload_batch_id": selected_batch_id,
+            "query": payload.query,
+            "results": results,
+        }
+        if ranking_warnings:
+            response["warnings"] = ranking_warnings
+        return response
 
     @app.post("/projects/{project_id}/extract-requirements")
     def extract_requirements(
@@ -1237,6 +1303,7 @@ def create_app() -> FastAPI:
             "artifact": artifact_meta,
             "validation": draft_result["validation"],
             "grounding": draft_result["grounding"],
+            "warnings": draft_result["warnings"],
         }
 
     @app.get("/projects/{project_id}/drafts/{section_key}/latest")
@@ -1360,6 +1427,7 @@ def create_app() -> FastAPI:
         section_runs: list[dict[str, object]] = []
         combined_paragraphs: list[dict[str, object]] = []
         draft_payloads_by_section: dict[str, dict[str, object]] = {}
+        run_warnings: list[dict[str, object]] = []
 
         for target in section_targets:
             section_key = str(target["section_key"])
@@ -1378,6 +1446,9 @@ def create_app() -> FastAPI:
             )
             draft_payload = draft_result["draft"]
             draft_payloads_by_section[section_key] = draft_payload
+            section_warnings = draft_result.get("warnings")
+            if isinstance(section_warnings, list):
+                run_warnings.extend([warning for warning in section_warnings if isinstance(warning, dict)])
 
             artifact_meta = create_draft_artifact(
                 project_id=project_id,
@@ -1410,6 +1481,7 @@ def create_app() -> FastAPI:
                     },
                     "attempts": draft_result["attempts"],
                     "top_k_used": draft_result["top_k_used"],
+                    "warnings": draft_result["warnings"],
                 }
             )
 
@@ -1444,8 +1516,16 @@ def create_app() -> FastAPI:
         )
 
         unresolved = collect_unresolved_coverage_items(final_coverage_payload)
+        deduped_run_warnings: list[dict[str, object]] = []
+        seen_warning_keys: set[str] = set()
+        for warning in run_warnings:
+            key = str(warning)
+            if key in seen_warning_keys:
+                continue
+            seen_warning_keys.add(key)
+            deduped_run_warnings.append(warning)
 
-        return {
+        response: dict[str, object] = {
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
             "requirements": requirements_payload,
@@ -1469,6 +1549,9 @@ def create_app() -> FastAPI:
                 "unresolved_count": len(unresolved),
             },
         }
+        if deduped_run_warnings:
+            response["warnings"] = deduped_run_warnings
+        return response
 
     @app.get("/projects/{project_id}/export")
     def export_project(

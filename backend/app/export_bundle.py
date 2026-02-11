@@ -1110,13 +1110,20 @@ def _prepare_drafts_for_export(
                     snippet = snippet[:237].rstrip() + "..."
                     warnings.append(f"Citation snippet truncated to 240 chars in section '{section_key}'.")
 
-                if doc_id and doc_id not in valid_doc_ids:
+                if not doc_id:
+                    citation_mismatch_count += 1
+                    warnings.append(
+                        f"Citation mismatch in section '{section_key}': missing doc_id."
+                    )
+                    continue
+
+                if doc_id not in valid_doc_ids:
                     invalid_doc_ids.add(doc_id)
                     citation_mismatch_count += 1
                     warnings.append(
                         f"Citation mismatch in section '{section_key}': doc_id '{doc_id}' not in document registry."
                     )
-                if doc_id and page is not None:
+                if page is not None:
                     max_page = doc_page_counts.get(doc_id)
                     if max_page is not None and page > max_page:
                         citation_mismatch_count += 1
