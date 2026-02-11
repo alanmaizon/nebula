@@ -11,17 +11,19 @@ Source of truth: `docs/status.yml` and `docs/wiki/DEVELOPMENT_PLAN.md`
 - `2026-02-07`: Backup/restore drill completed with checksum and retrieval recovery evidence (`docs/wiki/Restore-Drill-2026-02-07.md`).
 - `2026-02-08`: Deterministic CI reliability gate validated and documented (`docs/wiki/CI-Reliability-2026-02-08.md`).
 - `2026-02-11`: Full-workflow demo freeze run passed (`docs/wiki/Demo-Freeze-2026-02-11.md`).
+- `2026-02-11`: Patch release `v0.1.1` published with docs sync/check fix and wiki cleanup (`docs/wiki/Release-Notes-v0.1.1.md`).
 
 ## Current Priorities (Now)
 - Produce and publish the 3-minute demo video with `#AmazonNova` and functional footage.
 - Prepare public demo/test access instructions and fallback credentials path.
 
 ## Next Milestones (Date-Based)
-- By `2026-03-16 17:00 PT`:
+### By `2026-03-16 17:00 PT`
 - Run full clean-environment rehearsals and lock submission build.
 - Submit final project (internal target: at least 2 hours earlier).
 - Verify repository/demo access and all required links in Devpost.
-- By `2026-03-18 17:00 PT`:
+
+### By `2026-03-18 17:00 PT`
 - Submit actionable feedback before `2026-03-18 17:00 PT`.
 - Keep demo environment stable and reachable through judging period.
 - Prepare concise issue-response playbook for judge clarification requests.
