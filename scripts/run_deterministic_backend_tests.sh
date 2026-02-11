@@ -24,9 +24,19 @@ done
 echo
 
 cd "${BACKEND_DIR}"
+PYTEST_BIN=".venv/bin/pytest"
+if [[ ! -x "${PYTEST_BIN}" ]]; then
+  if command -v pytest >/dev/null 2>&1; then
+    PYTEST_BIN="$(command -v pytest)"
+  else
+    echo "pytest is not available (.venv/bin/pytest or PATH)." >&2
+    exit 127
+  fi
+fi
+
 for i in $(seq 1 "${ITERATIONS}"); do
   echo "[${i}/${ITERATIONS}] running deterministic test set..."
-  PYTHONPATH=. .venv/bin/pytest -q "${TESTS[@]}"
+  PYTHONPATH=. "${PYTEST_BIN}" -q "${TESTS[@]}"
 done
 
 echo

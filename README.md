@@ -16,17 +16,16 @@ Nebula is an Amazon Nova-powered agentic grant development and governance worksp
 
 ## Current Delivery Status
 <!-- AUTO-GEN:README_STATUS:START -->
-- Last updated: `2026-02-09`
-- Overall completion: `92%`
-- Current milestone: `Step 7 - Export and UX (active polish)`
+- Last updated: `2026-02-08`
+- Overall completion: `88%`
+- Current milestone: `Week 4 - Submission Asset Packaging (In progress)`
 
 ### Done This Week
-- Removed required intake step and replaced it with optional advanced context briefing
-- Removed template-gated pipeline friction and kept summary/json toggles across artifacts
+- Prepared Devpost narrative draft emphasizing Nova and AWS architecture choices
 
 ### Next Up
-- Final polish of landing and navigation ergonomics
 - Produce and publish the 3-minute demo video with #AmazonNova and functional footage
+- Prepare public demo/test access instructions and fallback credentials path
 
 ### Current Blockers
 - No blockers recorded.
