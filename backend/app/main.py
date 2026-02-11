@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Mapping
+from typing import Mapping, TypedDict
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
@@ -81,6 +81,15 @@ class GenerateFullDraftRequest(BaseModel):
     top_k: int | None = Field(default=None, ge=1, le=20)
     max_revision_rounds: int = Field(default=1, ge=0, le=3)
     context_brief: str | None = Field(default=None, max_length=2000)
+
+
+class ExportContext(TypedDict):
+    drafts: dict[str, dict[str, object]]
+    requirements_payload: dict[str, object] | None
+    coverage_payload: dict[str, object] | None
+    documents_payload: list[dict[str, object]]
+    artifacts_used: list[dict[str, object]]
+    artifact_timestamps: list[str]
 
 
 def get_nova_orchestrator() -> BedrockNovaOrchestrator:
@@ -241,6 +250,33 @@ def create_app() -> FastAPI:
 
         latest_batch_id = get_latest_upload_batch_id(project_id)
         return latest_batch_id
+
+    def require_project(project_id: str) -> dict[str, object]:
+        project = get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        return project
+
+    def resolve_project_upload_batch(
+        *,
+        project_id: str,
+        document_scope: str,
+        upload_batch_id: str | None,
+    ) -> tuple[dict[str, object], str | None]:
+        project = require_project(project_id)
+        selected_batch_id = resolve_upload_batch_scope(
+            project_id=project_id,
+            document_scope=document_scope,
+            upload_batch_id=upload_batch_id,
+        )
+        return project, selected_batch_id
+
+    def serialize_artifact_reference(artifact: Mapping[str, object]) -> dict[str, object]:
+        return {
+            "id": artifact["id"],
+            "source": artifact["source"],
+            "created_at": artifact["created_at"],
+        }
 
     def select_primary_rfp_document(chunks: list[dict[str, object]]) -> tuple[list[dict[str, object]], dict[str, object]]:
         docs: dict[str, dict[str, object]] = {}
@@ -685,18 +721,12 @@ def create_app() -> FastAPI:
 
         return written_files
 
-    def assemble_export_bundle_for_project(
+    def collect_export_context(
         *,
-        request: Request,
         project_id: str,
-        project: dict[str, object],
         selected_batch_id: str | None,
         requested_sections: list[str],
-        profile: str,
-        include_debug: bool,
-        output_filename_base: str | None,
-        use_agent: bool,
-    ) -> dict[str, object]:
+    ) -> ExportContext:
         requirements_artifact = get_latest_requirements_artifact(project_id, upload_batch_id=selected_batch_id)
         draft_artifacts = list_latest_draft_artifacts(project_id, upload_batch_id=selected_batch_id)
         coverage_artifact = get_latest_coverage_artifact(project_id, upload_batch_id=selected_batch_id)
@@ -749,21 +779,26 @@ def create_app() -> FastAPI:
             )
             artifact_timestamps.append(str(coverage_artifact["created_at"]))
 
-        project_updated_at = project.get("created_at")
-        if artifact_timestamps:
-            project_updated_at = max([str(project.get("created_at", "")), *artifact_timestamps])
-
-        validations: dict[str, object] = {
-            "requirements": {"present": requirements_payload is not None},
-            "drafts": {"sections": len(drafts)},
-            "coverage": {"present": coverage_payload is not None},
+        return {
+            "drafts": drafts,
+            "requirements_payload": requirements_payload,
+            "coverage_payload": coverage_payload,
+            "documents_payload": documents_payload,
+            "artifacts_used": artifacts_used,
+            "artifact_timestamps": artifact_timestamps,
         }
 
-        missing_evidence: list[dict[str, object]] = []
+    def extract_draft_payloads(drafts: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
+        payloads: dict[str, dict[str, object]] = {}
         for section_name, entry in drafts.items():
             payload = entry.get("draft")
-            if not isinstance(payload, dict):
-                continue
+            if isinstance(payload, dict):
+                payloads[section_name] = payload
+        return payloads
+
+    def collect_missing_evidence(draft_payloads: dict[str, dict[str, object]]) -> list[dict[str, object]]:
+        missing_evidence: list[dict[str, object]] = []
+        for section_name, payload in draft_payloads.items():
             items = payload.get("missing_evidence")
             if not isinstance(items, list):
                 continue
@@ -775,7 +810,28 @@ def create_app() -> FastAPI:
                             "affected_sections": [section_name],
                         }
                     )
+        return missing_evidence
 
+    def extract_draft_paragraphs(draft_payload: dict[str, object]) -> list[dict[str, object]]:
+        paragraphs = draft_payload.get("paragraphs")
+        if not isinstance(paragraphs, list):
+            return []
+        return [paragraph for paragraph in paragraphs if isinstance(paragraph, dict)]
+
+    def collect_unresolved_coverage_items(coverage_payload: dict[str, object]) -> list[dict[str, object]]:
+        unresolved: list[dict[str, object]] = []
+        coverage_items = coverage_payload.get("items")
+        if not isinstance(coverage_items, list):
+            return unresolved
+        for item in coverage_items:
+            if not isinstance(item, dict):
+                continue
+            status = str(item.get("status") or "").strip().lower()
+            if status in {"partial", "missing"}:
+                unresolved.append(item)
+        return unresolved
+
+    def build_source_selection(project_id: str, selected_batch_id: str | None) -> dict[str, object]:
         source_selection: dict[str, object] = {
             "selected_document_id": None,
             "selected_file_name": None,
@@ -785,6 +841,127 @@ def create_app() -> FastAPI:
         requirement_chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
         if requirement_chunks:
             _, source_selection = select_primary_rfp_document(select_requirement_chunks(requirement_chunks))
+        return source_selection
+
+    def build_run_metadata(request: Request) -> dict[str, object]:
+        return {
+            "model_ids": {
+                "primary": settings.bedrock_model_id,
+                "lite": settings.bedrock_lite_model_id,
+            },
+            "temperatures": {"agent_temperature": settings.agent_temperature},
+            "max_tokens": settings.agent_max_tokens,
+            "retrieval_top_k": settings.retrieval_top_k_default,
+            "chunking": {
+                "chunk_size_chars": settings.chunk_size_chars,
+                "chunk_overlap_chars": settings.chunk_overlap_chars,
+            },
+            "request_ids": [getattr(request.state, "request_id", None)],
+        }
+
+    def build_hackathon_markdown_report(
+        *,
+        project_name: str,
+        documents_payload: list[dict[str, object]],
+        requirements_payload: dict[str, object] | None,
+        coverage_payload: dict[str, object] | None,
+        drafts: dict[str, dict[str, object]],
+    ) -> str:
+        draft_payloads = extract_draft_payloads(drafts)
+        missing_evidence_for_report = collect_missing_evidence(draft_payloads)
+
+        return compose_markdown_report(
+            project_name=project_name,
+            documents=documents_payload,
+            requirements=requirements_payload,
+            drafts=draft_payloads,
+            coverage=coverage_payload,
+            missing_evidence=missing_evidence_for_report,
+            validations={},
+        )
+
+    def write_hackathon_report(project_id: str, markdown_report: str, request: Request) -> Path:
+        report_path = Path("docs/exports") / project_id / "report.md"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(markdown_report, encoding="utf-8")
+
+        logger.info(
+            "export_report_written",
+            extra={
+                "event": "export_report_written",
+                "request_id": getattr(request.state, "request_id", None),
+                "project_id": project_id,
+                "path": str(report_path),
+            },
+        )
+        return report_path
+
+    def persist_export_bundle_markdown_files(
+        project_id: str,
+        export_bundle: dict[str, object],
+        request: Request,
+    ) -> list[dict[str, str]]:
+        markdown_files = extract_markdown_files(export_bundle)
+        try:
+            written_files = write_markdown_export_files(project_id, markdown_files)
+            logger.info(
+                "export_files_written",
+                extra={
+                    "event": "export_files_written",
+                    "request_id": getattr(request.state, "request_id", None),
+                    "project_id": project_id,
+                    "files_written": len(written_files),
+                },
+            )
+            if markdown_files and not written_files:
+                append_export_warning(
+                    export_bundle,
+                    "Markdown bundle existed but no files were written to disk.",
+                )
+        except OSError as exc:
+            append_export_warning(
+                export_bundle,
+                f"Automatic markdown file write failed: {exc}",
+            )
+        return markdown_files
+
+    def assemble_export_bundle_for_project(
+        *,
+        request: Request,
+        project_id: str,
+        project: dict[str, object],
+        selected_batch_id: str | None,
+        requested_sections: list[str],
+        profile: str,
+        include_debug: bool,
+        output_filename_base: str | None,
+        use_agent: bool,
+    ) -> dict[str, object]:
+        context: ExportContext = collect_export_context(
+            project_id=project_id,
+            selected_batch_id=selected_batch_id,
+            requested_sections=requested_sections,
+        )
+        drafts = context["drafts"]
+        requirements_payload = context["requirements_payload"]
+        coverage_payload = context["coverage_payload"]
+        documents_payload = context["documents_payload"]
+        artifacts_used = context["artifacts_used"]
+        artifact_timestamps = context["artifact_timestamps"]
+
+        project_updated_at = project.get("created_at")
+        if artifact_timestamps:
+            project_updated_at = max([str(project.get("created_at", "")), *artifact_timestamps])
+
+        validations: dict[str, object] = {
+            "requirements": {"present": requirements_payload is not None},
+            "drafts": {"sections": len(drafts)},
+            "coverage": {"present": coverage_payload is not None},
+        }
+
+        draft_payloads = extract_draft_payloads(drafts)
+        missing_evidence = collect_missing_evidence(draft_payloads)
+        source_selection = build_source_selection(project_id, selected_batch_id)
 
         export_input = {
             "project": {
@@ -808,20 +985,7 @@ def create_app() -> FastAPI:
             "validations": validations,
             "missing_evidence": missing_evidence,
             "source_selection": source_selection,
-            "run_metadata": {
-                "model_ids": {
-                    "primary": settings.bedrock_model_id,
-                    "lite": settings.bedrock_lite_model_id,
-                },
-                "temperatures": {"agent_temperature": settings.agent_temperature},
-                "max_tokens": settings.agent_max_tokens,
-                "retrieval_top_k": settings.retrieval_top_k_default,
-                "chunking": {
-                    "chunk_size_chars": settings.chunk_size_chars,
-                    "chunk_overlap_chars": settings.chunk_overlap_chars,
-                },
-                "request_ids": [getattr(request.state, "request_id", None)],
-            },
+            "run_metadata": build_run_metadata(request),
             "artifacts_used": artifacts_used,
         }
 
@@ -850,28 +1014,7 @@ def create_app() -> FastAPI:
                         f"Fell back to deterministic export: final-stage agent unavailable ({exc}).",
                     )
 
-        markdown_files = extract_markdown_files(export_bundle)
-        try:
-            written_files = write_markdown_export_files(project_id, markdown_files)
-            logger.info(
-                "export_files_written",
-                extra={
-                    "event": "export_files_written",
-                    "request_id": getattr(request.state, "request_id", None),
-                    "project_id": project_id,
-                    "files_written": len(written_files),
-                },
-            )
-            if markdown_files and not written_files:
-                append_export_warning(
-                    export_bundle,
-                    "Markdown bundle existed but no files were written to disk.",
-                )
-        except OSError as exc:
-            append_export_warning(
-                export_bundle,
-                f"Automatic markdown file write failed: {exc}",
-            )
+        persist_export_bundle_markdown_files(project_id, export_bundle, request)
 
         return export_bundle
 
@@ -893,9 +1036,7 @@ def create_app() -> FastAPI:
 
     @app.post("/projects/{project_id}/upload")
     async def upload_documents(project_id: str, files: list[UploadFile] = File(...)) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
+        require_project(project_id)
 
         if len(files) > settings.max_upload_files:
             raise HTTPException(
@@ -1002,10 +1143,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="all", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1026,11 +1164,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1049,11 +1183,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1078,11 +1208,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1120,11 +1246,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1138,11 +1260,7 @@ def create_app() -> FastAPI:
             "upload_batch_id": selected_batch_id,
             "section_key": section_key,
             "draft": latest["payload"],
-            "artifact": {
-                "id": latest["id"],
-                "source": latest["source"],
-                "created_at": latest["created_at"],
-            },
+            "artifact": serialize_artifact_reference(latest),
         }
 
     @app.post("/projects/{project_id}/coverage")
@@ -1152,11 +1270,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1203,11 +1317,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1220,11 +1330,7 @@ def create_app() -> FastAPI:
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
             "coverage": latest["payload"],
-            "artifact": {
-                "id": latest["id"],
-                "source": latest["source"],
-                "created_at": latest["created_at"],
-            },
+            "artifact": serialize_artifact_reference(latest),
         }
 
     @app.post("/projects/{project_id}/generate-full-draft")
@@ -1237,11 +1343,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        project, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1257,7 +1359,7 @@ def create_app() -> FastAPI:
 
         section_runs: list[dict[str, object]] = []
         combined_paragraphs: list[dict[str, object]] = []
-        combined_missing_evidence: list[dict[str, object]] = []
+        draft_payloads_by_section: dict[str, dict[str, object]] = {}
 
         for target in section_targets:
             section_key = str(target["section_key"])
@@ -1275,6 +1377,7 @@ def create_app() -> FastAPI:
                 context_brief=context_brief,
             )
             draft_payload = draft_result["draft"]
+            draft_payloads_by_section[section_key] = draft_payload
 
             artifact_meta = create_draft_artifact(
                 project_id=project_id,
@@ -1289,21 +1392,7 @@ def create_app() -> FastAPI:
                 draft_payload=draft_payload,
             )
 
-            paragraphs = draft_payload.get("paragraphs")
-            if isinstance(paragraphs, list):
-                for paragraph in paragraphs:
-                    if isinstance(paragraph, dict):
-                        combined_paragraphs.append(paragraph)
-            missing_items = draft_payload.get("missing_evidence")
-            if isinstance(missing_items, list):
-                for item in missing_items:
-                    if isinstance(item, dict):
-                        combined_missing_evidence.append(
-                            {
-                                **item,
-                                "affected_sections": [section_key],
-                            }
-                        )
+            combined_paragraphs.extend(extract_draft_paragraphs(draft_payload))
 
             section_runs.append(
                 {
@@ -1324,6 +1413,7 @@ def create_app() -> FastAPI:
                 }
             )
 
+        combined_missing_evidence = collect_missing_evidence(draft_payloads_by_section)
         combined_draft_payload = {
             "section_key": "Draft Application",
             "paragraphs": combined_paragraphs,
@@ -1353,15 +1443,7 @@ def create_app() -> FastAPI:
             use_agent=False,
         )
 
-        unresolved: list[dict[str, object]] = []
-        coverage_items = final_coverage_payload.get("items")
-        if isinstance(coverage_items, list):
-            for item in coverage_items:
-                if not isinstance(item, dict):
-                    continue
-                status = str(item.get("status") or "").strip().lower()
-                if status in {"partial", "missing"}:
-                    unresolved.append(item)
+        unresolved = collect_unresolved_coverage_items(final_coverage_payload)
 
         return {
             "project_id": project_id,
@@ -1402,101 +1484,35 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ):
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-        requested_format = format
-
-        selected_batch_id = resolve_upload_batch_scope(
+        project, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
         )
-
-        requirements_artifact = get_latest_requirements_artifact(project_id, upload_batch_id=selected_batch_id)
-        draft_artifacts = list_latest_draft_artifacts(project_id, upload_batch_id=selected_batch_id)
-        coverage_artifact = get_latest_coverage_artifact(project_id, upload_batch_id=selected_batch_id)
-        documents = list_documents(project_id, upload_batch_id=selected_batch_id)
+        requested_format = format
 
         requested_sections = parse_requested_sections(sections, section_key)
-        drafts: dict[str, dict[str, object]] = {}
-        artifacts_used: list[dict[str, object]] = []
-        artifact_timestamps: list[str] = []
-
-        for artifact in draft_artifacts:
-            this_section = str(artifact.get("section_key", "")).strip()
-            if requested_sections and this_section not in requested_sections:
-                continue
-            drafts[this_section] = {
-                "draft": artifact["payload"],
-                "artifact": {
-                    "id": artifact["id"],
-                    "source": artifact["source"],
-                    "updated_at": artifact["created_at"],
-                },
-            }
-            artifacts_used.append(
-                {
-                    "type": "draft",
-                    "id": artifact["id"],
-                    "updated_at": artifact["created_at"],
-                }
-            )
-            artifact_timestamps.append(str(artifact["created_at"]))
-
-        requirements_payload = requirements_artifact["payload"] if requirements_artifact else None
-        coverage_payload = coverage_artifact["payload"] if coverage_artifact else None
-        documents_payload = build_export_documents(project_id, documents, upload_batch_id=selected_batch_id)
-
-        if requirements_artifact:
-            artifacts_used.append(
-                {
-                    "type": "requirements",
-                    "id": requirements_artifact["id"],
-                    "updated_at": requirements_artifact["created_at"],
-                }
-            )
-            artifact_timestamps.append(str(requirements_artifact["created_at"]))
-        if coverage_artifact:
-            artifacts_used.append(
-                {
-                    "type": "coverage",
-                    "id": coverage_artifact["id"],
-                    "updated_at": coverage_artifact["created_at"],
-                }
-            )
-            artifact_timestamps.append(str(coverage_artifact["created_at"]))
 
         if requested_format == "markdown" and profile == "hackathon":
-            draft_payloads: dict[str, dict[str, object]] = {}
-            for section_name, entry in drafts.items():
-                payload = entry.get("draft")
-                if isinstance(payload, dict):
-                    draft_payloads[section_name] = payload
-
-            missing_evidence_for_report: list[dict[str, object]] = []
-            for section_name, draft_payload in draft_payloads.items():
-                section_missing = draft_payload.get("missing_evidence")
-                if not isinstance(section_missing, list):
-                    continue
-                for item in section_missing:
-                    if isinstance(item, dict):
-                        missing_evidence_for_report.append(
-                            {
-                                **item,
-                                "affected_sections": [section_name],
-                            }
-                        )
+            context: ExportContext = collect_export_context(
+                project_id=project_id,
+                selected_batch_id=selected_batch_id,
+                requested_sections=requested_sections,
+            )
+            drafts = context["drafts"]
+            requirements_payload = context["requirements_payload"]
+            coverage_payload = context["coverage_payload"]
+            documents_payload = context["documents_payload"]
+            requirements_dict = requirements_payload if isinstance(requirements_payload, dict) else None
+            coverage_dict = coverage_payload if isinstance(coverage_payload, dict) else None
 
             try:
-                markdown_report = compose_markdown_report(
+                markdown_report = build_hackathon_markdown_report(
                     project_name=str(project.get("name") or ""),
-                    documents=documents_payload,
-                    requirements=requirements_payload if isinstance(requirements_payload, dict) else None,
-                    drafts=draft_payloads,
-                    coverage=coverage_payload if isinstance(coverage_payload, dict) else None,
-                    missing_evidence=missing_evidence_for_report,
-                    validations={},
+                    documents_payload=documents_payload,
+                    requirements_payload=requirements_dict,
+                    coverage_payload=coverage_dict,
+                    drafts=drafts,
                 )
             except ExportCompositionError as exc:
                 raise HTTPException(
@@ -1507,19 +1523,7 @@ def create_app() -> FastAPI:
                     },
                 ) from exc
 
-            report_path = Path("docs/exports") / project_id / "report.md"
-            report_path.parent.mkdir(parents=True, exist_ok=True)
-            report_path.write_text(markdown_report, encoding="utf-8")
-
-            logger.info(
-                "export_report_written",
-                extra={
-                    "event": "export_report_written",
-                    "request_id": getattr(request.state, "request_id", None),
-                    "project_id": project_id,
-                    "path": str(report_path),
-                },
-            )
+            report_path = write_hackathon_report(project_id, markdown_report, request)
 
             return PlainTextResponse(
                 markdown_report,
@@ -1551,11 +1555,7 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
-        project = get_project(project_id)
-        if project is None:
-            raise HTTPException(status_code=404, detail="Project not found")
-
-        selected_batch_id = resolve_upload_batch_scope(
+        _, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
@@ -1568,11 +1568,7 @@ def create_app() -> FastAPI:
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
             "requirements": latest["payload"],
-            "artifact": {
-                "id": latest["id"],
-                "source": latest["source"],
-                "created_at": latest["created_at"],
-            },
+            "artifact": serialize_artifact_reference(latest),
         }
 
     return app
