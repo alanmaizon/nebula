@@ -17,11 +17,8 @@ It turns source documents into cited draft sections, requirement coverage, and e
 - Models: Amazon Nova via Bedrock
 
 ## Quick Start
-1. Copy env files:
-```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env.local
-```
+1. Make sure environmental variables are imported
+
 2. Run with Docker:
 ```bash
 docker compose up --build
