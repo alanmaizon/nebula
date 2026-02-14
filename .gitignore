@@ -34,3 +34,7 @@ test-results/
 output/playwright/
 *.trace
 *.har
+
+# Ignore folder
+
+ignore/
