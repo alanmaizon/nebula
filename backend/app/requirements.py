@@ -23,6 +23,7 @@ class RequirementQuestion(BaseModel):
     id: str = Field(..., min_length=1)
     prompt: str = Field(..., min_length=1)
     limit: QuestionLimit = Field(default_factory=QuestionLimit)
+    provenance: str | None = None
 
 
 class RequirementsArtifact(BaseModel):
@@ -303,25 +304,298 @@ def _extract_question_limit(text: str) -> QuestionLimit:
     return QuestionLimit(type="none")
 
 
-def _extract_questions(lines: list[str]) -> list[dict[str, object]]:
-    pattern = re.compile(
-        r"^(?:q(?:uestion)?\s*(\d+)\s*[:\).-]?\s*|(\d+)[\).:]\s+)(.+)$",
+_QUESTION_PASS_PRIORITY: dict[str, int] = {
+    "explicit_tag": 4,
+    "structured_outline": 3,
+    "inline_indicator": 2,
+    "fallback_question": 1,
+}
+
+_QUESTION_VERB_PREFIXES = (
+    "describe",
+    "explain",
+    "provide",
+    "include",
+    "outline",
+    "identify",
+    "summarize",
+    "detail",
+    "demonstrate",
+    "list",
+    "submit",
+    "attach",
+    "address",
+)
+
+_HEADING_NOISE_PREFIXES = (
+    "funding opportunity",
+    "program overview",
+    "required narrative questions",
+    "submission requirements",
+    "evaluation criteria",
+    "rubric",
+    "eligibility",
+    "disallowed costs",
+    "required attachments",
+)
+
+
+def _clean_candidate_prompt(text: str) -> str:
+    cleaned = " ".join(text.strip(" -*\t").split())
+    if not cleaned:
+        return ""
+
+    cleaned = re.sub(r"^(?:q(?:uestion)?\s*\d+\s*[:\).-]?\s*)", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"^(?:\d+(?:\.\d+){0,4}|[A-Z]\.\d+(?:\.\d+){0,4}|[IVXLCDM]{1,6})\s*(?:[)\.:\-])?\s+",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(
+        r"^(?:req(?:uirement)?)[\s\-_]*[A-Za-z]?\d+(?:\.\d+)*\s*[:\-]\s*",
+        "",
+        cleaned,
         flags=re.IGNORECASE,
     )
-    questions: list[dict[str, object]] = []
-    for line in lines:
+    return " ".join(cleaned.split()).strip(" -\t")
+
+
+def _looks_like_requirement_prompt(text: str) -> bool:
+    cleaned = _clean_candidate_prompt(text)
+    if not cleaned or len(cleaned) < 10:
+        return False
+    if cleaned.endswith(":"):
+        return False
+
+    lowered = cleaned.lower()
+    if any(lowered.startswith(prefix) for prefix in _HEADING_NOISE_PREFIXES):
+        return False
+
+    words = re.findall(r"[a-zA-Z]{2,}", cleaned)
+    if len(words) < 3:
+        return False
+
+    if _extract_question_limit(cleaned).type != "none":
+        return True
+
+    if cleaned.endswith("?"):
+        return True
+
+    if any(lowered.startswith(prefix) for prefix in _QUESTION_VERB_PREFIXES):
+        return True
+
+    if re.search(
+        r"\b(must|shall|required|required to|is required to|are required to|please)\b",
+        lowered,
+    ):
+        return True
+
+    return False
+
+
+def _build_question_candidate(
+    *,
+    raw_prompt: str,
+    provenance: str,
+    line_index: int,
+) -> dict[str, object] | None:
+    prompt = _clean_candidate_prompt(raw_prompt)
+    if not _looks_like_requirement_prompt(prompt):
+        return None
+    return {
+        "prompt": prompt,
+        "limit": _extract_question_limit(prompt).model_dump(),
+        "provenance": provenance,
+        "line_index": line_index,
+    }
+
+
+def _extract_explicit_tag_candidates(lines: list[str]) -> list[dict[str, object]]:
+    pattern = re.compile(
+        r"^(?:req(?:uirement)?)[\s\-_]*([A-Za-z]?\d+(?:\.\d+)*)\s*[:\-]\s+(.+)$",
+        flags=re.IGNORECASE,
+    )
+    results: list[dict[str, object]] = []
+    for line_index, line in enumerate(lines):
         match = pattern.match(line.strip(" -*\t"))
         if not match:
             continue
-        number = match.group(1) or match.group(2) or str(len(questions) + 1)
-        prompt = match.group(3).strip()
-        questions.append(
-            {
-                "id": f"Q{number}",
-                "prompt": prompt,
-                "limit": _extract_question_limit(prompt).model_dump(),
-            }
+        candidate = _build_question_candidate(
+            raw_prompt=match.group(2),
+            provenance="explicit_tag",
+            line_index=line_index,
         )
+        if candidate is not None:
+            results.append(candidate)
+    return results
+
+
+def _extract_structured_outline_candidates(lines: list[str]) -> list[dict[str, object]]:
+    pattern = re.compile(
+        r"^((?:\d+(?:\.\d+){1,4}|[A-Z]\.\d+(?:\.\d+){0,4}|[IVXLCDM]{1,6}))\s*(?:[)\.:\-])?\s+(.+)$",
+        flags=re.IGNORECASE,
+    )
+    results: list[dict[str, object]] = []
+    for line_index, line in enumerate(lines):
+        match = pattern.match(line.strip(" -*\t"))
+        if not match:
+            continue
+
+        marker = match.group(1)
+        marker_upper = marker.upper()
+        is_numeric_outline = "." in marker and marker[0].isdigit()
+        is_letter_outline = bool(re.match(r"^[A-Z]\.\d+", marker_upper))
+        is_roman_outline = bool(re.fullmatch(r"[IVXLCDM]{1,6}", marker_upper))
+        if not (is_numeric_outline or is_letter_outline or is_roman_outline):
+            continue
+
+        candidate = _build_question_candidate(
+            raw_prompt=match.group(2),
+            provenance="structured_outline",
+            line_index=line_index,
+        )
+        if candidate is not None:
+            results.append(candidate)
+    return results
+
+
+def _extract_inline_requirement_candidates(lines: list[str]) -> list[dict[str, object]]:
+    results: list[dict[str, object]] = []
+    for line_index, line in enumerate(lines):
+        stripped = line.strip(" -*\t")
+        if not stripped:
+            continue
+
+        matched_prompt: str | None = None
+
+        subject_pattern = re.search(
+            r"\b(?:applicants?|organizations?|proposals?|responses?|grantees?)\b.+\b(?:must|shall|required)\b[:\s\-]*(.+)$",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if subject_pattern:
+            matched_prompt = subject_pattern.group(1)
+
+        if matched_prompt is None:
+            requirement_pattern = re.search(
+                r"\b(?:must|shall|required to|is required to|are required to)\b[:\s\-]*(.+)$",
+                stripped,
+                flags=re.IGNORECASE,
+            )
+            if requirement_pattern:
+                matched_prompt = requirement_pattern.group(1)
+
+        if matched_prompt is None and ":" in stripped:
+            heading, _, tail = stripped.partition(":")
+            heading_lower = heading.lower()
+            if any(
+                token in heading_lower
+                for token in ("requirement", "narrative", "prompt", "response")
+            ):
+                matched_prompt = tail
+
+        if matched_prompt is None and _extract_question_limit(stripped).type != "none":
+            matched_prompt = stripped
+
+        if matched_prompt is None:
+            continue
+
+        candidate = _build_question_candidate(
+            raw_prompt=matched_prompt,
+            provenance="inline_indicator",
+            line_index=line_index,
+        )
+        if candidate is not None:
+            results.append(candidate)
+    return results
+
+
+def _extract_fallback_question_candidates(lines: list[str]) -> list[dict[str, object]]:
+    question_pattern = re.compile(
+        r"^(?:q(?:uestion)?\s*(\d+)\s*[:\).-]?\s*|(\d+)[\).:]\s+)(.+)$",
+        flags=re.IGNORECASE,
+    )
+    results: list[dict[str, object]] = []
+    for line_index, line in enumerate(lines):
+        stripped = line.strip(" -*\t")
+        if not stripped:
+            continue
+
+        prompt_text: str | None = None
+        question_match = question_pattern.match(stripped)
+        if question_match:
+            prompt_text = question_match.group(3)
+        elif stripped.endswith("?") and _looks_like_requirement_prompt(stripped):
+            prompt_text = stripped
+
+        if prompt_text is None:
+            continue
+
+        candidate = _build_question_candidate(
+            raw_prompt=prompt_text,
+            provenance="fallback_question",
+            line_index=line_index,
+        )
+        if candidate is not None:
+            results.append(candidate)
+    return results
+
+
+def _candidate_score(candidate: dict[str, object]) -> int:
+    prompt = str(candidate.get("prompt") or "")
+    provenance = str(candidate.get("provenance") or "")
+    priority = _QUESTION_PASS_PRIORITY.get(provenance, 0)
+    return (priority * 1000) + _question_prompt_rank(prompt)
+
+
+def _extract_questions(lines: list[str]) -> list[dict[str, object]]:
+    ordered_candidates: list[dict[str, object]] = []
+    ordered_candidates.extend(_extract_explicit_tag_candidates(lines))
+    ordered_candidates.extend(_extract_structured_outline_candidates(lines))
+    ordered_candidates.extend(_extract_inline_requirement_candidates(lines))
+    ordered_candidates.extend(_extract_fallback_question_candidates(lines))
+
+    selected: list[dict[str, object]] = []
+    seen_prompt_keys: set[str] = set()
+    base_question_index: dict[str, int] = {}
+    for candidate in ordered_candidates:
+        prompt = str(candidate.get("prompt", "")).strip()
+        if not prompt:
+            continue
+        prompt_key = _normalize_question_key(prompt)
+        if prompt_key in seen_prompt_keys:
+            continue
+
+        base_key = _normalize_question_base_key(prompt)
+        score = _candidate_score(candidate)
+        if base_key and base_key in base_question_index:
+            existing_index = base_question_index[base_key]
+            existing = selected[existing_index]
+            existing_prompt_key = _normalize_question_key(str(existing.get("prompt", "")))
+            existing_score = _candidate_score(existing)
+            if score > existing_score:
+                if existing_prompt_key:
+                    seen_prompt_keys.discard(existing_prompt_key)
+                selected[existing_index] = candidate
+                seen_prompt_keys.add(prompt_key)
+            continue
+
+        selected.append(candidate)
+        seen_prompt_keys.add(prompt_key)
+        if base_key:
+            base_question_index[base_key] = len(selected) - 1
+
+    questions: list[dict[str, object]] = []
+    for index, candidate in enumerate(selected, start=1):
+        question = {
+            "id": f"Q{index}",
+            "prompt": str(candidate.get("prompt", "")),
+            "limit": candidate.get("limit", QuestionLimit(type="none").model_dump()),
+        }
+        provenance = str(candidate.get("provenance") or "").strip()
+        if provenance:
+            question["provenance"] = provenance
+        questions.append(question)
     return questions
 
 
@@ -452,7 +726,16 @@ def merge_requirements_payload(
             limit = question.get("limit", {"type": "none", "value": None})
             if not isinstance(limit, dict):
                 limit = {"type": "none", "value": None}
+            provenance = question.get("provenance")
+            provenance_value: str | None = None
+            if isinstance(provenance, str):
+                cleaned_provenance = provenance.strip()
+                if cleaned_provenance:
+                    provenance_value = cleaned_provenance
+
             candidate = {"id": question_id, "prompt": prompt, "limit": limit}
+            if provenance_value is not None:
+                candidate["provenance"] = provenance_value
 
             base_key = _normalize_question_base_key(prompt)
             if base_key and base_key in base_question_index:
@@ -519,11 +802,18 @@ def repair_requirements_payload(payload: dict[str, object]) -> dict[str, object]
             limit = {"type": limit, "value": None}
         if not isinstance(limit, dict):
             limit = {"type": "none", "value": None}
+        provenance = question.get("provenance")
+        normalized_provenance: str | None = None
+        if isinstance(provenance, str):
+            stripped_provenance = provenance.strip()
+            if stripped_provenance:
+                normalized_provenance = stripped_provenance
         repaired_questions.append(
             {
                 "id": identifier,
                 "prompt": prompt,
                 "limit": limit,
+                **({"provenance": normalized_provenance} if normalized_provenance is not None else {}),
             }
         )
 

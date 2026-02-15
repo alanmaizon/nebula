@@ -242,3 +242,69 @@ def test_merge_requirements_filters_non_cost_noise_from_disallowed() -> None:
     assert "Required Narrative Questions" not in merged["disallowed_costs"]
     assert "Describe how services continue after grant period." not in merged["disallowed_costs"]
     assert "ters" not in merged["disallowed_costs"]
+
+
+def test_extract_questions_pass_explicit_tags_preserves_provenance() -> None:
+    rfp_text = """
+REQ-101: Describe the target population and unmet need. (max 300 words)
+REQUIREMENT-202: Provide an implementation timeline by quarter. (max 500 words)
+"""
+
+    payload = extract_requirements_payload([{"text": rfp_text}])
+
+    prompts = [item["prompt"] for item in payload["questions"]]
+    assert "Describe the target population and unmet need. (max 300 words)" in prompts
+    assert "Provide an implementation timeline by quarter. (max 500 words)" in prompts
+
+    provenance_by_prompt = {
+        item["prompt"]: item.get("provenance")
+        for item in payload["questions"]
+    }
+    assert provenance_by_prompt["Describe the target population and unmet need. (max 300 words)"] == "explicit_tag"
+    assert provenance_by_prompt["Provide an implementation timeline by quarter. (max 500 words)"] == "explicit_tag"
+
+
+def test_extract_questions_pass_structured_outlines_preserves_provenance() -> None:
+    rfp_text = """
+1.2.3 Describe the local housing instability trend over the past 3 years.
+A.1 Provide staffing plan and implementation ownership.
+III. Explain risk mitigation for delivery delays.
+"""
+
+    payload = extract_requirements_payload([{"text": rfp_text}])
+    provenance_by_prompt = {item["prompt"]: item.get("provenance") for item in payload["questions"]}
+
+    assert provenance_by_prompt["Describe the local housing instability trend over the past 3 years."] == (
+        "structured_outline"
+    )
+    assert provenance_by_prompt["Provide staffing plan and implementation ownership."] == "structured_outline"
+    assert provenance_by_prompt["Explain risk mitigation for delivery delays."] == "structured_outline"
+
+
+def test_extract_questions_pass_inline_indicators_preserves_provenance() -> None:
+    rfp_text = """
+Applicants must provide an evidence-backed staffing plan (max 250 words).
+Narrative Requirement: Explain how outcomes will be measured across quarters.
+"""
+
+    payload = extract_requirements_payload([{"text": rfp_text}])
+    prompts = [item["prompt"] for item in payload["questions"]]
+    assert "provide an evidence-backed staffing plan (max 250 words)." in prompts
+    assert "Explain how outcomes will be measured across quarters." in prompts
+
+    provenance_by_prompt = {item["prompt"]: item.get("provenance") for item in payload["questions"]}
+    assert provenance_by_prompt["provide an evidence-backed staffing plan (max 250 words)."] == "inline_indicator"
+    assert provenance_by_prompt["Explain how outcomes will be measured across quarters."] == "inline_indicator"
+
+
+def test_extract_questions_pass_fallback_question_preserves_provenance() -> None:
+    rfp_text = """
+Question 1: Describe the need statement for your service area.
+Question 2: Provide two measurable annual outcomes.
+"""
+
+    payload = extract_requirements_payload([{"text": rfp_text}])
+    provenance_by_prompt = {item["prompt"]: item.get("provenance") for item in payload["questions"]}
+
+    assert provenance_by_prompt["Describe the need statement for your service area."] == "fallback_question"
+    assert provenance_by_prompt["Provide two measurable annual outcomes."] == "fallback_question"
