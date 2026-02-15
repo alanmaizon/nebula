@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from functools import lru_cache
 import logging
 import os
 from pathlib import Path
@@ -92,8 +93,13 @@ class ExportContext(TypedDict):
     artifact_timestamps: list[str]
 
 
-def get_nova_orchestrator() -> BedrockNovaOrchestrator:
+@lru_cache(maxsize=1)
+def _cached_nova_orchestrator() -> BedrockNovaOrchestrator:
     return BedrockNovaOrchestrator(settings=settings)
+
+
+def get_nova_orchestrator() -> BedrockNovaOrchestrator:
+    return _cached_nova_orchestrator()
 
 
 @asynccontextmanager
@@ -444,8 +450,10 @@ def create_app() -> FastAPI:
         *,
         project_id: str,
         selected_batch_id: str | None,
+        chunks_override: list[dict[str, object]] | None = None,
+        orchestrator: BedrockNovaOrchestrator | None = None,
     ) -> dict[str, object]:
-        chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
+        chunks = chunks_override if chunks_override is not None else list_chunks(project_id, upload_batch_id=selected_batch_id)
         if not chunks:
             raise HTTPException(
                 status_code=400,
@@ -459,8 +467,9 @@ def create_app() -> FastAPI:
         extraction_mode = "deterministic-only"
         nova_error: str | None = None
         nova_question_count = 0
+        runner = orchestrator or get_nova_orchestrator()
         try:
-            nova_payload = get_nova_orchestrator().extract_requirements(requirement_chunks)
+            nova_payload = runner.extract_requirements(requirement_chunks)
             nova_question_count = len(nova_payload.get("questions", [])) if isinstance(nova_payload, dict) else 0
             if isinstance(nova_payload, dict):
                 extracted_payload = merge_requirements_payload(deterministic_payload, nova_payload)
@@ -507,9 +516,11 @@ def create_app() -> FastAPI:
         *,
         requirements_payload: dict[str, object],
         draft_payload: dict[str, object],
+        orchestrator: BedrockNovaOrchestrator | None = None,
     ) -> tuple[dict[str, object], bool, list[str]]:
+        runner = orchestrator or get_nova_orchestrator()
         try:
-            coverage_payload = get_nova_orchestrator().compute_coverage(
+            coverage_payload = runner.compute_coverage(
                 requirements=requirements_payload,
                 draft=draft_payload,
             )
@@ -543,8 +554,12 @@ def create_app() -> FastAPI:
         max_revision_rounds: int,
         force_retry: bool,
         context_brief: str | None = None,
+        chunks_override: list[dict[str, object]] | None = None,
+        ranked_cache: dict[tuple[str, int], tuple[list[dict[str, object]], list[dict[str, object]]]] | None = None,
+        orchestrator: BedrockNovaOrchestrator | None = None,
     ) -> dict[str, object]:
-        chunks = list_chunks(project_id, upload_batch_id=selected_batch_id)
+        chunks = chunks_override if chunks_override is not None else list_chunks(project_id, upload_batch_id=selected_batch_id)
+        runner = orchestrator or get_nova_orchestrator()
         prompt_context: dict[str, str] | None = None
         if context_brief:
             trimmed = context_brief.strip()
@@ -552,15 +567,22 @@ def create_app() -> FastAPI:
                 prompt_context = {"context_brief": trimmed}
 
         default_top_k = requested_top_k or settings.retrieval_top_k_default
-        ranked_all, ranking_warnings = (
-            rank_chunks_by_query(chunks, query_text, min(20, len(chunks))) if chunks else ([], [])
-        )
+        ranking_cache_key = (query_text.strip().lower(), id(chunks))
+        if chunks:
+            if ranked_cache is not None and ranking_cache_key in ranked_cache:
+                ranked_all, ranking_warnings = ranked_cache[ranking_cache_key]
+            else:
+                ranked_all, ranking_warnings = rank_chunks_by_query(chunks, query_text, min(20, len(chunks)))
+                if ranked_cache is not None:
+                    ranked_cache[ranking_cache_key] = (ranked_all, ranking_warnings)
+        else:
+            ranked_all, ranking_warnings = [], []
 
         top_k = default_top_k
         retry_on_missing = False
         if settings.enable_agentic_orchestration_pilot and ranked_all:
             try:
-                plan = get_nova_orchestrator().plan_section_generation(
+                plan = runner.plan_section_generation(
                     section_key=section_key,
                     requested_top_k=default_top_k,
                     available_chunk_count=len(ranked_all),
@@ -590,7 +612,7 @@ def create_app() -> FastAPI:
             ranked_chunks = ranked_all[:current_top_k] if ranked_all else []
             if ranked_chunks:
                 try:
-                    draft_payload = get_nova_orchestrator().generate_section(
+                    draft_payload = runner.generate_section(
                         section_key,
                         ranked_chunks,
                         prompt_context=prompt_context,
@@ -1410,30 +1432,41 @@ def create_app() -> FastAPI:
         document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
+        total_started = time.perf_counter()
         project, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
         )
+        runner = get_nova_orchestrator()
 
+        extraction_started = time.perf_counter()
         extraction_result = run_requirements_extraction_for_batch(
             project_id=project_id,
             selected_batch_id=selected_batch_id,
+            orchestrator=runner,
         )
+        extraction_ms = round((time.perf_counter() - extraction_started) * 1000, 2)
         requirements_payload = extraction_result["requirements"]
         context_brief = payload.context_brief.strip() if payload.context_brief else None
         section_targets = build_section_targets_from_requirements(requirements_payload)
+        indexed_chunks = extraction_result["chunks"]
 
         section_runs: list[dict[str, object]] = []
         combined_paragraphs: list[dict[str, object]] = []
         draft_payloads_by_section: dict[str, dict[str, object]] = {}
         run_warnings: list[dict[str, object]] = []
+        ranked_cache: dict[tuple[str, int], tuple[list[dict[str, object]], list[dict[str, object]]]] = {}
+        drafting_ms_total = 0.0
+        section_coverage_ms_total = 0.0
 
         for target in section_targets:
+            section_started = time.perf_counter()
             section_key = str(target["section_key"])
             prompt = str(target["prompt"])
             requirement_id = str(target["requirement_id"])
 
+            draft_started = time.perf_counter()
             draft_result = generate_validated_section_draft(
                 project_id=project_id,
                 selected_batch_id=selected_batch_id,
@@ -1443,7 +1476,12 @@ def create_app() -> FastAPI:
                 max_revision_rounds=payload.max_revision_rounds,
                 force_retry=True,
                 context_brief=context_brief,
+                chunks_override=indexed_chunks,
+                ranked_cache=ranked_cache,
+                orchestrator=runner,
             )
+            draft_ms = round((time.perf_counter() - draft_started) * 1000, 2)
+            drafting_ms_total += draft_ms
             draft_payload = draft_result["draft"]
             draft_payloads_by_section[section_key] = draft_payload
             section_warnings = draft_result.get("warnings")
@@ -1458,10 +1496,14 @@ def create_app() -> FastAPI:
                 upload_batch_id=selected_batch_id,
             )
 
+            section_coverage_started = time.perf_counter()
             section_coverage, section_repaired, section_validation_errors = compute_validated_coverage_payload(
                 requirements_payload=requirements_payload,
                 draft_payload=draft_payload,
+                orchestrator=runner,
             )
+            section_coverage_ms = round((time.perf_counter() - section_coverage_started) * 1000, 2)
+            section_coverage_ms_total += section_coverage_ms
 
             combined_paragraphs.extend(extract_draft_paragraphs(draft_payload))
 
@@ -1482,6 +1524,11 @@ def create_app() -> FastAPI:
                     "attempts": draft_result["attempts"],
                     "top_k_used": draft_result["top_k_used"],
                     "warnings": draft_result["warnings"],
+                    "timings_ms": {
+                        "draft": draft_ms,
+                        "coverage": section_coverage_ms,
+                        "total": round((time.perf_counter() - section_started) * 1000, 2),
+                    },
                 }
             )
 
@@ -1491,10 +1538,14 @@ def create_app() -> FastAPI:
             "paragraphs": combined_paragraphs,
             "missing_evidence": combined_missing_evidence,
         }
+        coverage_started = time.perf_counter()
         final_coverage_payload, coverage_repaired, coverage_validation_errors = compute_validated_coverage_payload(
             requirements_payload=requirements_payload,
             draft_payload=combined_draft_payload,
+            orchestrator=runner,
         )
+        final_coverage_ms = round((time.perf_counter() - coverage_started) * 1000, 2)
+        coverage_ms_total = round(section_coverage_ms_total + final_coverage_ms, 2)
         coverage_artifact = create_coverage_artifact(
             project_id=project_id,
             payload=final_coverage_payload,
@@ -1503,6 +1554,7 @@ def create_app() -> FastAPI:
         )
 
         requested_sections = [str(target["section_key"]) for target in section_targets]
+        export_started = time.perf_counter()
         export_bundle = assemble_export_bundle_for_project(
             request=request,
             project_id=project_id,
@@ -1514,6 +1566,8 @@ def create_app() -> FastAPI:
             output_filename_base=None,
             use_agent=False,
         )
+        export_ms = round((time.perf_counter() - export_started) * 1000, 2)
+        total_ms = round((time.perf_counter() - total_started) * 1000, 2)
 
         unresolved = collect_unresolved_coverage_items(final_coverage_payload)
         deduped_run_warnings: list[dict[str, object]] = []
@@ -1547,6 +1601,13 @@ def create_app() -> FastAPI:
                 "sections_completed": len(section_runs),
                 "max_revision_rounds": payload.max_revision_rounds,
                 "unresolved_count": len(unresolved),
+                "timings_ms": {
+                    "extraction": extraction_ms,
+                    "drafting": round(drafting_ms_total, 2),
+                    "coverage": coverage_ms_total,
+                    "export": export_ms,
+                    "total": total_ms,
+                },
             },
         }
         if deduped_run_warnings:

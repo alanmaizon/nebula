@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
+import time
 from typing import Any
 
 from app.config import Settings
+
+logger = logging.getLogger("nebula.nova")
 
 
 class NovaRuntimeError(RuntimeError):
@@ -155,6 +159,7 @@ class BedrockNovaOrchestrator:
         if not model_id:
             raise NovaRuntimeError("Bedrock model ID is not configured.")
 
+        started = time.perf_counter()
         try:
             response = self._client.converse(
                 modelId=model_id,
@@ -166,6 +171,16 @@ class BedrockNovaOrchestrator:
                 },
             )
         except Exception as exc:  # pragma: no cover - exercised via runtime integration
+            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            logger.warning(
+                "nova_invoke_failed",
+                extra={
+                    "event": "nova_invoke_failed",
+                    "model_id": model_id,
+                    "duration_ms": duration_ms,
+                    "error": str(exc),
+                },
+            )
             raise NovaRuntimeError(f"Bedrock invocation failed for model '{model_id}': {exc}") from exc
 
         text = self._extract_text(response)
@@ -175,6 +190,18 @@ class BedrockNovaOrchestrator:
             raise NovaRuntimeError(f"Nova response parsing failed for model '{model_id}': {exc}") from exc
         if not isinstance(payload, dict):
             raise NovaRuntimeError("Nova response must be a JSON object.")
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        logger.info(
+            "nova_invoke_completed",
+            extra={
+                "event": "nova_invoke_completed",
+                "model_id": model_id,
+                "duration_ms": duration_ms,
+                "system_prompt_chars": len(system_prompt),
+                "user_prompt_chars": len(user_prompt),
+                "response_chars": len(text),
+            },
+        )
         return payload
 
     @staticmethod
@@ -224,15 +251,20 @@ class BedrockNovaOrchestrator:
     ) -> str:
         lines: list[str] = []
         used_chars = 0
+        seen_text: set[str] = set()
         for chunk in chunks[:max_chunks]:
             available = max_total_chars - used_chars
             if available < 80:
                 break
             chunk_limit = min(max_chars_per_chunk, max(40, available - 40))
             text = BedrockNovaOrchestrator._truncate(str(chunk.get("text", "")), chunk_limit)
+            text_key = " ".join(text.lower().split())
+            if text_key in seen_text:
+                continue
             line = f"- doc={chunk.get('file_name')} page={chunk.get('page')} text={text}"
             lines.append(line)
             used_chars += len(line)
+            seen_text.add(text_key)
         return "\n".join(lines)
 
     @staticmethod
@@ -246,6 +278,7 @@ class BedrockNovaOrchestrator:
         lines: list[str] = []
         used_chars = 0
         seen_locations: set[str] = set()
+        seen_text: set[str] = set()
         for chunk in ranked_chunks:
             if len(lines) >= max_chunks:
                 break
@@ -257,6 +290,9 @@ class BedrockNovaOrchestrator:
                 break
             chunk_limit = min(max_chars_per_chunk, max(40, available - 60))
             text = BedrockNovaOrchestrator._truncate(str(chunk.get("text", "")), chunk_limit)
+            text_key = " ".join(text.lower().split())
+            if text_key in seen_text:
+                continue
             line = (
                 f"- doc={chunk.get('file_name')} page={chunk.get('page')} score={chunk.get('score')} "
                 f"text={text}"
@@ -264,6 +300,7 @@ class BedrockNovaOrchestrator:
             lines.append(line)
             used_chars += len(line)
             seen_locations.add(location_key)
+            seen_text.add(text_key)
         return "\n".join(lines)
 
     @staticmethod
