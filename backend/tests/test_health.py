@@ -228,6 +228,50 @@ def test_retrieve_defaults_to_latest_upload_batch(tmp_path: Path) -> None:
         assert all_payload["results"][0]["file_name"] == "old.txt"
 
 
+def test_reindex_defaults_to_latest_upload_batch(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 80
+    settings.chunk_overlap_chars = 20
+    settings.embedding_dim = 64
+    settings.embedding_mode = "hash"
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Reindex Batch Scope"}).json()["id"]
+
+        first_upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("old.txt", b"legacyterm legacyterm legacyterm", "text/plain"))],
+        )
+        assert first_upload.status_code == 200
+
+        second_upload = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("new.txt", b"newterm newterm newterm", "text/plain"))],
+        )
+        assert second_upload.status_code == 200
+        second_batch_id = second_upload.json()["upload_batch_id"]
+
+        reindex = client.post(f"/projects/{project_id}/reindex")
+        assert reindex.status_code == 200
+        payload = reindex.json()
+        assert payload["upload_batch_id"] == second_batch_id
+        assert payload["chunks_deleted"] >= 1
+        assert payload["chunks_indexed"] >= 1
+        assert payload["embedding"]["mode"] == "hash"
+        assert payload["documents"][0]["parse_report"]["embedding_providers"]["hash"] >= 1
+
+        latest_scoped = client.post(
+            f"/projects/{project_id}/retrieve",
+            json={"query": "legacyterm", "top_k": 3},
+        )
+        assert latest_scoped.status_code == 200
+        latest_payload = latest_scoped.json()
+        assert latest_payload["upload_batch_id"] == second_batch_id
+        assert len(latest_payload["results"]) >= 1
+        assert latest_payload["results"][0]["file_name"] == "new.txt"
+
+
 def test_retrieve_handles_embedding_dimension_drift(tmp_path: Path) -> None:
     settings.database_url = f"sqlite:///{tmp_path}/test.db"
     settings.storage_root = str(tmp_path / "uploads")

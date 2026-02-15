@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     bedrock_model_id: str = "us.amazon.nova-pro-v1:0"
     bedrock_lite_model_id: str = "us.amazon.nova-lite-v1:0"
+    bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
+    embedding_mode: str = "hash"
     agent_temperature: float = 0.1
     agent_max_tokens: int = 2048
     enable_agentic_orchestration_pilot: bool = False

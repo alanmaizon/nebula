@@ -56,6 +56,7 @@ def init_db() -> None:
                 page INTEGER NOT NULL,
                 text TEXT NOT NULL,
                 embedding_json TEXT NOT NULL,
+                embedding_provider TEXT,
                 upload_batch_id TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(project_id) REFERENCES projects(id),
@@ -120,6 +121,7 @@ def init_db() -> None:
         )
         _ensure_column(conn, "documents", "upload_batch_id", "TEXT")
         _ensure_column(conn, "chunks", "upload_batch_id", "TEXT")
+        _ensure_column(conn, "chunks", "embedding_provider", "TEXT")
         _ensure_column(conn, "requirements_artifacts", "upload_batch_id", "TEXT")
         _ensure_column(conn, "draft_artifacts", "upload_batch_id", "TEXT")
         _ensure_column(conn, "coverage_artifacts", "upload_batch_id", "TEXT")
@@ -152,6 +154,13 @@ def init_db() -> None:
             UPDATE chunks
             SET upload_batch_id = 'legacy'
             WHERE upload_batch_id IS NULL OR TRIM(upload_batch_id) = ''
+            """
+        )
+        conn.execute(
+            """
+            UPDATE chunks
+            SET embedding_provider = 'hash'
+            WHERE embedding_provider IS NULL OR TRIM(embedding_provider) = ''
             """
         )
 
@@ -307,6 +316,7 @@ def create_chunks(
                 "page": int(chunk["page"]),
                 "text": str(chunk["text"]),
                 "embedding_json": json.dumps(chunk["embedding"]),
+                "embedding_provider": str(chunk.get("embedding_provider") or "hash"),
                 "upload_batch_id": upload_batch_id,
                 "created_at": now,
             }
@@ -319,10 +329,10 @@ def create_chunks(
         conn.executemany(
             """
             INSERT INTO chunks (
-                id, project_id, document_id, chunk_index, page, text, embedding_json, upload_batch_id, created_at
+                id, project_id, document_id, chunk_index, page, text, embedding_json, embedding_provider, upload_batch_id, created_at
             )
             VALUES (
-                :id, :project_id, :document_id, :chunk_index, :page, :text, :embedding_json, :upload_batch_id, :created_at
+                :id, :project_id, :document_id, :chunk_index, :page, :text, :embedding_json, :embedding_provider, :upload_batch_id, :created_at
             )
             """,
             rows,
@@ -341,6 +351,7 @@ def list_chunks(project_id: str, upload_batch_id: str | None = None) -> list[dic
                 c.page,
                 c.text,
                 c.embedding_json,
+                c.embedding_provider,
                 c.upload_batch_id,
                 c.created_at
             FROM chunks c
@@ -361,6 +372,18 @@ def list_chunks(project_id: str, upload_batch_id: str | None = None) -> list[dic
         item["embedding"] = json.loads(item.pop("embedding_json"))
         parsed.append(item)
     return parsed
+
+
+def delete_chunks(project_id: str, upload_batch_id: str | None = None) -> int:
+    with get_conn() as conn:
+        if upload_batch_id is None:
+            cursor = conn.execute("DELETE FROM chunks WHERE project_id = ?", (project_id,))
+        else:
+            cursor = conn.execute(
+                "DELETE FROM chunks WHERE project_id = ? AND upload_batch_id = ?",
+                (project_id, upload_batch_id),
+            )
+    return int(cursor.rowcount if cursor.rowcount is not None else 0)
 
 
 def create_requirements_artifact(

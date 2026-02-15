@@ -31,6 +31,7 @@ from app.db import (
     get_latest_upload_batch_id,
     get_project,
     init_db,
+    delete_chunks,
     list_latest_draft_artifacts,
     list_chunks,
     list_documents,
@@ -55,7 +56,14 @@ from app.nova_runtime import BedrockNovaOrchestrator, NovaRuntimeError
 from app.export_bundle import EXPORT_VERSION, build_export_bundle, combine_markdown_files
 from app.requirements import validate_with_repair as validate_requirements_with_repair
 from app.requirements import extract_requirements_payload, merge_requirements_payload
-from app.retrieval import build_parse_report, chunk_pages, cosine_similarity, embed_text, extract_text_pages
+from app.retrieval import (
+    EmbeddingProviderError,
+    EmbeddingService,
+    build_parse_report,
+    chunk_pages,
+    cosine_similarity,
+    extract_text_pages,
+)
 
 logger = logging.getLogger("nebula.api")
 
@@ -100,6 +108,19 @@ def _cached_nova_orchestrator() -> BedrockNovaOrchestrator:
 
 def get_nova_orchestrator() -> BedrockNovaOrchestrator:
     return _cached_nova_orchestrator()
+
+
+@lru_cache(maxsize=1)
+def _cached_embedding_service() -> EmbeddingService:
+    return EmbeddingService(
+        mode=settings.embedding_mode,
+        aws_region=settings.aws_region,
+        bedrock_model_id=settings.bedrock_embedding_model_id,
+    )
+
+
+def get_embedding_service() -> EmbeddingService:
+    return _cached_embedding_service()
 
 
 @asynccontextmanager
@@ -183,11 +204,33 @@ def create_app() -> FastAPI:
         if top_k < 1 or not chunks:
             return [], []
 
+        warnings: list[dict[str, object]] = []
+
+        def append_warning(code: str, message: str, details: dict[str, object]) -> None:
+            key = (code, message)
+            existing = {
+                (str(item.get("code", "")), str(item.get("message", "")))
+                for item in warnings
+                if isinstance(item, dict)
+            }
+            if key in existing:
+                return
+            warnings.append(
+                {
+                    "code": code,
+                    "message": message,
+                    "details": details,
+                }
+            )
+
         dims: dict[int, int] = {}
+        provider_counts: dict[str, int] = {}
         for chunk in chunks:
             embedding = chunk.get("embedding")
             if isinstance(embedding, list) and embedding:
                 dims[len(embedding)] = dims.get(len(embedding), 0) + 1
+            provider = str(chunk.get("embedding_provider") or "hash").strip().lower() or "hash"
+            provider_counts[provider] = provider_counts.get(provider, 0) + 1
 
         if not dims:
             return [], []
@@ -205,7 +248,52 @@ def create_app() -> FastAPI:
                 },
             )
 
-        query_embedding = embed_text(query, target_dim)
+        embedding_service = get_embedding_service()
+        try:
+            query_embedding_result = embedding_service.embed(query, target_dim)
+        except EmbeddingProviderError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={"message": "Embedding provider failed for retrieval.", "error": str(exc)},
+            ) from exc
+
+        if query_embedding_result.warning is not None:
+            warnings.append(query_embedding_result.warning)
+
+        query_provider = query_embedding_result.provider
+        query_embedding = query_embedding_result.vector
+        query_dim = len(query_embedding)
+        if query_dim != target_dim:
+            append_warning(
+                "embedding_query_dim_mismatch",
+                "Query embedding dimension does not match indexed chunk dimension target.",
+                {
+                    "configured_dim": settings.embedding_dim,
+                    "selected_target_dim": target_dim,
+                    "query_dim": query_dim,
+                },
+            )
+            target_dim = query_dim
+
+        if provider_counts and query_provider not in provider_counts:
+            append_warning(
+                "embedding_mode_drift",
+                "Query embedding provider differs from indexed chunk provider(s). Re-index project documents.",
+                {
+                    "query_provider": query_provider,
+                    "chunk_provider_counts": provider_counts,
+                    "embedding_mode": settings.embedding_mode,
+                },
+            )
+        if len(provider_counts) > 1:
+            append_warning(
+                "mixed_embedding_providers",
+                "Project chunks contain mixed embedding providers. Re-index for consistent retrieval scoring.",
+                {
+                    "chunk_provider_counts": provider_counts,
+                },
+            )
+
         scored_results: list[dict[str, object]] = []
         skipped_chunks = 0
         for chunk in chunks:
@@ -233,20 +321,17 @@ def create_app() -> FastAPI:
                     "total_chunks": len(chunks),
                 },
             )
-        warnings: list[dict[str, object]] = []
         if target_dim != settings.embedding_dim or skipped_chunks > 0:
-            warnings.append(
+            append_warning(
+                "embedding_dim_drift",
+                "Embedding dimension drift detected. Re-index project documents for stable retrieval.",
                 {
-                    "code": "embedding_dim_drift",
-                    "message": "Embedding dimension drift detected. Re-index project documents for stable retrieval.",
-                    "details": {
-                        "configured_dim": settings.embedding_dim,
-                        "target_dim": target_dim,
-                        "available_dims": sorted(dims.keys()),
-                        "skipped_chunks": skipped_chunks,
-                        "total_chunks": len(chunks),
-                    },
-                }
+                    "configured_dim": settings.embedding_dim,
+                    "target_dim": target_dim,
+                    "available_dims": sorted(dims.keys()),
+                    "skipped_chunks": skipped_chunks,
+                    "total_chunks": len(chunks),
+                },
             )
         scored_results.sort(key=lambda item: float(item["score"]), reverse=True)
         return scored_results[:top_k], warnings
@@ -1127,6 +1212,8 @@ def create_app() -> FastAPI:
         upload_batch_id = str(uuid4())
         saved_documents: list[dict[str, object]] = []
         quality_counts: dict[str, int] = {"good": 0, "low": 0, "none": 0}
+        embedding_warnings: list[dict[str, object]] = []
+        embedding_service = get_embedding_service()
         project_folder = Path(settings.storage_root) / project_id
         project_folder.mkdir(parents=True, exist_ok=True)
 
@@ -1171,6 +1258,8 @@ def create_app() -> FastAPI:
                 chunk_size_chars=settings.chunk_size_chars,
                 chunk_overlap_chars=settings.chunk_overlap_chars,
                 embedding_dim=settings.embedding_dim,
+                embedding_service=embedding_service,
+                embedding_warnings=embedding_warnings,
             )
             parse_report = build_parse_report(
                 content=content,
@@ -1193,6 +1282,7 @@ def create_app() -> FastAPI:
                         "page": chunk.page,
                         "text": chunk.text,
                         "embedding": chunk.embedding,
+                        "embedding_provider": chunk.embedding_provider,
                     }
                     for chunk in chunks
                 ],
@@ -1214,6 +1304,10 @@ def create_app() -> FastAPI:
             "parse_report": {
                 "documents_total": len(saved_documents),
                 "quality_counts": quality_counts,
+            },
+            "embedding": {
+                **embedding_service.describe(),
+                "warnings": embedding_warnings,
             },
         }
 
@@ -1255,15 +1349,118 @@ def create_app() -> FastAPI:
 
         top_k = payload.top_k or settings.retrieval_top_k_default
         results, ranking_warnings = rank_chunks_by_query(chunks, payload.query, top_k)
+        embedding_service = get_embedding_service()
         response: dict[str, object] = {
             "project_id": project_id,
             "upload_batch_id": selected_batch_id,
             "query": payload.query,
             "results": results,
+            "embedding": embedding_service.describe(),
         }
         if ranking_warnings:
             response["warnings"] = ranking_warnings
         return response
+
+    @app.post("/projects/{project_id}/reindex")
+    def reindex_project_chunks(
+        project_id: str,
+        document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
+        upload_batch_id: str | None = Query(default=None),
+    ) -> dict[str, object]:
+        _, selected_batch_id = resolve_project_upload_batch(
+            project_id=project_id,
+            document_scope=document_scope,
+            upload_batch_id=upload_batch_id,
+        )
+        documents = list_documents(project_id, upload_batch_id=selected_batch_id)
+        if not documents:
+            raise HTTPException(status_code=404, detail="No documents found for requested re-index scope.")
+
+        deleted_chunks = delete_chunks(project_id, upload_batch_id=selected_batch_id)
+        embedding_service = get_embedding_service()
+        embedding_warnings: list[dict[str, object]] = []
+        quality_counts: dict[str, int] = {"good": 0, "low": 0, "none": 0}
+        reindexed_documents: list[dict[str, object]] = []
+        chunks_indexed_total = 0
+
+        for document in documents:
+            file_name = str(document.get("file_name") or "").strip()
+            content_type = str(document.get("content_type") or "application/octet-stream")
+            storage_path = str(document.get("storage_path") or "").strip()
+            if not storage_path:
+                raise HTTPException(status_code=422, detail=f"Missing storage path for document '{file_name}'.")
+
+            path = Path(storage_path)
+            if not path.exists():
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Stored file for document '{file_name}' was not found at '{storage_path}'.",
+                )
+
+            content = path.read_bytes()
+            pages = extract_text_pages(content=content, content_type=content_type, file_name=file_name)
+            chunks = chunk_pages(
+                pages=pages,
+                chunk_size_chars=settings.chunk_size_chars,
+                chunk_overlap_chars=settings.chunk_overlap_chars,
+                embedding_dim=settings.embedding_dim,
+                embedding_service=embedding_service,
+                embedding_warnings=embedding_warnings,
+            )
+            parse_report = build_parse_report(
+                content=content,
+                content_type=content_type,
+                file_name=file_name,
+                pages=pages,
+                chunks=chunks,
+            )
+            quality = str(parse_report.get("quality", "none"))
+            if quality not in quality_counts:
+                quality = "none"
+            quality_counts[quality] += 1
+
+            document_upload_batch_id = selected_batch_id or str(document.get("upload_batch_id") or "legacy")
+            create_chunks(
+                project_id=project_id,
+                document_id=str(document["id"]),
+                upload_batch_id=document_upload_batch_id,
+                chunks=[
+                    {
+                        "chunk_index": chunk.chunk_index,
+                        "page": chunk.page,
+                        "text": chunk.text,
+                        "embedding": chunk.embedding,
+                        "embedding_provider": chunk.embedding_provider,
+                    }
+                    for chunk in chunks
+                ],
+            )
+            chunks_indexed_total += len(chunks)
+            public_document = serialize_document_for_api(document)
+            reindexed_documents.append(
+                {
+                    **public_document,
+                    "pages_extracted": len(pages),
+                    "chunks_indexed": len(chunks),
+                    "parse_report": parse_report,
+                }
+            )
+
+        return {
+            "project_id": project_id,
+            "upload_batch_id": selected_batch_id,
+            "documents": reindexed_documents,
+            "chunks_deleted": deleted_chunks,
+            "chunks_indexed": chunks_indexed_total,
+            "parse_report": {
+                "documents_total": len(reindexed_documents),
+                "quality_counts": quality_counts,
+            },
+            "embedding": {
+                **embedding_service.describe(),
+                "warnings": embedding_warnings,
+            },
+        }
 
     @app.post("/projects/{project_id}/extract-requirements")
     def extract_requirements(
