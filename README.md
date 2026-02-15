@@ -52,6 +52,7 @@ docker compose up --build
 ## Core API
 - `POST /projects`
 - `POST /projects/{id}/upload`
+- `POST /projects/{id}/reindex`
 - `POST /projects/{id}/extract-requirements`
 - `POST /projects/{id}/generate-section`
 - `POST /projects/{id}/generate-full-draft`
@@ -60,4 +61,5 @@ docker compose up --build
 
 ## Notes
 - Current parser extracts text from text-like files (`.txt`, `.md`, `.csv`, `.json`, `.yaml`, `.yml`, `.xml`, `.html`).
+- Embedding modes: `EMBEDDING_MODE=hash|bedrock|hybrid` with `BEDROCK_EMBEDDING_MODEL_ID` for Bedrock-backed vectors.
 - If embedding settings change after indexing, API responses may include `warnings` with `code: embedding_dim_drift`; re-index documents to resolve.

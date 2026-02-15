@@ -47,7 +47,7 @@ flowchart LR
 | API Layer (FastAPI) | Auth/session boundary, endpoint routing, response shaping | HTTP requests | workflow commands/results |
 | Workflow Orchestrator | Coordinates parse/retrieve/generate/validate pipeline | project + section commands | normalized artifacts |
 | Parser and Chunker | Extract text/page anchors, chunk documents | uploaded files | chunks + metadata |
-| Embedding Service | Convert chunks to vectors | chunks | embeddings |
+| Embedding Service | Convert chunks to vectors with `hash|bedrock|hybrid` mode and fallback | chunks | embeddings + provider metadata |
 | Vector Store | Retrieval by semantic similarity + filters | query + project scope | ranked evidence chunks |
 | Bedrock Nova | Requirements extraction + drafting with strict prompts | limited context payload | JSON model output |
 | Schema Validator | Enforce output contracts; repair once when invalid | model JSON | valid typed objects or error |
@@ -193,6 +193,7 @@ erDiagram
 ## 7) API Surface (MVP)
 - `POST /projects`
 - `POST /projects/{id}/upload`
+- `POST /projects/{id}/reindex`
 - `POST /projects/{id}/extract-requirements`
 - `POST /projects/{id}/generate-section`
 - `GET /projects/{id}/export`
