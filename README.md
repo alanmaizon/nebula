@@ -8,6 +8,7 @@ It turns source documents into cited draft sections, requirement coverage, and e
 - Generates citation-backed draft sections
 - Computes coverage (`met` / `partial` / `missing`)
 - Flags missing evidence
+- Supports citation click-through evidence inspection and grouped missing-evidence guidance
 - Exports JSON + Markdown bundles
 
 ## Stack
