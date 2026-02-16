@@ -512,7 +512,11 @@ def create_app() -> FastAPI:
             prompt = str(question.get("prompt") or "").strip()
             if not prompt:
                 continue
-            requirement_id = str(question.get("id") or f"Q{index}").strip() or f"Q{index}"
+            requirement_id = (
+                str(question.get("internal_id") or "").strip()
+                or str(question.get("id") or "").strip()
+                or f"Q{index}"
+            )
             base_section_key = derive_section_title_from_prompt(prompt).strip() or f"Section {index}"
             count = seen_section_keys.get(base_section_key, 0) + 1
             seen_section_keys[base_section_key] = count

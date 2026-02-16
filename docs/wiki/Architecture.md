@@ -151,6 +151,8 @@ erDiagram
     }
     REQUIREMENT {
       string id
+      string internal_id
+      string original_id
       string project_id
       string prompt
       string limit_type
@@ -179,6 +181,8 @@ erDiagram
       string id
       string project_id
       string requirement_id
+      string internal_id
+      string original_id
       string status
       string notes
     }
@@ -206,7 +210,7 @@ Current backend runtime path (Nova on Bedrock):
 - `POST /projects/{project_id}/extract-requirements`
   - endpoint: `backend/app/main.py` (`extract_requirements`)
   - orchestrator: `backend/app/nova_runtime.py` (`BedrockNovaOrchestrator.extract_requirements`)
-  - deterministic pre-pass: `backend/app/requirements.py` multi-pass extraction (`explicit_tag`, `structured_outline`, `inline_indicator`, `fallback_question`) with question provenance
+  - deterministic pre-pass: `backend/app/requirements.py` multi-pass extraction (`explicit_tag`, `structured_outline`, `inline_indicator`, `fallback_question`) with question provenance and dual IDs (`internal_id`, `original_id`)
   - model ID: `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
   - artifact source tag: `nova-agents-v1`
 - `POST /projects/{project_id}/generate-section`

@@ -253,13 +253,19 @@ def _reconcile_coverage_items(
     if requirements is None:
         normalized_only: list[dict[str, object]] = []
         for item in coverage_items:
-            req_id = str(item.get("requirement_id") or "").strip()
+            req_id = (
+                str(item.get("internal_id") or "").strip()
+                or str(item.get("requirement_id") or "").strip()
+            )
             if not req_id:
                 continue
+            original_id = _normalize_optional_id(item.get("original_id"))
             refs = _as_str_list(item.get("evidence_refs"))
             normalized_only.append(
                 {
                     "requirement_id": req_id,
+                    "internal_id": req_id,
+                    "original_id": original_id,
                     "status": _normalize_coverage_status(item.get("status")),
                     "notes": str(item.get("notes") or "").strip() or "Coverage note unavailable.",
                     "evidence_refs": refs,
@@ -268,11 +274,20 @@ def _reconcile_coverage_items(
         return normalized_only
 
     definitions = _build_requirement_definitions_for_reconciliation(requirements)
-    coverage_lookup = {
-        str(item.get("requirement_id") or "").strip(): item
-        for item in coverage_items
-        if isinstance(item, dict) and str(item.get("requirement_id") or "").strip()
-    }
+    coverage_lookup: dict[str, dict[str, object]] = {}
+    for item in coverage_items:
+        if not isinstance(item, dict):
+            continue
+        keys = {
+            str(item.get("requirement_id") or "").strip(),
+            str(item.get("internal_id") or "").strip(),
+            str(item.get("original_id") or "").strip(),
+        }
+        normalized_keys = {key for key in keys if key}
+        if not normalized_keys:
+            continue
+        for key in normalized_keys:
+            coverage_lookup[key] = item
     section_stats = _build_section_stats(drafts)
 
     reconciled: list[dict[str, object]] = []
@@ -280,8 +295,11 @@ def _reconcile_coverage_items(
 
     for definition in definitions:
         requirement_id = str(definition["requirement_id"])
+        original_id = _normalize_optional_id(definition.get("original_id"))
         requirement_text = str(definition["requirement"])
-        existing = coverage_lookup.get(requirement_id, {})
+        existing = coverage_lookup.get(requirement_id) or {}
+        if not existing and original_id is not None:
+            existing = coverage_lookup.get(original_id, {})
         existing_status = _normalize_coverage_status(existing.get("status"))
         existing_notes = str(existing.get("notes") or "").strip()
         existing_refs = _as_str_list(existing.get("evidence_refs"))
@@ -325,6 +343,8 @@ def _reconcile_coverage_items(
         reconciled.append(
             {
                 "requirement_id": requirement_id,
+                "internal_id": requirement_id,
+                "original_id": original_id,
                 "status": status,
                 "notes": notes,
                 "evidence_refs": refs,
@@ -335,12 +355,17 @@ def _reconcile_coverage_items(
     for item in coverage_items:
         if not isinstance(item, dict):
             continue
-        requirement_id = str(item.get("requirement_id") or "").strip()
+        requirement_id = (
+            str(item.get("internal_id") or "").strip()
+            or str(item.get("requirement_id") or "").strip()
+        )
         if not requirement_id or requirement_id in seen_ids:
             continue
         reconciled.append(
             {
                 "requirement_id": requirement_id,
+                "internal_id": requirement_id,
+                "original_id": _normalize_optional_id(item.get("original_id")),
                 "status": _normalize_coverage_status(item.get("status")),
                 "notes": str(item.get("notes") or "").strip() or "Coverage note unavailable.",
                 "evidence_refs": _as_str_list(item.get("evidence_refs")),
@@ -361,7 +386,12 @@ def _build_requirement_definitions_for_reconciliation(
         for index, question in enumerate(questions, start=1):
             if not isinstance(question, dict):
                 continue
-            requirement_id = str(question.get("id") or f"Q{index}").strip() or f"Q{index}"
+            requirement_id = (
+                str(question.get("internal_id") or "").strip()
+                or str(question.get("id") or "").strip()
+                or f"Q{index}"
+            )
+            original_id = _normalize_optional_id(question.get("original_id"))
             prompt = str(question.get("prompt") or "").strip()
             if not prompt:
                 continue
@@ -372,6 +402,8 @@ def _build_requirement_definitions_for_reconciliation(
             definitions.append(
                 {
                     "requirement_id": requirement_id,
+                    "internal_id": requirement_id,
+                    "original_id": original_id,
                     "requirement": prompt,
                     "expected_section": expected_section,
                     "word_limit": _question_word_limit(prompt, question.get("limit")),
@@ -388,6 +420,8 @@ def _build_requirement_definitions_for_reconciliation(
             definitions.append(
                 {
                     "requirement_id": f"A{attachment_index}",
+                    "internal_id": f"A{attachment_index}",
+                    "original_id": None,
                     "requirement": text,
                     "expected_section": "",
                     "word_limit": None,
@@ -406,6 +440,8 @@ def _build_requirement_definitions_for_reconciliation(
             definitions.append(
                 {
                     "requirement_id": f"{prefix}{index}",
+                    "internal_id": f"{prefix}{index}",
+                    "original_id": None,
                     "requirement": text,
                     "expected_section": "",
                     "word_limit": None,
@@ -788,18 +824,19 @@ def _render_requirements_matrix_markdown(rows: list[dict[str, str]]) -> str:
     lines = [
         "# Requirements Matrix",
         "",
-        "| requirement_id | requirement | status | notes |",
-        "|---|---|---|---|",
+        "| internal_id | original_id | requirement | status | notes |",
+        "|---|---|---|---|---|",
     ]
     if not rows:
-        lines.append("| n/a | No requirements available | missing |  |")
+        lines.append("| n/a |  | No requirements available | missing |  |")
     else:
         for row in rows:
             lines.append(
                 "| "
                 + " | ".join(
                     [
-                        _escape_pipe(row.get("requirement_id", "")),
+                        _escape_pipe(row.get("internal_id", "")),
+                        _escape_pipe(row.get("original_id", "")),
                         _escape_pipe(row.get("requirement", "")),
                         _escape_pipe(row.get("status", "")),
                         _escape_pipe(row.get("notes", "")),
@@ -1010,8 +1047,19 @@ def _build_requirement_rows(
     coverage_items: list[dict[str, object]],
 ) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
-    coverage_lookup = {str(item.get("requirement_id") or ""): item for item in coverage_items if isinstance(item, dict)}
-    seen_requirement_ids: set[str] = set()
+    coverage_lookup: dict[str, dict[str, object]] = {}
+    for item in coverage_items:
+        if not isinstance(item, dict):
+            continue
+        aliases = {
+            str(item.get("requirement_id") or "").strip(),
+            str(item.get("internal_id") or "").strip(),
+            str(item.get("original_id") or "").strip(),
+        }
+        for alias in aliases:
+            if alias:
+                coverage_lookup[alias] = item
+    seen_internal_ids: set[str] = set()
 
     if requirements:
         questions = requirements.get("questions")
@@ -1019,10 +1067,15 @@ def _build_requirement_rows(
             for index, question in enumerate(questions, start=1):
                 if not isinstance(question, dict):
                     continue
-                req_id = str(question.get("id") or f"Q{index}")
+                req_id = (
+                    str(question.get("internal_id") or "").strip()
+                    or str(question.get("id") or "").strip()
+                    or f"Q{index}"
+                )
+                original_id = _normalize_optional_id(question.get("original_id"))
                 prompt = str(question.get("prompt") or "").strip() or f"Question {index}"
-                rows.append(_build_row(req_id, prompt, coverage_lookup.get(req_id)))
-                seen_requirement_ids.add(req_id)
+                rows.append(_build_row(req_id, original_id, prompt, coverage_lookup.get(req_id)))
+                seen_internal_ids.add(req_id)
 
         attachments = requirements.get("required_attachments")
         if isinstance(attachments, list):
@@ -1032,8 +1085,8 @@ def _build_requirement_rows(
                 if not text:
                     continue
                 req_id = f"A{attachment_index}"
-                rows.append(_build_row(req_id, text, coverage_lookup.get(req_id)))
-                seen_requirement_ids.add(req_id)
+                rows.append(_build_row(req_id, None, text, coverage_lookup.get(req_id)))
+                seen_internal_ids.add(req_id)
                 attachment_index += 1
 
         for key_prefix, source_key in [("E", "eligibility"), ("R", "rubric"), ("D", "disallowed_costs")]:
@@ -1045,29 +1098,46 @@ def _build_requirement_rows(
                 if not text:
                     continue
                 req_id = f"{key_prefix}{index}"
-                rows.append(_build_row(req_id, text, coverage_lookup.get(req_id)))
-                seen_requirement_ids.add(req_id)
+                rows.append(_build_row(req_id, None, text, coverage_lookup.get(req_id)))
+                seen_internal_ids.add(req_id)
 
     for item in coverage_items:
-        req_id = str(item.get("requirement_id") or "").strip()
-        if not req_id or req_id in seen_requirement_ids:
+        req_id = (
+            str(item.get("internal_id") or "").strip()
+            or str(item.get("requirement_id") or "").strip()
+        )
+        if not req_id or req_id in seen_internal_ids:
             continue
-        rows.append(_build_row(req_id, f"Unknown requirement ({req_id})", item))
-        seen_requirement_ids.add(req_id)
+        rows.append(
+            _build_row(
+                req_id,
+                _normalize_optional_id(item.get("original_id")),
+                f"Unknown requirement ({req_id})",
+                item,
+            )
+        )
+        seen_internal_ids.add(req_id)
 
     return rows
 
 
-def _build_row(requirement_id: str, requirement: str, coverage_item: dict[str, object] | None) -> dict[str, str]:
+def _build_row(
+    internal_id: str,
+    original_id: str | None,
+    requirement: str,
+    coverage_item: dict[str, object] | None,
+) -> dict[str, str]:
     if not coverage_item:
         return {
-            "requirement_id": requirement_id,
+            "internal_id": internal_id,
+            "original_id": original_id or "",
             "requirement": requirement,
             "status": "missing",
             "notes": "No coverage item returned.",
         }
     return {
-        "requirement_id": requirement_id,
+        "internal_id": str(coverage_item.get("internal_id") or coverage_item.get("requirement_id") or internal_id),
+        "original_id": _normalize_optional_id(coverage_item.get("original_id")) or original_id or "",
         "requirement": requirement,
         "status": str(coverage_item.get("status") or "missing"),
         "notes": str(coverage_item.get("notes") or ""),
@@ -1620,6 +1690,15 @@ def _as_str_list(value: object) -> list[str]:
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
     return []
+
+
+def _normalize_optional_id(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split()).strip()
+    if not normalized:
+        return None
+    return normalized
 
 
 def _dedupe_preserve_order(values: list[str]) -> list[str]:

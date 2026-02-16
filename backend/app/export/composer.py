@@ -23,7 +23,8 @@ _MIN_CONFIDENCE_FOR_SUPPORTED = 0.35
 
 @dataclass
 class RequirementRow:
-    requirement_id: str
+    internal_id: str
+    original_id: str
     requirement: str
     status: str
     evidence_pointers: str
@@ -33,7 +34,8 @@ class RequirementRow:
 
 @dataclass
 class CoverageRow:
-    requirement_id: str
+    internal_id: str
+    original_id: str
     status: str
     notes: str
     evidence_refs: str
@@ -122,8 +124,8 @@ def compose_markdown_report(
         [
             "## Requirements Matrix",
             "",
-            "| requirement_id | requirement | status | evidence pointers | notes |",
-            "|---|---|---|---|---|",
+            "| internal_id | original_id | requirement | status | evidence pointers | notes |",
+            "|---|---|---|---|---|---|",
         ]
     )
     for row in requirement_rows:
@@ -131,7 +133,8 @@ def compose_markdown_report(
             "| "
             + " | ".join(
                 [
-                    _escape_table(row.requirement_id),
+                    _escape_table(row.internal_id),
+                    _escape_table(row.original_id),
                     _escape_table(row.requirement),
                     _escape_table(row.status),
                     _escape_table(row.evidence_pointers),
@@ -146,8 +149,8 @@ def compose_markdown_report(
             "",
             "## Coverage",
             "",
-            "| requirement_id | status | notes | evidence_refs |",
-            "|---|---|---|---|",
+            "| internal_id | original_id | status | notes | evidence_refs |",
+            "|---|---|---|---|---|",
         ]
     )
     for row in coverage_rows:
@@ -155,7 +158,8 @@ def compose_markdown_report(
             "| "
             + " | ".join(
                 [
-                    _escape_table(row.requirement_id),
+                    _escape_table(row.internal_id),
+                    _escape_table(row.original_id),
                     _escape_table(row.status),
                     _escape_table(row.notes),
                     _escape_table(row.evidence_refs),
@@ -501,7 +505,12 @@ def _build_requirement_definitions(requirements: dict[str, object] | None) -> li
         for index, question in enumerate(questions, start=1):
             if not isinstance(question, dict):
                 continue
-            req_id = str(question.get("id") or f"Q{index}")
+            req_id = (
+                str(question.get("internal_id") or "").strip()
+                or str(question.get("id") or "").strip()
+                or f"Q{index}"
+            )
+            original_id = _normalize_optional_id(question.get("original_id")) or ""
             prompt = str(question.get("prompt") or "").strip()
             if not prompt:
                 continue
@@ -513,14 +522,28 @@ def _build_requirement_definitions(requirements: dict[str, object] | None) -> li
                         limit = int(raw_limit.get("value"))
                     except (TypeError, ValueError):
                         limit = None
-            rows.append({"requirement_id": req_id, "requirement": prompt, "word_limit": limit})
+            rows.append(
+                {
+                    "internal_id": req_id,
+                    "original_id": original_id,
+                    "requirement": prompt,
+                    "word_limit": limit,
+                }
+            )
 
     attachments = requirements.get("required_attachments")
     if isinstance(attachments, list):
         for index, item in enumerate(attachments, start=1):
             text = str(item).strip()
             if text:
-                rows.append({"requirement_id": f"A{index}", "requirement": text, "word_limit": None})
+                rows.append(
+                    {
+                        "internal_id": f"A{index}",
+                        "original_id": "",
+                        "requirement": text,
+                        "word_limit": None,
+                    }
+                )
 
     for prefix, key in [("E", "eligibility"), ("R", "rubric"), ("D", "disallowed_costs")]:
         entries = requirements.get(key)
@@ -529,7 +552,14 @@ def _build_requirement_definitions(requirements: dict[str, object] | None) -> li
         for index, item in enumerate(entries, start=1):
             text = str(item).strip()
             if text:
-                rows.append({"requirement_id": f"{prefix}{index}", "requirement": text, "word_limit": None})
+                rows.append(
+                    {
+                        "internal_id": f"{prefix}{index}",
+                        "original_id": "",
+                        "requirement": text,
+                        "word_limit": None,
+                    }
+                )
 
     return rows
 
@@ -544,9 +574,14 @@ def _coverage_lookup(coverage: dict[str, object] | None) -> dict[str, dict[str, 
     for item in items:
         if not isinstance(item, dict):
             continue
-        req_id = str(item.get("requirement_id") or "").strip()
-        if req_id:
-            lookup[req_id] = item
+        aliases = {
+            str(item.get("requirement_id") or "").strip(),
+            str(item.get("internal_id") or "").strip(),
+            str(item.get("original_id") or "").strip(),
+        }
+        for req_id in aliases:
+            if req_id:
+                lookup[req_id] = item
     return lookup
 
 
@@ -560,10 +595,11 @@ def _build_requirement_rows(
     sections_by_key = {normalize_key(section["title"]): section for section in sections}
 
     for definition in requirement_defs:
-        req_id = str(definition["requirement_id"])
+        req_id = str(definition["internal_id"])
+        original_id = str(definition.get("original_id") or "").strip()
         req_text = str(definition["requirement"])
         word_limit = definition.get("word_limit")
-        coverage_item = coverage_lookup.get(req_id)
+        coverage_item = coverage_lookup.get(req_id) or coverage_lookup.get(original_id)
 
         status = str((coverage_item or {}).get("status") or "missing").lower()
         if status not in {"met", "partial", "missing"}:
@@ -590,7 +626,11 @@ def _build_requirement_rows(
 
         rows.append(
             RequirementRow(
-                requirement_id=req_id,
+                internal_id=req_id,
+                original_id=(
+                    _normalize_optional_id((coverage_item or {}).get("original_id"))
+                    or original_id
+                ),
                 requirement=req_text,
                 status=status,
                 evidence_pointers=", ".join(evidence_refs),
@@ -615,7 +655,8 @@ def _build_coverage_rows(
     )
     return [
         CoverageRow(
-            requirement_id=row.requirement_id,
+            internal_id=row.internal_id,
+            original_id=row.original_id,
             status=row.status,
             notes=row.notes,
             evidence_refs=row.evidence_pointers,
@@ -664,6 +705,15 @@ def _refs_match_section(refs: list[str], section_title: str) -> bool:
 def _max_status(left: str, right: str) -> str:
     order = {"missing": 0, "partial": 1, "met": 2}
     return right if order.get(right, 0) > order.get(left, 0) else left
+
+
+def _normalize_optional_id(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split()).strip()
+    if not normalized:
+        return None
+    return normalized
 
 
 def _run_quality_gates(

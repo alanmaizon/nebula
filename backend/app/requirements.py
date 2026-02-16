@@ -21,6 +21,8 @@ class QuestionLimit(BaseModel):
 
 class RequirementQuestion(BaseModel):
     id: str = Field(..., min_length=1)
+    internal_id: str | None = Field(default=None, min_length=1)
+    original_id: str | None = Field(default=None, min_length=1)
     prompt: str = Field(..., min_length=1)
     limit: QuestionLimit = Field(default_factory=QuestionLimit)
     provenance: str | None = None
@@ -103,6 +105,45 @@ def _normalize_attachment_key(value: str) -> str:
 def _normalize_free_text(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9\s]", " ", value.lower())
     return " ".join(normalized.split())
+
+
+def _normalize_original_requirement_id(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split()).strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def _normalize_internal_question_id(raw_id: object, fallback_index: int) -> str:
+    candidate = str(raw_id or "").strip()
+    if not candidate:
+        return f"Q{fallback_index}"
+
+    canonical_match = re.fullmatch(r"[Qq]\s*[_\-]?(\d+)", candidate)
+    if canonical_match:
+        return f"Q{int(canonical_match.group(1))}"
+
+    number_match = re.fullmatch(r"(?i)(?:question\s*)?(\d+)", candidate)
+    if number_match:
+        return f"Q{int(number_match.group(1))}"
+
+    return f"Q{fallback_index}"
+
+
+def _coerce_question_identifiers(
+    *,
+    raw_internal_id: object,
+    raw_original_id: object,
+    fallback_index: int,
+) -> tuple[str, str | None]:
+    internal_id = _normalize_internal_question_id(raw_internal_id, fallback_index)
+    original_id = _normalize_original_requirement_id(raw_original_id)
+    raw_internal = _normalize_original_requirement_id(raw_internal_id)
+    if original_id is None and raw_internal and raw_internal != internal_id:
+        original_id = raw_internal
+    return internal_id, original_id
 
 
 def _is_question_or_heading_line(value: str) -> bool:
@@ -398,21 +439,26 @@ def _build_question_candidate(
     raw_prompt: str,
     provenance: str,
     line_index: int,
+    original_id: str | None = None,
 ) -> dict[str, object] | None:
     prompt = _clean_candidate_prompt(raw_prompt)
     if not _looks_like_requirement_prompt(prompt):
         return None
-    return {
+    candidate: dict[str, object] = {
         "prompt": prompt,
         "limit": _extract_question_limit(prompt).model_dump(),
         "provenance": provenance,
         "line_index": line_index,
     }
+    normalized_original_id = _normalize_original_requirement_id(original_id)
+    if normalized_original_id is not None:
+        candidate["original_id"] = normalized_original_id
+    return candidate
 
 
 def _extract_explicit_tag_candidates(lines: list[str]) -> list[dict[str, object]]:
     pattern = re.compile(
-        r"^(?:req(?:uirement)?)[\s\-_]*([A-Za-z]?\d+(?:\.\d+)*)\s*[:\-]\s+(.+)$",
+        r"^((?:req(?:uirement)?)[\s\-_]*[A-Za-z]?\d+(?:\.\d+)*)\s*[:\-]\s+(.+)$",
         flags=re.IGNORECASE,
     )
     results: list[dict[str, object]] = []
@@ -424,6 +470,7 @@ def _extract_explicit_tag_candidates(lines: list[str]) -> list[dict[str, object]
             raw_prompt=match.group(2),
             provenance="explicit_tag",
             line_index=line_index,
+            original_id=match.group(1),
         )
         if candidate is not None:
             results.append(candidate)
@@ -453,6 +500,7 @@ def _extract_structured_outline_candidates(lines: list[str]) -> list[dict[str, o
             raw_prompt=match.group(2),
             provenance="structured_outline",
             line_index=line_index,
+            original_id=marker,
         )
         if candidate is not None:
             results.append(candidate)
@@ -522,9 +570,13 @@ def _extract_fallback_question_candidates(lines: list[str]) -> list[dict[str, ob
             continue
 
         prompt_text: str | None = None
+        original_id: str | None = None
         question_match = question_pattern.match(stripped)
         if question_match:
             prompt_text = question_match.group(3)
+            question_number = question_match.group(1) or question_match.group(2)
+            if question_number:
+                original_id = f"Question {question_number}"
         elif stripped.endswith("?") and _looks_like_requirement_prompt(stripped):
             prompt_text = stripped
 
@@ -535,6 +587,7 @@ def _extract_fallback_question_candidates(lines: list[str]) -> list[dict[str, ob
             raw_prompt=prompt_text,
             provenance="fallback_question",
             line_index=line_index,
+            original_id=original_id,
         )
         if candidate is not None:
             results.append(candidate)
@@ -587,11 +640,19 @@ def _extract_questions(lines: list[str]) -> list[dict[str, object]]:
 
     questions: list[dict[str, object]] = []
     for index, candidate in enumerate(selected, start=1):
+        internal_id, original_id = _coerce_question_identifiers(
+            raw_internal_id=f"Q{index}",
+            raw_original_id=candidate.get("original_id"),
+            fallback_index=index,
+        )
         question = {
-            "id": f"Q{index}",
+            "id": internal_id,
+            "internal_id": internal_id,
             "prompt": str(candidate.get("prompt", "")),
             "limit": candidate.get("limit", QuestionLimit(type="none").model_dump()),
         }
+        if original_id is not None:
+            question["original_id"] = original_id
         provenance = str(candidate.get("provenance") or "").strip()
         if provenance:
             question["provenance"] = provenance
@@ -711,6 +772,7 @@ def merge_requirements_payload(
 
     merged_questions: list[dict[str, object]] = []
     seen_prompt_keys: set[str] = set()
+    question_index_by_prompt_key: dict[str, int] = {}
     base_question_index: dict[str, int] = {}
     for source in (left, right):
         for question in source.get("questions", []):
@@ -721,8 +783,20 @@ def merge_requirements_payload(
                 continue
             prompt_key = _normalize_question_key(prompt)
             if prompt_key in seen_prompt_keys:
+                existing_index = question_index_by_prompt_key.get(prompt_key)
+                if existing_index is not None:
+                    incoming_original_id = _normalize_original_requirement_id(question.get("original_id"))
+                    existing_original_id = _normalize_original_requirement_id(
+                        merged_questions[existing_index].get("original_id")
+                    )
+                    if incoming_original_id is not None and existing_original_id is None:
+                        merged_questions[existing_index]["original_id"] = incoming_original_id
                 continue
-            question_id = str(question.get("id", "")).strip() or f"Q{len(merged_questions) + 1}"
+            question_id, original_id = _coerce_question_identifiers(
+                raw_internal_id=question.get("internal_id") or question.get("id"),
+                raw_original_id=question.get("original_id"),
+                fallback_index=len(merged_questions) + 1,
+            )
             limit = question.get("limit", {"type": "none", "value": None})
             if not isinstance(limit, dict):
                 limit = {"type": "none", "value": None}
@@ -733,7 +807,9 @@ def merge_requirements_payload(
                 if cleaned_provenance:
                     provenance_value = cleaned_provenance
 
-            candidate = {"id": question_id, "prompt": prompt, "limit": limit}
+            candidate = {"id": question_id, "internal_id": question_id, "prompt": prompt, "limit": limit}
+            if original_id is not None:
+                candidate["original_id"] = original_id
             if provenance_value is not None:
                 candidate["provenance"] = provenance_value
 
@@ -742,12 +818,31 @@ def merge_requirements_payload(
                 existing_index = base_question_index[base_key]
                 existing_prompt = str(merged_questions[existing_index].get("prompt", ""))
                 if _question_prompt_rank(prompt) > _question_prompt_rank(existing_prompt):
+                    existing_internal_id = str(
+                        merged_questions[existing_index].get("internal_id")
+                        or merged_questions[existing_index].get("id")
+                        or ""
+                    ).strip()
+                    if existing_internal_id:
+                        candidate["id"] = existing_internal_id
+                        candidate["internal_id"] = existing_internal_id
+                    if "original_id" not in candidate:
+                        existing_original_id = _normalize_original_requirement_id(
+                            merged_questions[existing_index].get("original_id")
+                        )
+                        if existing_original_id is not None:
+                            candidate["original_id"] = existing_original_id
+                    existing_prompt_key = _normalize_question_key(existing_prompt)
+                    if existing_prompt_key:
+                        question_index_by_prompt_key.pop(existing_prompt_key, None)
                     merged_questions[existing_index] = candidate
                     seen_prompt_keys.add(prompt_key)
+                    question_index_by_prompt_key[prompt_key] = existing_index
                 continue
 
             merged_questions.append(candidate)
             seen_prompt_keys.add(prompt_key)
+            question_index_by_prompt_key[prompt_key] = len(merged_questions) - 1
             if base_key:
                 base_question_index[base_key] = len(merged_questions) - 1
 
@@ -783,11 +878,18 @@ def repair_requirements_payload(payload: dict[str, object]) -> dict[str, object]
     repaired_questions: list[dict[str, object]] = []
     for index, question in enumerate(repaired["questions"], start=1):
         if isinstance(question, str):
+            internal_id, original_id = _coerce_question_identifiers(
+                raw_internal_id=f"Q{index}",
+                raw_original_id=None,
+                fallback_index=index,
+            )
             repaired_questions.append(
                 {
-                    "id": f"Q{index}",
+                    "id": internal_id,
+                    "internal_id": internal_id,
                     "prompt": question,
                     "limit": QuestionLimit(type="none").model_dump(),
+                    **({"original_id": original_id} if original_id is not None else {}),
                 }
             )
             continue
@@ -796,7 +898,11 @@ def repair_requirements_payload(payload: dict[str, object]) -> dict[str, object]
         prompt = str(question.get("prompt", "")).strip()
         if not prompt:
             continue
-        identifier = str(question.get("id", "")).strip() or f"Q{index}"
+        internal_id, original_id = _coerce_question_identifiers(
+            raw_internal_id=question.get("internal_id") or question.get("id"),
+            raw_original_id=question.get("original_id"),
+            fallback_index=index,
+        )
         limit = question.get("limit", {"type": "none"})
         if isinstance(limit, str):
             limit = {"type": limit, "value": None}
@@ -810,9 +916,11 @@ def repair_requirements_payload(payload: dict[str, object]) -> dict[str, object]
                 normalized_provenance = stripped_provenance
         repaired_questions.append(
             {
-                "id": identifier,
+                "id": internal_id,
+                "internal_id": internal_id,
                 "prompt": prompt,
                 "limit": limit,
+                **({"original_id": original_id} if original_id is not None else {}),
                 **({"provenance": normalized_provenance} if normalized_provenance is not None else {}),
             }
         )
