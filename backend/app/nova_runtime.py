@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from app.config import Settings
+from app.requirements import merge_requirements_payload, repair_requirements_payload
 
 logger = logging.getLogger("nebula.nova")
 
@@ -21,24 +22,44 @@ class BedrockNovaOrchestrator:
         self._client = client or self._create_bedrock_client()
 
     def extract_requirements(self, chunks: list[dict[str, object]]) -> dict[str, object]:
-        context = self._render_chunk_context(
-            chunks,
-            max_chunks=20,
-            max_chars_per_chunk=600,
-            max_total_chars=4200,
-        )
+        windows, planner_diagnostics = self._plan_requirement_windows(chunks)
+        payloads: list[dict[str, object]] = []
+        context_chars_by_window: list[int] = []
+        window_chunk_counts: list[int] = []
+
         system_prompt = (
             "You are an RFP analyst. Extract requirements into strict JSON only. "
             "Do not include markdown or prose."
         )
-        user_prompt = (
-            "Return a JSON object with keys: "
-            "funder, deadline, eligibility, questions, required_attachments, rubric, disallowed_costs. "
-            "questions must be an array of objects with keys id, prompt, limit where limit has keys type and value. "
-            "limit.type must be one of words, chars, none.\n\n"
-            f"RFP context:\n{context}"
-        )
-        return self._invoke_json_model(self._settings.bedrock_model_id, system_prompt, user_prompt)
+
+        for window_index, window_chunks in enumerate(windows, start=1):
+            context = self._render_chunk_context(
+                window_chunks,
+                max_chunks=self._settings.extraction_context_max_chunks,
+                max_chars_per_chunk=self._settings.extraction_context_max_chars_per_chunk,
+                max_total_chars=self._settings.extraction_context_max_total_chars,
+            )
+            context_chars_by_window.append(len(context))
+            window_chunk_counts.append(len(window_chunks))
+            user_prompt = (
+                "Return a JSON object with keys: "
+                "funder, deadline, eligibility, questions, required_attachments, rubric, disallowed_costs. "
+                "questions must be an array of objects with keys id, prompt, limit where limit has keys type and value. "
+                "limit.type must be one of words, chars, none.\n\n"
+                f"Extraction window {window_index} of {len(windows)}.\n"
+                f"RFP context:\n{context}"
+            )
+            payload = self._invoke_json_model(self._settings.bedrock_model_id, system_prompt, user_prompt)
+            payloads.append(payload if isinstance(payload, dict) else {})
+
+        merged_payload, merge_diagnostics = self._merge_requirement_payloads(payloads)
+        diagnostics = {
+            **planner_diagnostics,
+            **merge_diagnostics,
+            "window_chunk_counts": window_chunk_counts,
+            "window_context_chars": context_chars_by_window,
+        }
+        return {**merged_payload, "_extraction_diagnostics": diagnostics}
 
     def plan_section_generation(
         self,
@@ -266,6 +287,101 @@ class BedrockNovaOrchestrator:
             used_chars += len(line)
             seen_text.add(text_key)
         return "\n".join(lines)
+
+    def _plan_requirement_windows(
+        self,
+        chunks: list[dict[str, object]],
+    ) -> tuple[list[list[dict[str, object]]], dict[str, object]]:
+        total_chunks = len(chunks)
+        estimated_chars = sum(len(self._normalize_text(str(chunk.get("text", "")))) for chunk in chunks)
+
+        single_pass = (
+            total_chunks <= self._settings.extraction_context_max_chunks
+            and estimated_chars <= self._settings.extraction_context_max_total_chars
+        )
+        if single_pass:
+            return [chunks], {
+                "mode": "single_pass",
+                "window_count": 1,
+                "chunks_total": total_chunks,
+                "estimated_chars_total": estimated_chars,
+                "window_overlap_chunks": 0,
+            }
+
+        window_size = max(1, self._settings.extraction_window_size_chunks)
+        overlap = max(0, min(window_size - 1, self._settings.extraction_window_overlap_chunks))
+        max_passes = max(1, self._settings.extraction_window_max_passes)
+        step = max(1, window_size - overlap)
+
+        windows: list[list[dict[str, object]]] = []
+        starts: list[int] = []
+        for start in range(0, total_chunks, step):
+            if len(windows) >= max_passes:
+                break
+            end = min(total_chunks, start + window_size)
+            windows.append(chunks[start:end])
+            starts.append(start)
+            if end >= total_chunks:
+                break
+
+        if windows and len(windows) < max_passes:
+            tail_start = max(0, total_chunks - window_size)
+            if tail_start not in starts:
+                windows.append(chunks[tail_start:total_chunks])
+                starts.append(tail_start)
+
+        coverage_ranges = []
+        for start, window in zip(starts, windows, strict=False):
+            coverage_ranges.append([start, start + len(window)])
+
+        return windows, {
+            "mode": "multi_pass",
+            "window_count": len(windows),
+            "chunks_total": total_chunks,
+            "estimated_chars_total": estimated_chars,
+            "window_size_chunks": window_size,
+            "window_overlap_chunks": overlap,
+            "window_max_passes": max_passes,
+            "window_ranges": coverage_ranges,
+        }
+
+    @staticmethod
+    def _merge_requirement_payloads(payloads: list[dict[str, object]]) -> tuple[dict[str, object], dict[str, object]]:
+        if not payloads:
+            merged_empty = repair_requirements_payload({})
+            return merged_empty, {
+                "raw_candidates": 0,
+                "deduped_candidates": 0,
+                "dropped_candidates": 0,
+                "dedupe_ratio": 0.0,
+                "per_window_candidates": [],
+            }
+
+        repaired_payloads = [repair_requirements_payload(payload) for payload in payloads]
+        per_window_candidates = [
+            len(payload.get("questions", []))
+            for payload in repaired_payloads
+        ]
+        raw_candidates = sum(per_window_candidates)
+
+        merged = repaired_payloads[0]
+        for payload in repaired_payloads[1:]:
+            merged = merge_requirements_payload(merged, payload)
+
+        deduped_candidates = len(merged.get("questions", []))
+        dropped = max(0, raw_candidates - deduped_candidates)
+        dedupe_ratio = round(dropped / raw_candidates, 3) if raw_candidates > 0 else 0.0
+        return merged, {
+            "raw_candidates": raw_candidates,
+            "deduped_candidates": deduped_candidates,
+            "dropped_candidates": dropped,
+            "dedupe_ratio": dedupe_ratio,
+            "per_window_candidates": per_window_candidates,
+        }
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        return " ".join(text.split())
 
     @staticmethod
     def _render_ranked_context(

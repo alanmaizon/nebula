@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     chunk_overlap_chars: int = 200
     embedding_dim: int = 128
     retrieval_top_k_default: int = 5
+    extraction_context_max_chunks: int = 20
+    extraction_context_max_chars_per_chunk: int = 600
+    extraction_context_max_total_chars: int = 4200
+    extraction_window_size_chunks: int = 14
+    extraction_window_overlap_chunks: int = 4
+    extraction_window_max_passes: int = 4
     max_upload_files: int = 20
     max_upload_file_bytes: int = 10 * 1024 * 1024
     max_upload_batch_bytes: int = 25 * 1024 * 1024
