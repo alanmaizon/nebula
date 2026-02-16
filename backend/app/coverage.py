@@ -11,6 +11,8 @@ CoverageStatus = Literal["met", "partial", "missing"]
 
 class CoverageItem(BaseModel):
     requirement_id: str = Field(..., min_length=1)
+    internal_id: str | None = Field(default=None, min_length=1)
+    original_id: str | None = Field(default=None, min_length=1)
     status: CoverageStatus
     notes: str = Field(..., min_length=1)
     evidence_refs: list[str] = Field(default_factory=list)
@@ -24,9 +26,21 @@ def _normalize_text(value: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
 
 
-def _build_requirement_catalog(requirements: dict[str, object]) -> tuple[dict[str, str], dict[str, str]]:
+def _normalize_optional_id(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.split()).strip()
+    if not normalized:
+        return None
+    return normalized
+
+
+def _build_requirement_catalog(
+    requirements: dict[str, object],
+) -> tuple[dict[str, str], dict[str, str], dict[str, str | None]]:
     canonical: dict[str, str] = {}
     aliases: dict[str, str] = {}
+    original_ids: dict[str, str | None] = {}
 
     questions = requirements.get("questions", [])
     if isinstance(questions, list):
@@ -36,12 +50,15 @@ def _build_requirement_catalog(requirements: dict[str, object]) -> tuple[dict[st
             prompt = str(question.get("prompt", "")).strip()
             if not prompt:
                 continue
-            raw_id = str(question.get("id", "")).strip()
+            raw_id = str(question.get("internal_id") or question.get("id") or "").strip()
             identifier = raw_id or f"Q{index}"
             canonical[identifier] = prompt
+            original_ids[identifier] = _normalize_optional_id(question.get("original_id"))
 
             aliases[_normalize_text(identifier)] = identifier
             aliases[_normalize_text(prompt)] = identifier
+            if original_ids[identifier]:
+                aliases[_normalize_text(str(original_ids[identifier]))] = identifier
 
             digits_match = re.fullmatch(r"[Qq]?(\d+)", identifier)
             if digits_match:
@@ -59,10 +76,11 @@ def _build_requirement_catalog(requirements: dict[str, object]) -> tuple[dict[st
             identifier = f"A{attachment_index}"
             attachment_index += 1
             canonical[identifier] = attachment_text
+            original_ids[identifier] = None
             aliases[_normalize_text(identifier)] = identifier
             aliases[_normalize_text(attachment_text)] = identifier
 
-    return canonical, aliases
+    return canonical, aliases, original_ids
 
 
 def _attachment_index_from_token(token: str) -> int | None:
@@ -143,7 +161,7 @@ def normalize_coverage_payload(
     requirements: dict[str, object],
     payload: dict[str, object],
 ) -> dict[str, object]:
-    canonical, aliases = _build_requirement_catalog(requirements)
+    canonical, aliases, original_ids = _build_requirement_catalog(requirements)
     items = payload.get("items", [])
     if not isinstance(items, list):
         items = []
@@ -155,7 +173,11 @@ def normalize_coverage_payload(
         if not isinstance(item, dict):
             continue
 
-        raw_requirement_id = str(item.get("requirement_id", "")).strip()
+        raw_requirement_id = (
+            str(item.get("internal_id", "")).strip()
+            or str(item.get("requirement_id", "")).strip()
+            or str(item.get("original_id", "")).strip()
+        )
         if not raw_requirement_id:
             continue
 
@@ -183,6 +205,8 @@ def normalize_coverage_payload(
         normalized_items.append(
             {
                 "requirement_id": requirement_id,
+                "internal_id": requirement_id,
+                "original_id": original_ids.get(requirement_id),
                 "status": status,
                 "notes": notes,
                 "evidence_refs": [str(ref) for ref in refs],
@@ -196,6 +220,8 @@ def normalize_coverage_payload(
         normalized_items.append(
             {
                 "requirement_id": requirement_id,
+                "internal_id": requirement_id,
+                "original_id": original_ids.get(requirement_id),
                 "status": "missing",
                 "notes": f"No coverage item returned for requirement: {requirement_text}",
                 "evidence_refs": [],
@@ -242,7 +268,8 @@ def build_coverage_payload(requirements: dict[str, object], draft: dict[str, obj
     for question in questions:
         if not isinstance(question, dict):
             continue
-        req_id = str(question.get("id", "")).strip() or "unknown"
+        req_id = str(question.get("internal_id") or question.get("id") or "").strip() or "unknown"
+        original_id = _normalize_optional_id(question.get("original_id"))
         prompt = str(question.get("prompt", "")).strip()
         if not prompt:
             continue
@@ -270,6 +297,8 @@ def build_coverage_payload(requirements: dict[str, object], draft: dict[str, obj
         items.append(
             {
                 "requirement_id": req_id,
+                "internal_id": req_id,
+                "original_id": original_id,
                 "status": status,
                 "notes": notes,
                 "evidence_refs": best_refs,
@@ -293,15 +322,19 @@ def validate_with_repair(payload: dict[str, object]) -> tuple[CoverageArtifact |
         if not isinstance(item, dict):
             continue
         requirement_id = str(item.get("requirement_id", "")).strip()
+        internal_id = str(item.get("internal_id", "")).strip() or requirement_id
+        original_id = _normalize_optional_id(item.get("original_id"))
         status = str(item.get("status", "")).strip()
         notes = str(item.get("notes", "")).strip()
         refs = item.get("evidence_refs", [])
         if not isinstance(refs, list):
             refs = []
-        if requirement_id and status in {"met", "partial", "missing"} and notes:
+        if requirement_id and internal_id and status in {"met", "partial", "missing"} and notes:
             repaired_items.append(
                 {
                     "requirement_id": requirement_id,
+                    "internal_id": internal_id,
+                    "original_id": original_id,
                     "status": status,
                     "notes": notes,
                     "evidence_refs": [str(ref) for ref in refs],

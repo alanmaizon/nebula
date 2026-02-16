@@ -352,3 +352,35 @@ def test_build_export_bundle_surfaces_source_ambiguity_in_warnings_and_markdown(
     files = payload["bundle"]["markdown"]["files"]
     coverage = next(file for file in files if file["path"] in {"COVERAGE.md", "coverage.md"})
     assert "Source ambiguity warnings: 1" in coverage["content"]
+
+
+def test_build_export_bundle_preserves_internal_and_original_requirement_ids() -> None:
+    test_input = _base_input()
+    test_input["requirements"]["questions"][0]["internal_id"] = "Q1"
+    test_input["requirements"]["questions"][0]["original_id"] = "REQ-101"
+    test_input["coverage"]["items"] = [
+        {
+            "requirement_id": "REQ-101",
+            "status": "met",
+            "notes": "Covered by citation evidence.",
+            "evidence_refs": ["impact_report.txt:p1"],
+        }
+    ]
+
+    payload = build_export_bundle(test_input)
+    bundle_json = payload["bundle"]["json"]
+    assert bundle_json is not None
+
+    question = bundle_json["requirements"]["questions"][0]
+    assert question["id"] == "Q1"
+    assert question["internal_id"] == "Q1"
+    assert question["original_id"] == "REQ-101"
+
+    coverage_item = next(item for item in bundle_json["coverage"]["items"] if item["requirement_id"] == "Q1")
+    assert coverage_item["internal_id"] == "Q1"
+    assert coverage_item["original_id"] == "REQ-101"
+
+    files = payload["bundle"]["markdown"]["files"]
+    requirements_md = next(file for file in files if file["path"] in {"REQUIREMENTS_MATRIX.md", "requirements.md"})
+    assert "| internal_id | original_id | requirement | status | notes |" in requirements_md["content"]
+    assert "| Q1 | REQ-101 | Need Statement (350 words max): Describe need." in requirements_md["content"]

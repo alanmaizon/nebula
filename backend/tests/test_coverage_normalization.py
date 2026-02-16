@@ -28,6 +28,7 @@ def test_normalize_coverage_payload_maps_text_attachment_to_canonical_id() -> No
     items = normalized["items"]
 
     assert [item["requirement_id"] for item in items] == ["Q1", "Q2", "A1"]
+    assert [item["internal_id"] for item in items] == ["Q1", "Q2", "A1"]
     assert items[2]["status"] == "missing"
 
 
@@ -86,3 +87,36 @@ def test_normalize_coverage_payload_maps_prefixed_ids_to_canonical_ids() -> None
     assert "rubric_need_alignment" not in by_id
     assert by_id["Q3"]["status"] == "missing"
     assert by_id["A2"]["status"] == "missing"
+
+
+def test_normalize_coverage_payload_maps_original_solicitation_id_and_keeps_dual_ids() -> None:
+    requirements = {
+        "questions": [
+            {
+                "id": "Q1",
+                "internal_id": "Q1",
+                "original_id": "REQ-101",
+                "prompt": "Need Statement (350 words max): Describe the specific community need.",
+            }
+        ],
+        "required_attachments": [],
+    }
+    coverage_payload = {
+        "items": [
+            {
+                "requirement_id": "REQ-101",
+                "status": "met",
+                "notes": "Covered by source evidence.",
+                "evidence_refs": ["impact.txt:p1"],
+            }
+        ]
+    }
+
+    normalized = normalize_coverage_payload(requirements=requirements, payload=coverage_payload)
+    assert len(normalized["items"]) == 1
+    item = normalized["items"][0]
+
+    assert item["requirement_id"] == "Q1"
+    assert item["internal_id"] == "Q1"
+    assert item["original_id"] == "REQ-101"
+    assert item["status"] == "met"

@@ -107,9 +107,15 @@ def test_q1_reconciliation_sets_status_not_missing_when_need_statement_exists() 
         validations={},
     )
 
-    assert "| Q1 | Need Statement (350 words max): Describe the specific community need your program addresses. | missing |" not in report
-    assert re.search(r"\| Q1 \| Need Statement \(350 words max\): Describe the specific community need your program addresses\. \| (partial|met) \|", report)
-    assert re.search(r"\| Q1 \| (partial|met) \|", report)
+    assert (
+        "| Q1 |  | Need Statement (350 words max): Describe the specific community need your program addresses. | missing |"
+        not in report
+    )
+    assert re.search(
+        r"\| Q1 \|  \| Need Statement \(350 words max\): Describe the specific community need your program addresses\. \| (partial|met) \|",
+        report,
+    )
+    assert re.search(r"\| Q1 \|  \| (partial|met) \|", report)
 
 
 def test_boilerplate_paragraph_without_citations_is_removed() -> None:
@@ -194,3 +200,32 @@ def test_word_limit_trimming_applies_for_q1_350_words_max() -> None:
 
     assert paragraph_word_count <= 350
     assert len(paragraph_lines) >= 2
+
+
+def test_report_includes_dual_id_columns_for_traceability() -> None:
+    requirements = _requirements()
+    requirements["questions"][0]["internal_id"] = "Q1"
+    requirements["questions"][0]["original_id"] = "REQ-101"
+
+    report = compose_markdown_report(
+        project_name="Nebula Demo",
+        documents=_documents(),
+        requirements=requirements,
+        drafts={"Need Statement": _section_with_two_supported_paragraphs("Need Statement")},
+        coverage={
+            "items": [
+                {
+                    "requirement_id": "REQ-101",
+                    "status": "met",
+                    "notes": "Covered",
+                    "evidence_refs": ["impact_report.txt:p1"],
+                }
+            ]
+        },
+        missing_evidence=[],
+        validations={},
+    )
+
+    assert "| internal_id | original_id | requirement | status | evidence pointers | notes |" in report
+    assert "| Q1 | REQ-101 | Need Statement (350 words max): Describe the specific community need your program addresses." in report
+    assert "| internal_id | original_id | status | notes | evidence_refs |" in report

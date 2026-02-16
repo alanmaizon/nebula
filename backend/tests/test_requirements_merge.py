@@ -263,6 +263,23 @@ REQUIREMENT-202: Provide an implementation timeline by quarter. (max 500 words)
     assert provenance_by_prompt["Describe the target population and unmet need. (max 300 words)"] == "explicit_tag"
     assert provenance_by_prompt["Provide an implementation timeline by quarter. (max 500 words)"] == "explicit_tag"
 
+    first = next(
+        item
+        for item in payload["questions"]
+        if item["prompt"] == "Describe the target population and unmet need. (max 300 words)"
+    )
+    second = next(
+        item
+        for item in payload["questions"]
+        if item["prompt"] == "Provide an implementation timeline by quarter. (max 500 words)"
+    )
+    assert first["internal_id"] == "Q1"
+    assert first["id"] == "Q1"
+    assert first["original_id"] == "REQ-101"
+    assert second["internal_id"] == "Q2"
+    assert second["id"] == "Q2"
+    assert second["original_id"] == "REQUIREMENT-202"
+
 
 def test_extract_questions_pass_structured_outlines_preserves_provenance() -> None:
     rfp_text = """
@@ -308,3 +325,51 @@ Question 2: Provide two measurable annual outcomes.
 
     assert provenance_by_prompt["Describe the need statement for your service area."] == "fallback_question"
     assert provenance_by_prompt["Provide two measurable annual outcomes."] == "fallback_question"
+
+    first = next(item for item in payload["questions"] if item["prompt"] == "Describe the need statement for your service area.")
+    second = next(item for item in payload["questions"] if item["prompt"] == "Provide two measurable annual outcomes.")
+    assert first["internal_id"] == "Q1"
+    assert first["original_id"] == "Question 1"
+    assert second["internal_id"] == "Q2"
+    assert second["original_id"] == "Question 2"
+
+
+def test_merge_requirements_keeps_internal_id_and_preserves_original_id_from_nova() -> None:
+    deterministic = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [
+            {
+                "id": "Q1",
+                "internal_id": "Q1",
+                "prompt": "Need Statement (350 words max): Describe the specific community need.",
+                "limit": {"type": "words", "value": 350},
+            }
+        ],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [],
+    }
+    nova = {
+        "funder": "City Grants Office",
+        "deadline": "April 1, 2026",
+        "eligibility": [],
+        "questions": [
+            {
+                "id": "REQ-101",
+                "prompt": "Need Statement (350 words max): Describe the specific community need.",
+                "limit": {"type": "words", "value": 350},
+                "original_id": "REQ-101",
+            }
+        ],
+        "required_attachments": [],
+        "rubric": [],
+        "disallowed_costs": [],
+    }
+
+    merged = merge_requirements_payload(deterministic, nova)
+    question = merged["questions"][0]
+    assert question["id"] == "Q1"
+    assert question["internal_id"] == "Q1"
+    assert question["original_id"] == "REQ-101"
