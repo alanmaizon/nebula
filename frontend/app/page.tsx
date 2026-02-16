@@ -2,9 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
+import MissingEvidencePanel from "./components/MissingEvidencePanel";
+import TraceabilityPanel from "./components/TraceabilityPanel";
+import {
+  extractTraceabilityData,
+  type JsonValue,
+} from "./lib/traceability";
+
 const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
-type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
 type RunStatus = "idle" | "loading" | "success" | "error";
 
 type PipelineRunResult = {
@@ -682,6 +688,17 @@ export default function HomePage() {
     ];
   }, [result]);
 
+  const traceability = useMemo(() => {
+    if (!result) {
+      return {
+        sections: [],
+        citationCount: 0,
+        missingEvidenceGroups: [],
+      };
+    }
+    return extractTraceabilityData(result.exportJson);
+  }, [result]);
+
   if (!showWorkspace) {
     return (
       <main className="nebula-landing">
@@ -926,8 +943,13 @@ export default function HomePage() {
                         <strong>{item.label}:</strong> {item.value}
                       </span>
                     ))}
+                    <span>
+                      <strong>Citations:</strong> {traceability.citationCount}
+                    </span>
                   </section>
                 ) : null}
+
+                <TraceabilityPanel sections={traceability.sections} />
 
                 <MarkdownViewer
                   content={result.exportMarkdown}
@@ -935,6 +957,12 @@ export default function HomePage() {
                 />
               </div>
             ) : null}
+
+            <MissingEvidencePanel
+              groups={traceability.missingEvidenceGroups}
+              status={runStatus}
+              errorMessage={runError}
+            />
 
             {runStatus === "error" ? <p className="error-text">{runError ?? "Pipeline failed."}</p> : null}
           </section>
