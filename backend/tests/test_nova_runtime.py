@@ -91,3 +91,76 @@ def test_nova_orchestrator_wraps_malformed_json_parse_errors() -> None:
                 }
             ]
         )
+
+
+def test_nova_orchestrator_adaptive_extraction_merges_windows_and_reports_diagnostics() -> None:
+    class MultiWindowClient:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+            self.window_call = 0
+
+        def converse(self, **kwargs):
+            self.calls.append(kwargs)
+            prompt = kwargs["messages"][0]["content"][0]["text"]
+            if "Extraction window" in prompt:
+                self.window_call += 1
+                if self.window_call == 1:
+                    text = (
+                        '{"funder":"City Community Fund","deadline":"March 30, 2026","eligibility":[],'  # noqa: E501
+                        '"questions":[{"id":"REQ-101","prompt":"Need Statement (250 words max): Describe local need.","limit":{"type":"words","value":250}}],'  # noqa: E501
+                        '"required_attachments":[],"rubric":[],"disallowed_costs":[]}'
+                    )
+                elif self.window_call == 2:
+                    text = (
+                        '{"funder":"City Community Fund","deadline":"March 30, 2026","eligibility":[],'  # noqa: E501
+                        '"questions":[{"id":"REQ-101","prompt":"Need Statement (250 words max): Describe local need.","limit":{"type":"words","value":250}},'  # noqa: E501
+                        '{"id":"REQ-202","prompt":"Program Design (350 words max): Explain implementation.","limit":{"type":"words","value":350}}],'  # noqa: E501
+                        '"required_attachments":[],"rubric":[],"disallowed_costs":[]}'
+                    )
+                else:
+                    text = (
+                        '{"funder":"City Community Fund","deadline":"March 30, 2026","eligibility":[],'  # noqa: E501
+                        '"questions":[{"id":"REQ-202","prompt":"Program Design (350 words max): Explain implementation.","limit":{"type":"words","value":350}}],'  # noqa: E501
+                        '"required_attachments":[],"rubric":[],"disallowed_costs":[]}'
+                    )
+                return {"output": {"message": {"content": [{"text": text}]}}}
+
+            # non-extraction path fallback (unused in this test)
+            text = '{"items":[{"requirement_id":"Q1","status":"met","notes":"Covered","evidence_refs":["rfp.txt:p1"]}]}'  # noqa: E501
+            return {"output": {"message": {"content": [{"text": text}]}}}
+
+    runtime_settings = settings.model_copy(deep=True)
+    runtime_settings.extraction_context_max_chunks = 2
+    runtime_settings.extraction_context_max_total_chars = 200
+    runtime_settings.extraction_window_size_chunks = 2
+    runtime_settings.extraction_window_overlap_chunks = 1
+    runtime_settings.extraction_window_max_passes = 3
+
+    client = MultiWindowClient()
+    orchestrator = BedrockNovaOrchestrator(settings=runtime_settings, client=client)
+    chunks = [
+        {"file_name": "rfp.txt", "page": 1, "text": "Need Statement requirement detail one."},
+        {"file_name": "rfp.txt", "page": 2, "text": "Need Statement requirement detail two."},
+        {"file_name": "rfp.txt", "page": 3, "text": "Program Design requirement detail one."},
+        {"file_name": "rfp.txt", "page": 4, "text": "Program Design requirement detail two."},
+    ]
+
+    payload = orchestrator.extract_requirements(chunks)
+    questions = payload["questions"]
+    diagnostics = payload["_extraction_diagnostics"]
+
+    assert len(client.calls) == diagnostics["window_count"]
+    assert diagnostics["mode"] == "multi_pass"
+    assert diagnostics["window_count"] >= 2
+    assert diagnostics["raw_candidates"] == 4
+    assert diagnostics["deduped_candidates"] == 2
+    assert diagnostics["dropped_candidates"] == 2
+    assert diagnostics["dedupe_ratio"] == 0.5
+    assert diagnostics["window_overlap_chunks"] == 1
+    assert len(diagnostics["window_ranges"]) == diagnostics["window_count"]
+    assert len(diagnostics["window_context_chars"]) == diagnostics["window_count"]
+    assert len(diagnostics["per_window_candidates"]) == diagnostics["window_count"]
+
+    prompts = {item["prompt"] for item in questions}
+    assert "Need Statement (250 words max): Describe local need." in prompts
+    assert "Program Design (350 words max): Explain implementation." in prompts

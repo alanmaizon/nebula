@@ -556,9 +556,22 @@ def create_app() -> FastAPI:
         extraction_mode = "deterministic-only"
         nova_error: str | None = None
         nova_question_count = 0
+        adaptive_context: dict[str, object] = {
+            "mode": "deterministic-only",
+            "window_count": 0,
+            "raw_candidates": 0,
+            "deduped_candidates": 0,
+            "dropped_candidates": 0,
+            "dedupe_ratio": 0.0,
+        }
         runner = orchestrator or get_nova_orchestrator()
         try:
             nova_payload = runner.extract_requirements(requirement_chunks)
+            if isinstance(nova_payload, dict):
+                diagnostics = nova_payload.get("_extraction_diagnostics")
+                if isinstance(diagnostics, dict):
+                    adaptive_context = diagnostics
+                nova_payload = {key: value for key, value in nova_payload.items() if key != "_extraction_diagnostics"}
             nova_question_count = len(nova_payload.get("questions", [])) if isinstance(nova_payload, dict) else 0
             if isinstance(nova_payload, dict):
                 extracted_payload = merge_requirements_payload(deterministic_payload, nova_payload)
@@ -597,6 +610,7 @@ def create_app() -> FastAPI:
                 "nova_question_count": nova_question_count,
                 "nova_error": nova_error,
                 "rfp_selection": rfp_selection,
+                "adaptive_context": adaptive_context,
             },
             "chunks": chunks,
         }

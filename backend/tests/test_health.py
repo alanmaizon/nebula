@@ -554,6 +554,10 @@ Disallowed costs:
         assert len(requirements["disallowed_costs"]) >= 1
         assert extraction["mode"] in {"deterministic+nova", "deterministic-only"}
         assert extraction["deterministic_question_count"] >= 2
+        adaptive_context = extraction["adaptive_context"]
+        assert adaptive_context["mode"] in {"single_pass", "multi_pass", "deterministic-only"}
+        assert adaptive_context["window_count"] >= 0
+        assert adaptive_context["deduped_candidates"] >= 0
 
         latest = client.get(f"/projects/{project_id}/requirements/latest")
         assert latest.status_code == 200

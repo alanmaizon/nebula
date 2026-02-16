@@ -211,6 +211,10 @@ Current backend runtime path (Nova on Bedrock):
   - endpoint: `backend/app/main.py` (`extract_requirements`)
   - orchestrator: `backend/app/nova_runtime.py` (`BedrockNovaOrchestrator.extract_requirements`)
   - deterministic pre-pass: `backend/app/requirements.py` multi-pass extraction (`explicit_tag`, `structured_outline`, `inline_indicator`, `fallback_question`) with question provenance and dual IDs (`internal_id`, `original_id`)
+  - adaptive Nova context planner:
+    - single-pass extraction for small RFPs
+    - multi-pass overlapping chunk windows for long RFPs with deterministic merge/dedupe across windows
+    - extraction diagnostics emitted in API metadata (`window_count`, `dedupe_ratio`, dropped candidate counts)
   - model ID: `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
   - artifact source tag: `nova-agents-v1`
 - `POST /projects/{project_id}/generate-section`
