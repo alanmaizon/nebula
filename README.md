@@ -61,7 +61,7 @@ docker compose up --build
 - `GET /projects/{id}/export`
 
 ## Notes
-- Current parser extracts text from text-like files (`.txt`, `.md`, `.csv`, `.json`, `.yaml`, `.yml`, `.xml`, `.html`).
+- Current parser registry supports `.txt`, `.md`, `.csv`, `.json`, `.yaml`, `.yml`, `.xml`, `.html`, plus native `.pdf`, `.docx`, and `.rtf`.
 - Embedding modes: `EMBEDDING_MODE=hash|bedrock|hybrid` with `BEDROCK_EMBEDDING_MODEL_ID` for Bedrock-backed vectors.
 - Deterministic requirements extraction uses ordered passes (`explicit_tag` -> `structured_outline` -> `inline_indicator` -> `fallback_question`) and stores question-level provenance.
 - If embedding settings change after indexing, API responses may include `warnings` with `code: embedding_dim_drift`; re-index documents to resolve.

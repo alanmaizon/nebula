@@ -1252,13 +1252,13 @@ def create_app() -> FastAPI:
                 size_bytes=len(content),
                 upload_batch_id=upload_batch_id,
             )
-            pages = extract_text_pages(
+            extraction = extract_text_pages(
                 content=content,
                 content_type=str(document["content_type"]),
                 file_name=safe_name,
             )
             chunks = chunk_pages(
-                pages=pages,
+                pages=extraction.pages,
                 chunk_size_chars=settings.chunk_size_chars,
                 chunk_overlap_chars=settings.chunk_overlap_chars,
                 embedding_dim=settings.embedding_dim,
@@ -1269,7 +1269,7 @@ def create_app() -> FastAPI:
                 content=content,
                 content_type=str(document["content_type"]),
                 file_name=safe_name,
-                pages=pages,
+                extraction=extraction,
                 chunks=chunks,
             )
             quality = str(parse_report.get("quality", "none"))
@@ -1295,7 +1295,7 @@ def create_app() -> FastAPI:
             saved_documents.append(
                 {
                     **public_document,
-                    "pages_extracted": len(pages),
+                    "pages_extracted": len(extraction.pages),
                     "chunks_indexed": len(chunks),
                     "parse_report": parse_report,
                 }
@@ -1402,9 +1402,9 @@ def create_app() -> FastAPI:
                 )
 
             content = path.read_bytes()
-            pages = extract_text_pages(content=content, content_type=content_type, file_name=file_name)
+            extraction = extract_text_pages(content=content, content_type=content_type, file_name=file_name)
             chunks = chunk_pages(
-                pages=pages,
+                pages=extraction.pages,
                 chunk_size_chars=settings.chunk_size_chars,
                 chunk_overlap_chars=settings.chunk_overlap_chars,
                 embedding_dim=settings.embedding_dim,
@@ -1415,7 +1415,7 @@ def create_app() -> FastAPI:
                 content=content,
                 content_type=content_type,
                 file_name=file_name,
-                pages=pages,
+                extraction=extraction,
                 chunks=chunks,
             )
             quality = str(parse_report.get("quality", "none"))
@@ -1444,7 +1444,7 @@ def create_app() -> FastAPI:
             reindexed_documents.append(
                 {
                     **public_document,
-                    "pages_extracted": len(pages),
+                    "pages_extracted": len(extraction.pages),
                     "chunks_indexed": len(chunks),
                     "parse_report": parse_report,
                 }

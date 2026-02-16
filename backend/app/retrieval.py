@@ -6,20 +6,9 @@ import logging
 import math
 import re
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Literal
 
-
-TEXT_FILE_EXTENSIONS = {
-    ".txt",
-    ".md",
-    ".csv",
-    ".json",
-    ".yaml",
-    ".yml",
-    ".xml",
-    ".html",
-}
+from app.parsers import ParseResult, ParserRegistry
 
 logger = logging.getLogger("nebula.retrieval")
 
@@ -30,6 +19,15 @@ EmbeddingMode = Literal["hash", "bedrock", "hybrid"]
 class ExtractedPage:
     page: int
     text: str
+
+
+@dataclass(frozen=True)
+class TextExtraction:
+    pages: list[ExtractedPage]
+    parser_id: str
+    text_extractable: bool
+    error: str | None = None
+    fallback_parser_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -247,34 +245,27 @@ def _append_warning_once(warnings: list[dict[str, object]], warning: dict[str, o
     warnings.append(warning)
 
 
-def _is_text_file(content_type: str, file_name: str) -> bool:
-    if content_type.startswith("text/"):
-        return True
-    return Path(file_name).suffix.lower() in TEXT_FILE_EXTENSIONS
+_PARSER_REGISTRY = ParserRegistry()
 
 
-def extract_text_pages(content: bytes, content_type: str, file_name: str) -> list[ExtractedPage]:
-    if not _is_text_file(content_type=content_type, file_name=file_name):
-        return []
+def _from_parse_result(result: ParseResult) -> TextExtraction:
+    pages = [ExtractedPage(page=page.page, text=page.text) for page in result.pages]
+    return TextExtraction(
+        pages=pages,
+        parser_id=result.parser_id,
+        text_extractable=result.text_extractable,
+        error=result.error,
+        fallback_parser_id=result.fallback_parser_id,
+    )
 
-    text: str | None = None
-    for encoding in ("utf-8", "latin-1"):
-        try:
-            text = content.decode(encoding)
-            break
-        except UnicodeDecodeError:
-            continue
 
-    if text is None:
-        return []
-
-    pages = text.replace("\r\n", "\n").split("\f")
-    result: list[ExtractedPage] = []
-    for idx, page_text in enumerate(pages, start=1):
-        cleaned = page_text.strip()
-        if cleaned:
-            result.append(ExtractedPage(page=idx, text=cleaned))
-    return result
+def extract_text_pages(content: bytes, content_type: str, file_name: str) -> TextExtraction:
+    parse_result = _PARSER_REGISTRY.parse(
+        content=content,
+        content_type=content_type,
+        file_name=file_name,
+    )
+    return _from_parse_result(parse_result)
 
 
 def build_parse_report(
@@ -282,12 +273,13 @@ def build_parse_report(
     content: bytes,
     content_type: str,
     file_name: str,
-    pages: list[ExtractedPage],
+    extraction: TextExtraction,
     chunks: list[ChunkPayload],
 ) -> dict[str, object]:
+    del content_type, file_name
     bytes_in = len(content)
-    chars_extracted = sum(len(page.text) for page in pages)
-    text_extractable = _is_text_file(content_type=content_type, file_name=file_name)
+    chars_extracted = sum(len(page.text) for page in extraction.pages)
+    text_extractable = extraction.text_extractable
     text_density = round(chars_extracted / max(1, bytes_in), 3)
 
     embedding_providers: dict[str, int] = {}
@@ -299,6 +291,9 @@ def build_parse_report(
     if not text_extractable:
         quality = "none"
         reason = "unsupported_file_type"
+    elif extraction.error:
+        quality = "none"
+        reason = "parser_error"
     elif chars_extracted == 0:
         quality = "none"
         reason = "no_text_extracted"
@@ -313,9 +308,12 @@ def build_parse_report(
         "quality": quality,
         "reason": reason,
         "text_extractable": text_extractable,
+        "parser_id": extraction.parser_id,
+        "fallback_parser_id": extraction.fallback_parser_id,
+        "parser_error": extraction.error,
         "bytes_in": bytes_in,
         "chars_extracted": chars_extracted,
-        "pages_extracted": len(pages),
+        "pages_extracted": len(extraction.pages),
         "chunks_indexed": len(chunks),
         "embedding_providers": embedding_providers,
         "text_density": text_density,

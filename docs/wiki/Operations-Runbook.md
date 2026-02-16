@@ -9,6 +9,10 @@
 - Update `docs/status.yml`.
 - Run `python scripts/sync_docs.py`.
 - Triage dependency and CodeQL findings.
+- Verify parser dependencies remain pinned and installed in runtime image:
+  - `pypdf`
+  - `python-docx`
+  - `striprtf`
 
 ## Incident Template
 - `Time detected`:

@@ -1,4 +1,5 @@
 from pathlib import Path
+from io import BytesIO
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,55 @@ from app.coverage import build_coverage_payload
 from app.drafting import build_draft_payload
 from app.main import app
 from app.requirements import extract_requirements_payload
+
+
+def _build_pdf_bytes(text: str) -> bytes:
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_ref = writer._add_object(font)
+    resources = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): font_ref})})
+    page[NameObject("/Resources")] = resources
+
+    safe_text = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    content_stream = DecodedStreamObject()
+    content_stream.set_data(f"BT /F1 12 Tf 72 720 Td ({safe_text}) Tj ET".encode("utf-8"))
+    content_ref = writer._add_object(content_stream)
+    page[NameObject("/Contents")] = content_ref
+
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def _build_docx_bytes(lines: list[str]) -> bytes:
+    from docx import Document
+
+    doc = Document()
+    for line in lines:
+        doc.add_paragraph(line)
+
+    buffer = BytesIO()
+    doc.save(buffer)
+    return buffer.getvalue()
+
+
+def _build_rtf_bytes(line: str) -> bytes:
+    return (
+        "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Arial;}}\\f0\\fs24 "
+        + line.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+        + "}"
+    ).encode("utf-8")
 
 
 @pytest.fixture(autouse=True)
@@ -101,7 +151,7 @@ def test_upload_parse_report_marks_unsupported_file_types(tmp_path: Path) -> Non
 
         upload_response = client.post(
             f"/projects/{project_id}/upload",
-            files=[("files", ("scan.pdf", b"%PDF-1.7 binary payload", "application/pdf"))],
+            files=[("files", ("scan.bin", b"\x00\x01\x02\x03binary", "application/octet-stream"))],
         )
         assert upload_response.status_code == 200
         payload = upload_response.json()
@@ -109,7 +159,84 @@ def test_upload_parse_report_marks_unsupported_file_types(tmp_path: Path) -> Non
         report = document["parse_report"]
         assert report["quality"] == "none"
         assert report["reason"] == "unsupported_file_type"
+        assert report["parser_id"] == "none"
         assert report["chunks_indexed"] == 0
+
+
+def test_upload_parses_pdf_docx_and_rtf_documents(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 80
+    settings.chunk_overlap_chars = 20
+    settings.embedding_dim = 64
+
+    pdf_bytes = _build_pdf_bytes("Grant need statement with citation-ready outcomes.")
+    docx_bytes = _build_docx_bytes(
+        [
+            "Program design includes quarterly milestones.",
+            "Evaluation metrics track job placement and retention.",
+        ]
+    )
+    rtf_bytes = _build_rtf_bytes("Attachment narrative with budget justification.")
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Parser Registry"}).json()["id"]
+        upload_response = client.post(
+            f"/projects/{project_id}/upload",
+            files=[
+                ("files", ("sample.pdf", pdf_bytes, "application/pdf")),
+                (
+                    "files",
+                    (
+                        "sample.docx",
+                        docx_bytes,
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ),
+                ("files", ("sample.rtf", rtf_bytes, "application/rtf")),
+            ],
+        )
+        assert upload_response.status_code == 200
+        payload = upload_response.json()
+        assert payload["parse_report"]["documents_total"] == 3
+        assert payload["parse_report"]["quality_counts"]["none"] == 0
+
+        by_name = {document["file_name"]: document for document in payload["documents"]}
+        assert by_name["sample.pdf"]["parse_report"]["parser_id"] == "pdf"
+        assert by_name["sample.docx"]["parse_report"]["parser_id"] == "docx"
+        assert by_name["sample.rtf"]["parse_report"]["parser_id"] == "rtf"
+
+        for file_name in ("sample.pdf", "sample.docx", "sample.rtf"):
+            report = by_name[file_name]["parse_report"]
+            assert report["quality"] in {"good", "low"}
+            assert report["reason"] in {"ok", "low_extracted_text", "low_text_density"}
+            assert report["chars_extracted"] > 0
+            assert report["pages_extracted"] >= 1
+            assert by_name[file_name]["chunks_indexed"] >= 1
+
+
+def test_upload_parse_report_marks_malformed_pdf_as_parser_error(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 80
+    settings.chunk_overlap_chars = 20
+    settings.embedding_dim = 64
+
+    with TestClient(app) as client:
+        project_id = client.post("/projects", json={"name": "Malformed PDF"}).json()["id"]
+        upload_response = client.post(
+            f"/projects/{project_id}/upload",
+            files=[("files", ("broken.pdf", b"%PDF-1.7\nbad-pdf", "application/pdf"))],
+        )
+
+        assert upload_response.status_code == 200
+        payload = upload_response.json()
+        report = payload["documents"][0]["parse_report"]
+        assert report["parser_id"] == "pdf"
+        assert report["quality"] == "none"
+        assert report["reason"] == "parser_error"
+        assert report["chunks_indexed"] == 0
+        assert report["parser_error"]
 
 
 def test_upload_rejects_oversized_file(tmp_path: Path) -> None:
