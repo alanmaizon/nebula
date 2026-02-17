@@ -12,11 +12,15 @@ permissions:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
   ECR_BACKEND_REPOSITORY: ${{ secrets.ECR_BACKEND_REPOSITORY }}
   ECR_FRONTEND_REPOSITORY: ${{ secrets.ECR_FRONTEND_REPOSITORY }}
   ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
   ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
   ECS_FRONTEND_SERVICE: ${{ secrets.ECS_FRONTEND_SERVICE }}
+  ECS_BACKEND_CONTAINER_NAME: ${{ secrets.ECS_BACKEND_CONTAINER_NAME }}
+  ECS_FRONTEND_CONTAINER_NAME: ${{ secrets.ECS_FRONTEND_CONTAINER_NAME }}
+  NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE }}
 
 jobs:
   deploy:
@@ -25,84 +29,264 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Check deploy configuration
+      - name: Validate deploy configuration
         id: config
+        shell: bash
         run: |
-          if [ -z "${{ secrets.AWS_REGION }}" ] || \
-             [ -z "${{ secrets.AWS_ROLE_TO_ASSUME }}" ] || \
-             [ -z "${{ secrets.ECR_BACKEND_REPOSITORY }}" ] || \
-             [ -z "${{ secrets.ECR_FRONTEND_REPOSITORY }}" ] || \
-             [ -z "${{ secrets.ECS_CLUSTER }}" ] || \
-             [ -z "${{ secrets.ECS_BACKEND_SERVICE }}" ] || \
-             [ -z "${{ secrets.ECS_FRONTEND_SERVICE }}" ]; then
-            echo "enabled=false" >> "${GITHUB_OUTPUT}"
-            echo "Skipping deploy because required AWS secrets are not configured."
-          else
-            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          set -euo pipefail
+
+          missing=()
+          required=(
+            AWS_REGION
+            AWS_ROLE_TO_ASSUME
+            ECR_BACKEND_REPOSITORY
+            ECS_CLUSTER
+            ECS_BACKEND_SERVICE
+          )
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              missing+=("$key")
+            fi
+          done
+
+          deploy_frontend="false"
+          if [[ -n "${ECR_FRONTEND_REPOSITORY:-}" || -n "${ECS_FRONTEND_SERVICE:-}" ]]; then
+            deploy_frontend="true"
+            if [[ -z "${ECR_FRONTEND_REPOSITORY:-}" ]]; then
+              missing+=("ECR_FRONTEND_REPOSITORY")
+            fi
+            if [[ -z "${ECS_FRONTEND_SERVICE:-}" ]]; then
+              missing+=("ECS_FRONTEND_SERVICE")
+            fi
+            if [[ -z "${NEXT_PUBLIC_API_BASE:-}" ]]; then
+              missing+=("NEXT_PUBLIC_API_BASE")
+            fi
           fi
 
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            echo "Missing required deploy configuration values:" >&2
+            printf ' - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+          echo "deploy_frontend=${deploy_frontend}" >> "${GITHUB_OUTPUT}"
+
       - name: Configure AWS credentials
-        if: ${{ steps.config.outputs.enabled == 'true' }}
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
 
       - name: Login to Amazon ECR
-        if: ${{ steps.config.outputs.enabled == 'true' }}
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Resolve image names
-        if: ${{ steps.config.outputs.enabled == 'true' }}
+      - name: Resolve image names and container names
+        shell: bash
         run: |
+          set -euo pipefail
           REGISTRY="${{ steps.ecr.outputs.registry }}"
           BACKEND_IMAGE="${REGISTRY}/${ECR_BACKEND_REPOSITORY}:${GITHUB_SHA}"
-          BACKEND_IMAGE_LATEST="${REGISTRY}/${ECR_BACKEND_REPOSITORY}:latest"
           FRONTEND_IMAGE="${REGISTRY}/${ECR_FRONTEND_REPOSITORY}:${GITHUB_SHA}"
-          FRONTEND_IMAGE_LATEST="${REGISTRY}/${ECR_FRONTEND_REPOSITORY}:latest"
+
+          BACKEND_CONTAINER_NAME="${ECS_BACKEND_CONTAINER_NAME:-$ECS_BACKEND_SERVICE}"
+          FRONTEND_CONTAINER_NAME="${ECS_FRONTEND_CONTAINER_NAME:-$ECS_FRONTEND_SERVICE}"
+
           echo "BACKEND_IMAGE=${BACKEND_IMAGE}" >> "${GITHUB_ENV}"
-          echo "BACKEND_IMAGE_LATEST=${BACKEND_IMAGE_LATEST}" >> "${GITHUB_ENV}"
           echo "FRONTEND_IMAGE=${FRONTEND_IMAGE}" >> "${GITHUB_ENV}"
-          echo "FRONTEND_IMAGE_LATEST=${FRONTEND_IMAGE_LATEST}" >> "${GITHUB_ENV}"
+          echo "BACKEND_CONTAINER_NAME=${BACKEND_CONTAINER_NAME}" >> "${GITHUB_ENV}"
+          echo "FRONTEND_CONTAINER_NAME=${FRONTEND_CONTAINER_NAME}" >> "${GITHUB_ENV}"
+
+      - name: Validate AWS deployment readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          args=(
+            --region "${AWS_REGION}"
+            --cluster "${ECS_CLUSTER}"
+            --backend-service "${ECS_BACKEND_SERVICE}"
+            --backend-container "${BACKEND_CONTAINER_NAME}"
+            --backend-repo "${ECR_BACKEND_REPOSITORY}"
+            --role-arn "${AWS_ROLE_TO_ASSUME}"
+          )
+
+          if [[ "${{ steps.config.outputs.deploy_frontend }}" == "true" ]]; then
+            args+=(
+              --frontend-service "${ECS_FRONTEND_SERVICE}"
+              --frontend-container "${FRONTEND_CONTAINER_NAME}"
+              --frontend-repo "${ECR_FRONTEND_REPOSITORY}"
+            )
+          fi
+
+          bash scripts/aws/check_deploy_readiness.sh "${args[@]}"
 
       - name: Build and push backend image
-        if: ${{ steps.config.outputs.enabled == 'true' }}
+        shell: bash
         run: |
+          set -euo pipefail
           docker build -t "${BACKEND_IMAGE}" backend
-          docker tag "${BACKEND_IMAGE}" "${BACKEND_IMAGE_LATEST}"
           docker push "${BACKEND_IMAGE}"
-          docker push "${BACKEND_IMAGE_LATEST}"
 
       - name: Build and push frontend image
-        if: ${{ steps.config.outputs.enabled == 'true' }}
+        if: ${{ steps.config.outputs.deploy_frontend == 'true' }}
+        shell: bash
         run: |
+          set -euo pipefail
           docker build \
-            --build-arg NEXT_PUBLIC_API_BASE="${{ secrets.NEXT_PUBLIC_API_BASE }}" \
+            --build-arg NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE}" \
             -t "${FRONTEND_IMAGE}" \
             frontend
-          docker tag "${FRONTEND_IMAGE}" "${FRONTEND_IMAGE_LATEST}"
           docker push "${FRONTEND_IMAGE}"
-          docker push "${FRONTEND_IMAGE_LATEST}"
 
-      - name: Roll out ECS services
-        if: ${{ steps.config.outputs.enabled == 'true' }}
+      - name: Register backend task definition revision
+        shell: bash
         run: |
+          set -euo pipefail
+
+          BACKEND_TASK_DEF_ARN="$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_BACKEND_SERVICE}" \
+            --query 'services[0].taskDefinition' \
+            --output text)"
+
+          if [[ -z "${BACKEND_TASK_DEF_ARN}" || "${BACKEND_TASK_DEF_ARN}" == "None" ]]; then
+            echo "Unable to resolve backend task definition for service ${ECS_BACKEND_SERVICE}" >&2
+            exit 1
+          fi
+
+          aws ecs describe-task-definition \
+            --task-definition "${BACKEND_TASK_DEF_ARN}" \
+            --query 'taskDefinition' \
+            > backend-taskdef.base.json
+
+          jq -e --arg NAME "${BACKEND_CONTAINER_NAME}" '.containerDefinitions[] | select(.name == $NAME)' backend-taskdef.base.json > /dev/null || {
+            echo "Backend container '${BACKEND_CONTAINER_NAME}' not found in task definition ${BACKEND_TASK_DEF_ARN}" >&2
+            exit 1
+          }
+
+          jq \
+            --arg IMAGE "${BACKEND_IMAGE}" \
+            --arg NAME "${BACKEND_CONTAINER_NAME}" \
+            '
+              .containerDefinitions |= map(
+                if .name == $NAME
+                then .image = $IMAGE
+                else .
+                end
+              )
+              | del(
+                  .taskDefinitionArn,
+                  .revision,
+                  .status,
+                  .requiresAttributes,
+                  .compatibilities,
+                  .registeredAt,
+                  .registeredBy,
+                  .deregisteredAt
+                )
+            ' \
+            backend-taskdef.base.json > backend-taskdef.rendered.json
+
+          BACKEND_NEW_TASK_DEF_ARN="$(aws ecs register-task-definition \
+            --cli-input-json file://backend-taskdef.rendered.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+
+          echo "BACKEND_NEW_TASK_DEF_ARN=${BACKEND_NEW_TASK_DEF_ARN}" >> "${GITHUB_ENV}"
+
+      - name: Register frontend task definition revision
+        if: ${{ steps.config.outputs.deploy_frontend == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FRONTEND_TASK_DEF_ARN="$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_FRONTEND_SERVICE}" \
+            --query 'services[0].taskDefinition' \
+            --output text)"
+
+          if [[ -z "${FRONTEND_TASK_DEF_ARN}" || "${FRONTEND_TASK_DEF_ARN}" == "None" ]]; then
+            echo "Unable to resolve frontend task definition for service ${ECS_FRONTEND_SERVICE}" >&2
+            exit 1
+          fi
+
+          aws ecs describe-task-definition \
+            --task-definition "${FRONTEND_TASK_DEF_ARN}" \
+            --query 'taskDefinition' \
+            > frontend-taskdef.base.json
+
+          jq -e --arg NAME "${FRONTEND_CONTAINER_NAME}" '.containerDefinitions[] | select(.name == $NAME)' frontend-taskdef.base.json > /dev/null || {
+            echo "Frontend container '${FRONTEND_CONTAINER_NAME}' not found in task definition ${FRONTEND_TASK_DEF_ARN}" >&2
+            exit 1
+          }
+
+          jq \
+            --arg IMAGE "${FRONTEND_IMAGE}" \
+            --arg NAME "${FRONTEND_CONTAINER_NAME}" \
+            '
+              .containerDefinitions |= map(
+                if .name == $NAME
+                then .image = $IMAGE
+                else .
+                end
+              )
+              | del(
+                  .taskDefinitionArn,
+                  .revision,
+                  .status,
+                  .requiresAttributes,
+                  .compatibilities,
+                  .registeredAt,
+                  .registeredBy,
+                  .deregisteredAt
+                )
+            ' \
+            frontend-taskdef.base.json > frontend-taskdef.rendered.json
+
+          FRONTEND_NEW_TASK_DEF_ARN="$(aws ecs register-task-definition \
+            --cli-input-json file://frontend-taskdef.rendered.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+
+          echo "FRONTEND_NEW_TASK_DEF_ARN=${FRONTEND_NEW_TASK_DEF_ARN}" >> "${GITHUB_ENV}"
+
+      - name: Update backend ECS service
+        shell: bash
+        run: |
+          set -euo pipefail
           aws ecs update-service \
             --cluster "${ECS_CLUSTER}" \
             --service "${ECS_BACKEND_SERVICE}" \
-            --force-new-deployment
+            --task-definition "${BACKEND_NEW_TASK_DEF_ARN}"
+
+      - name: Update frontend ECS service
+        if: ${{ steps.config.outputs.deploy_frontend == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
           aws ecs update-service \
             --cluster "${ECS_CLUSTER}" \
             --service "${ECS_FRONTEND_SERVICE}" \
-            --force-new-deployment
+            --task-definition "${FRONTEND_NEW_TASK_DEF_ARN}"
 
       - name: Wait for ECS services stability
-        if: ${{ steps.config.outputs.enabled == 'true' }}
+        shell: bash
         run: |
-          aws ecs wait services-stable \
-            --cluster "${ECS_CLUSTER}" \
-            --services "${ECS_BACKEND_SERVICE}" "${ECS_FRONTEND_SERVICE}"
+          set -euo pipefail
+          if [[ "${{ steps.config.outputs.deploy_frontend }}" == "true" ]]; then
+            aws ecs wait services-stable \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_BACKEND_SERVICE}" "${ECS_FRONTEND_SERVICE}"
+          else
+            aws ecs wait services-stable \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_BACKEND_SERVICE}"
+          fi
+
           echo "Deployment completed for ECS services:"
           echo "- ${ECS_BACKEND_SERVICE}"
-          echo "- ${ECS_FRONTEND_SERVICE}"
+          if [[ "${{ steps.config.outputs.deploy_frontend }}" == "true" ]]; then
+            echo "- ${ECS_FRONTEND_SERVICE}"
+          fi

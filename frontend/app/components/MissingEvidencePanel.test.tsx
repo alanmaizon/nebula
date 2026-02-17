@@ -39,6 +39,7 @@ describe("MissingEvidencePanel", () => {
         errorMessage="Coverage computation failed"
       />
     );
-    expect(screen.getByText("Coverage computation failed")).toBeInTheDocument();
+    expect(screen.getByText(/Run failed before missing-evidence analysis\./)).toBeInTheDocument();
+    expect(screen.getByText(/Cause: Coverage computation failed/)).toBeInTheDocument();
   });
 });

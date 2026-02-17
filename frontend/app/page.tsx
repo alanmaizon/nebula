@@ -17,8 +17,7 @@ import {
   extractTraceabilityData,
   type JsonValue,
 } from "./lib/traceability";
-
-const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+import { buildApiUrl, resolveApiBase } from "./lib/apiBase";
 
 type RunStatus = "idle" | "loading" | "success" | "error";
 
@@ -489,12 +488,12 @@ export default function HomePage() {
     return payload;
   }
 
-  async function ensureProject(): Promise<string> {
+  async function ensureProject(apiBase: string): Promise<string> {
     if (projectId.trim()) {
       return projectId;
     }
 
-    const response = await fetch(`${apiBase}/projects`, {
+    const response = await fetch(buildApiUrl(apiBase, "/projects"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: projectName || "Nebula Project" }),
@@ -505,14 +504,17 @@ export default function HomePage() {
     return created;
   }
 
-  async function ensureIndexedDocuments(currentProjectId: string): Promise<IndexedDocumentsResult> {
+  async function ensureIndexedDocuments(
+    currentProjectId: string,
+    apiBase: string
+  ): Promise<IndexedDocumentsResult> {
     if (files.length > 0) {
       appendLog("Uploading selected documents...");
       const formData = new FormData();
       for (const file of files) {
         formData.append("files", file);
       }
-      const response = await fetch(`${apiBase}/projects/${currentProjectId}/upload`, {
+      const response = await fetch(buildApiUrl(apiBase, `/projects/${currentProjectId}/upload`), {
         method: "POST",
         body: formData,
       });
@@ -527,7 +529,7 @@ export default function HomePage() {
 
     appendLog("Checking existing indexed documents...");
     const docsResponse = await fetch(
-      `${apiBase}/projects/${currentProjectId}/documents?document_scope=latest`
+      buildApiUrl(apiBase, `/projects/${currentProjectId}/documents?document_scope=latest`)
     );
     const docsPayload = await parseJsonResponse(docsResponse);
     const docs = Array.isArray(docsPayload.documents)
@@ -551,10 +553,16 @@ export default function HomePage() {
     setRunLog([]);
 
     try {
-      const currentProjectId = await ensureProject();
+      const apiBase = resolveApiBase(
+        process.env.NEXT_PUBLIC_API_BASE,
+        typeof window !== "undefined" ? window.location.protocol : undefined
+      );
+      appendLog(`Using API base: ${apiBase}`);
+
+      const currentProjectId = await ensureProject(apiBase);
       appendLog(`Project ready: ${currentProjectId}`);
 
-      const indexedDocuments = await ensureIndexedDocuments(currentProjectId);
+      const indexedDocuments = await ensureIndexedDocuments(currentProjectId, apiBase);
       appendLog("Running complete Nova workflow...");
       const requestPayload: Record<string, unknown> = { top_k: 6, max_revision_rounds: 1 };
       const trimmedContext = contextBrief.trim();
@@ -563,7 +571,7 @@ export default function HomePage() {
       }
 
       const runResponse = await fetch(
-        `${apiBase}/projects/${currentProjectId}/generate-full-draft?profile=submission`,
+        buildApiUrl(apiBase, `/projects/${currentProjectId}/generate-full-draft?profile=submission`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

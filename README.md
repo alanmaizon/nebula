@@ -50,6 +50,11 @@ docker compose up --build
 - Backend: `http://localhost:8000`
 - Backend docs: `http://localhost:8000/docs`
 
+## AWS Deploy Checklist
+- Workflow: `.github/workflows/deploy-aws.yml`
+- Prerequisites and secrets: `docs/wiki/AWS-Production-Deployment-Checklist.md`
+- Readiness check script: `scripts/aws/check_deploy_readiness.sh`
+
 ## Core API
 - `POST /projects`
 - `POST /projects/{id}/upload`

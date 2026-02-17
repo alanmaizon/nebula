@@ -13,6 +13,8 @@ export default function MissingEvidencePanel({
   status,
   errorMessage,
 }: MissingEvidencePanelProps) {
+  const errorDetail = typeof errorMessage === "string" && errorMessage.trim() ? errorMessage.trim() : null;
+
   return (
     <section className="missing-evidence-shell" aria-label="Missing evidence panel">
       <h4>Missing Evidence</h4>
@@ -22,7 +24,10 @@ export default function MissingEvidencePanel({
       ) : null}
 
       {status === "error" ? (
-        <p className="error-text">{errorMessage ?? "Unable to compute missing evidence."}</p>
+        <p className="error-text">
+          Run failed before missing-evidence analysis.
+          {errorDetail ? ` Cause: ${errorDetail}` : " Unable to compute missing evidence."}
+        </p>
       ) : null}
 
       {status === "success" && groups.length === 0 ? (
