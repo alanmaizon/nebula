@@ -254,7 +254,7 @@ Documentation:
 ## Documentation Cadence
 - Daily: update issue status and project board.
 - Per PR: update docs for any behavior/config/API change.
-- Weekly: update `docs/status.yml` then run `python scripts/sync_docs.py`.
+- Per phase/status update: update `docs/status.yml` then run `python scripts/sync_docs.py`.
 - Milestone close: publish a short retrospective in wiki.
 
 ## Definition of Done (Per Issue)
@@ -265,7 +265,7 @@ Documentation:
 - Rollback or mitigation noted for risky changes.
 
 ## Backlog Management
-- This backlog is living and updated at least weekly.
+- This backlog is living and updated continuously as phase work advances.
 - GitHub Issues are the execution source of truth.
 - `DEVELOPMENT_PLAN.md` captures plan-level backlog by step.
 - `docs/status.yml` captures current-phase progress snapshot.
