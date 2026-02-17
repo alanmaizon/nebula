@@ -60,6 +60,19 @@ docker compose up --build
 - `POST /projects/{id}/coverage`
 - `GET /projects/{id}/export`
 
+## Workspace Quality Workflow
+After each run, review these workspace panels before final export:
+- `Quality Signals`: parse quality counts, extraction mode, candidate dedupe metrics, and RFP ambiguity warnings.
+- `Unresolved Coverage Gaps`: requirement-level `partial` / `missing` items with coverage notes and evidence refs.
+- `Missing Evidence`: grouped upload guidance for unresolved claims.
+
+Recommended flow:
+1. Upload clean, text-searchable source files.
+2. Run generate and review quality diagnostics.
+3. Address flagged gaps with targeted uploads.
+4. Re-run until unresolved gaps are cleared.
+5. Export markdown/json bundle.
+
 ## Notes
 - Current parser registry supports `.txt`, `.md`, `.csv`, `.json`, `.yaml`, `.yml`, `.xml`, `.html`, plus native `.pdf`, `.docx`, and `.rtf`.
 - Embedding modes: `EMBEDDING_MODE=hash|bedrock|hybrid` with `BEDROCK_EMBEDDING_MODEL_ID` for Bedrock-backed vectors.
