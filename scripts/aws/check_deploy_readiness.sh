@@ -293,6 +293,12 @@ check_service() {
      | select(.name == $NAME)
      | (.environment[]? | select(.name == "S3_BUCKET") | .value)) // empty
   ')"
+  local cors_origins
+  cors_origins="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "CORS_ORIGINS") | .value)) // empty
+  ')"
 
   if [[ -n "$db_url" && "$db_url" == sqlite:* ]]; then
     if [[ "${app_env}" == "production" ]]; then
@@ -305,6 +311,17 @@ check_service() {
   if [[ "${app_env}" == "production" ]]; then
     if [[ -z "${storage_backend}" || "${storage_backend}" == "local" || "${storage_backend}" == "filesystem" || "${storage_backend}" == "fs" ]]; then
       fail "Container ${container_name} uses local STORAGE_BACKEND in production; configure S3 storage"
+    fi
+    if [[ -n "${cors_origins}" ]]; then
+      if echo "${cors_origins}" | grep -q "http://"; then
+        fail "Container ${container_name} has insecure CORS_ORIGINS in production (http:// not allowed): ${cors_origins}"
+      fi
+      if echo "${cors_origins}" | grep -Eqi "(^|,)[[:space:]]*\\*([[:space:]]*,|$)"; then
+        fail "Container ${container_name} has wildcard CORS_ORIGINS in production: ${cors_origins}"
+      fi
+      if echo "${cors_origins}" | grep -Eqi "localhost|127\\.0\\.0\\.1"; then
+        fail "Container ${container_name} has localhost CORS_ORIGINS in production: ${cors_origins}"
+      fi
     fi
   fi
 

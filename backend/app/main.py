@@ -65,6 +65,23 @@ def create_app() -> FastAPI:
     cors_origins = settings.cors_origins_list
     if settings.cors_allow_credentials and any(origin == "*" for origin in cors_origins):
         raise RuntimeError("Invalid CORS_ORIGINS: wildcard '*' is not allowed when credentials are enabled.")
+    if settings.app_env == "production":
+        insecure = [origin for origin in cors_origins if origin.strip().lower().startswith("http://")]
+        if insecure:
+            raise RuntimeError(
+                "Invalid CORS_ORIGINS for production: use https:// origins (or empty to disable CORS). "
+                f"Found: {insecure}"
+            )
+        local = [
+            origin
+            for origin in cors_origins
+            if ("localhost" in origin.lower() or "127.0.0.1" in origin.lower())
+        ]
+        if local:
+            raise RuntimeError(
+                "Invalid CORS_ORIGINS for production: localhost origins are not allowed. "
+                f"Found: {local}"
+            )
 
     app = FastAPI(title=settings.app_name, version=APP_VERSION, lifespan=lifespan)
     app.add_middleware(
