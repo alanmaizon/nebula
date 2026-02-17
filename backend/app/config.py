@@ -22,8 +22,11 @@ class Settings(BaseSettings):
     agent_temperature: float = 0.1
     agent_max_tokens: int = 2048
     enable_agentic_orchestration_pilot: bool = False
+    storage_backend: str = "local"  # local|s3
     s3_bucket: str = "nebula-dev"
+    s3_prefix: str = "nebula"
     vector_store: str = "local"
+    # MVP default is sqlite; production should use RDS Postgres (e.g. postgresql://...).
     database_url: str = "sqlite:///./nebula.db"
     storage_root: str = "data/uploads"
     chunk_size_chars: int = 1200

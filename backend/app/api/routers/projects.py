@@ -23,6 +23,7 @@ from app.db import (
     list_documents,
 )
 from app.retrieval import build_parse_report, chunk_pages, extract_text_pages
+from app.storage import StorageError, load_document_bytes, save_document_bytes
 
 
 def build_projects_router(*, get_embedding_service: EmbeddingServiceGetter) -> APIRouter:
@@ -47,8 +48,6 @@ def build_projects_router(*, get_embedding_service: EmbeddingServiceGetter) -> A
         quality_counts: dict[str, int] = {"good": 0, "low": 0, "none": 0}
         embedding_warnings: list[dict[str, object]] = []
         embedding_service = get_embedding_service()
-        project_folder = Path(settings.storage_root) / project_id
-        project_folder.mkdir(parents=True, exist_ok=True)
 
         buffered_uploads: list[tuple[UploadFile, str, bytes]] = []
         total_bytes = 0
@@ -70,14 +69,24 @@ def build_projects_router(*, get_embedding_service: EmbeddingServiceGetter) -> A
             buffered_uploads.append((upload, safe_name, content))
 
         for upload, safe_name, content in buffered_uploads:
-            destination = project_folder / f"{uuid4()}_{safe_name}"
-            destination.write_bytes(content)
+            content_type = upload.content_type or "application/octet-stream"
+            try:
+                storage_path = save_document_bytes(
+                    settings=settings,
+                    project_id=project_id,
+                    upload_batch_id=upload_batch_id,
+                    file_name=safe_name,
+                    content_type=content_type,
+                    content=content,
+                )
+            except StorageError as exc:
+                raise HTTPException(status_code=502, detail=f"Failed to persist upload '{safe_name}': {exc}") from exc
 
             document = create_document(
                 project_id=project_id,
                 file_name=safe_name,
-                content_type=upload.content_type or "application/octet-stream",
-                storage_path=str(destination),
+                content_type=content_type,
+                storage_path=storage_path,
                 size_bytes=len(content),
                 upload_batch_id=upload_batch_id,
             )
@@ -228,14 +237,13 @@ def build_projects_router(*, get_embedding_service: EmbeddingServiceGetter) -> A
             if not storage_path:
                 raise HTTPException(status_code=422, detail=f"Missing storage path for document '{file_name}'.")
 
-            path = Path(storage_path)
-            if not path.exists():
+            try:
+                content = load_document_bytes(settings=settings, storage_path=storage_path)
+            except StorageError as exc:
                 raise HTTPException(
                     status_code=422,
-                    detail=f"Stored file for document '{file_name}' was not found at '{storage_path}'.",
-                )
-
-            content = path.read_bytes()
+                    detail=f"Stored file for document '{file_name}' could not be loaded ({exc}).",
+                ) from exc
             extraction = extract_text_pages(content=content, content_type=content_type, file_name=file_name)
             chunks = chunk_pages(
                 pages=extraction.pages,

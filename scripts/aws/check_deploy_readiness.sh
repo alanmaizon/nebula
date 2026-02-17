@@ -39,7 +39,7 @@ FRONTEND_CONTAINER="${ECS_FRONTEND_CONTAINER_NAME:-}"
 FRONTEND_REPO="${ECR_FRONTEND_REPOSITORY:-}"
 FRONTEND_API_BASE="${NEXT_PUBLIC_API_BASE:-}"
 ROLE_ARN="${AWS_ROLE_TO_ASSUME:-}"
-REQUIRED_BACKEND_VARS="${REQUIRED_BACKEND_VARS:-APP_ENV,AWS_REGION,BEDROCK_MODEL_ID,BEDROCK_LITE_MODEL_ID,BEDROCK_EMBEDDING_MODEL_ID,DATABASE_URL,STORAGE_ROOT,CORS_ORIGINS}"
+REQUIRED_BACKEND_VARS="${REQUIRED_BACKEND_VARS:-APP_ENV,AWS_REGION,BEDROCK_MODEL_ID,BEDROCK_LITE_MODEL_ID,BEDROCK_EMBEDDING_MODEL_ID,DATABASE_URL,STORAGE_BACKEND,S3_BUCKET,S3_PREFIX,STORAGE_ROOT,CORS_ORIGINS}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -275,8 +275,43 @@ check_service() {
      | select(.name == $NAME)
      | (.environment[]? | select(.name == "DATABASE_URL") | .value)) // empty
   ')"
+  local app_env
+  app_env="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "APP_ENV") | .value)) // empty
+  ')"
+  local storage_backend
+  storage_backend="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "STORAGE_BACKEND") | .value)) // empty
+  ')"
+  local s3_bucket
+  s3_bucket="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "S3_BUCKET") | .value)) // empty
+  ')"
+
   if [[ -n "$db_url" && "$db_url" == sqlite:* ]]; then
-    warn "Container ${container_name} uses sqlite DATABASE_URL; use RDS/Postgres for production"
+    if [[ "${app_env}" == "production" ]]; then
+      fail "Container ${container_name} uses sqlite DATABASE_URL in production; configure RDS/Postgres"
+    else
+      warn "Container ${container_name} uses sqlite DATABASE_URL; use RDS/Postgres for production"
+    fi
+  fi
+
+  if [[ "${app_env}" == "production" ]]; then
+    if [[ -z "${storage_backend}" || "${storage_backend}" == "local" || "${storage_backend}" == "filesystem" || "${storage_backend}" == "fs" ]]; then
+      fail "Container ${container_name} uses local STORAGE_BACKEND in production; configure S3 storage"
+    fi
+  fi
+
+  if [[ -n "${storage_backend}" && "${storage_backend}" == "s3" ]]; then
+    if [[ -z "${s3_bucket}" ]]; then
+      fail "Container ${container_name} has STORAGE_BACKEND=s3 but S3_BUCKET is not set"
+    fi
   fi
 
   local app_aws_region
