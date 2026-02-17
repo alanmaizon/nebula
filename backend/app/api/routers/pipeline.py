@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
@@ -29,13 +30,16 @@ from app.api.services.runtime import (
     run_requirements_extraction_for_batch,
     serialize_artifact_reference,
 )
-from app.config import settings
+from app.api.services.tracing import RunTraceRecorder, evaluate_full_draft_run
 from app.db import (
     create_coverage_artifact,
     create_draft_artifact,
+    create_judge_eval_artifact,
     get_latest_coverage_artifact,
     get_latest_draft_artifact,
     get_latest_requirements_artifact,
+    list_judge_eval_artifacts,
+    list_run_trace_events,
 )
 from app.export import ExportCompositionError
 from app.export_bundle import combine_markdown_files
@@ -220,14 +224,38 @@ def build_pipeline_router(
         upload_batch_id: str | None = Query(default=None),
     ) -> dict[str, object]:
         total_started = time.perf_counter()
+        run_id = str(uuid4())
         project, selected_batch_id = resolve_project_upload_batch(
             project_id=project_id,
             document_scope=document_scope,
             upload_batch_id=upload_batch_id,
         )
+        trace = RunTraceRecorder(
+            project_id=project_id,
+            upload_batch_id=selected_batch_id,
+            run_id=run_id,
+        )
+        trace.emit(
+            phase="run",
+            event_type="started",
+            payload={
+                "profile": profile,
+                "include_debug": include_debug,
+                "document_scope": document_scope,
+                "requested_upload_batch_id": upload_batch_id,
+                "top_k": payload.top_k,
+                "max_revision_rounds": payload.max_revision_rounds,
+                "context_brief": payload.context_brief,
+            },
+        )
         runner = get_nova_orchestrator()
 
         extraction_started = time.perf_counter()
+        trace.emit(
+            phase="requirements_extraction",
+            event_type="started",
+            payload={"project_id": project_id, "upload_batch_id": selected_batch_id},
+        )
         extraction_result = run_requirements_extraction_for_batch(
             project_id=project_id,
             selected_batch_id=selected_batch_id,
@@ -236,6 +264,24 @@ def build_pipeline_router(
         )
         extraction_ms = round((time.perf_counter() - extraction_started) * 1000, 2)
         requirements_payload = extraction_result["requirements"]
+        extraction_metadata = extraction_result["extraction"]
+        extraction_validation = extraction_result["validation"]
+        trace.emit(
+            phase="requirements_extraction",
+            event_type="completed",
+            payload={
+                "timing_ms": extraction_ms,
+                "mode": extraction_metadata.get("mode"),
+                "chunks_total": extraction_metadata.get("chunks_total"),
+                "chunks_considered": extraction_metadata.get("chunks_considered"),
+                "deterministic_question_count": extraction_metadata.get("deterministic_question_count"),
+                "nova_question_count": extraction_metadata.get("nova_question_count"),
+                "validation_repaired": extraction_validation.get("repaired"),
+                "validation_error_count": len(extraction_validation.get("errors", []))
+                if isinstance(extraction_validation.get("errors"), list)
+                else 0,
+            },
+        )
         context_brief = payload.context_brief.strip() if payload.context_brief else None
         section_targets = build_section_targets_from_requirements(requirements_payload)
         indexed_chunks = extraction_result["chunks"]
@@ -253,6 +299,15 @@ def build_pipeline_router(
             section_key = str(target["section_key"])
             prompt = str(target["prompt"])
             requirement_id = str(target["requirement_id"])
+            trace.emit(
+                phase="section_drafting",
+                event_type="started",
+                payload={
+                    "section_key": section_key,
+                    "requirement_id": requirement_id,
+                    "top_k_requested": payload.top_k,
+                },
+            )
 
             draft_started = time.perf_counter()
             draft_result = generate_validated_section_draft(
@@ -277,6 +332,21 @@ def build_pipeline_router(
             section_warnings = draft_result.get("warnings")
             if isinstance(section_warnings, list):
                 run_warnings.extend([warning for warning in section_warnings if isinstance(warning, dict)])
+            paragraph_count = len(draft_payload.get("paragraphs", [])) if isinstance(draft_payload, dict) else 0
+            trace.emit(
+                phase="section_drafting",
+                event_type="completed",
+                payload={
+                    "section_key": section_key,
+                    "timing_ms": draft_ms,
+                    "top_k_used": draft_result.get("top_k_used"),
+                    "attempt_count": len(draft_result.get("attempts", []))
+                    if isinstance(draft_result.get("attempts"), list)
+                    else 0,
+                    "paragraph_count": paragraph_count,
+                    "warning_count": len(section_warnings) if isinstance(section_warnings, list) else 0,
+                },
+            )
 
             artifact_meta = create_draft_artifact(
                 project_id=project_id,
@@ -295,6 +365,19 @@ def build_pipeline_router(
             )
             section_coverage_ms = round((time.perf_counter() - section_coverage_started) * 1000, 2)
             section_coverage_ms_total += section_coverage_ms
+            coverage_items = section_coverage.get("items")
+            coverage_item_count = len(coverage_items) if isinstance(coverage_items, list) else 0
+            trace.emit(
+                phase="section_coverage",
+                event_type="completed",
+                payload={
+                    "section_key": section_key,
+                    "timing_ms": section_coverage_ms,
+                    "coverage_items": coverage_item_count,
+                    "validation_repaired": section_repaired,
+                    "validation_error_count": len(section_validation_errors),
+                },
+            )
 
             combined_paragraphs.extend(extract_draft_paragraphs(draft_payload))
 
@@ -329,6 +412,15 @@ def build_pipeline_router(
             "paragraphs": combined_paragraphs,
             "missing_evidence": combined_missing_evidence,
         }
+        trace.emit(
+            phase="coverage_aggregate",
+            event_type="started",
+            payload={
+                "sections_total": len(section_targets),
+                "paragraph_count": len(combined_paragraphs),
+                "missing_evidence_count": len(combined_missing_evidence),
+            },
+        )
         coverage_started = time.perf_counter()
         final_coverage_payload, coverage_repaired, coverage_validation_errors = compute_validated_coverage_payload(
             requirements_payload=requirements_payload,
@@ -344,9 +436,35 @@ def build_pipeline_router(
             source="nova-agents-v1",
             upload_batch_id=selected_batch_id,
         )
+        final_counts = {"met": 0, "partial": 0, "missing": 0}
+        for item in final_coverage_payload.get("items", []) if isinstance(final_coverage_payload, dict) else []:
+            if not isinstance(item, dict):
+                continue
+            status = str(item.get("status") or "").strip().lower()
+            if status in final_counts:
+                final_counts[status] += 1
+        trace.emit(
+            phase="coverage_aggregate",
+            event_type="completed",
+            payload={
+                "timing_ms": coverage_ms_total,
+                "coverage_counts": final_counts,
+                "validation_repaired": coverage_repaired,
+                "validation_error_count": len(coverage_validation_errors),
+            },
+        )
 
         requested_sections = [str(target["section_key"]) for target in section_targets]
         export_started = time.perf_counter()
+        trace.emit(
+            phase="export",
+            event_type="started",
+            payload={
+                "profile": profile,
+                "include_debug": include_debug,
+                "requested_sections": requested_sections,
+            },
+        )
         export_bundle = assemble_export_bundle_for_project(
             request=request,
             project_id=project_id,
@@ -360,7 +478,21 @@ def build_pipeline_router(
             get_nova_orchestrator=get_nova_orchestrator,
         )
         export_ms = round((time.perf_counter() - export_started) * 1000, 2)
-        total_ms = round((time.perf_counter() - total_started) * 1000, 2)
+        export_quality = export_bundle.get("quality_gates")
+        export_warnings = (
+            export_quality.get("warnings")
+            if isinstance(export_quality, dict)
+            else []
+        )
+        trace.emit(
+            phase="export",
+            event_type="completed",
+            payload={
+                "timing_ms": export_ms,
+                "quality_passed": bool(export_quality.get("passed")) if isinstance(export_quality, dict) else False,
+                "quality_warning_count": len(export_warnings) if isinstance(export_warnings, list) else 0,
+            },
+        )
 
         unresolved = collect_unresolved_coverage_items(final_coverage_payload)
         deduped_run_warnings: list[dict[str, object]] = []
@@ -372,13 +504,64 @@ def build_pipeline_router(
             seen_warning_keys.add(key)
             deduped_run_warnings.append(warning)
 
+        judge_eval_payload = evaluate_full_draft_run(
+            requirements_payload=requirements_payload,
+            extraction_metadata=extraction_metadata if isinstance(extraction_metadata, dict) else {},
+            extraction_validation=extraction_validation if isinstance(extraction_validation, dict) else {},
+            section_runs=section_runs,
+            coverage_payload=final_coverage_payload,
+            coverage_validation={
+                "repaired": coverage_repaired,
+                "errors": coverage_validation_errors,
+            },
+            missing_evidence=combined_missing_evidence,
+            unresolved_items=unresolved,
+            export_bundle=export_bundle if isinstance(export_bundle, dict) else {},
+        )
+        judge_eval_gate = judge_eval_payload.get("gate")
+        judge_eval_artifact = create_judge_eval_artifact(
+            project_id=project_id,
+            run_id=run_id,
+            payload=judge_eval_payload,
+            source="judge-eval-v1",
+            upload_batch_id=selected_batch_id,
+        )
+        trace.emit(
+            phase="judge_eval",
+            event_type="completed",
+            payload={
+                "overall_score": judge_eval_payload.get("overall_score"),
+                "gate": judge_eval_gate,
+            },
+        )
+
+        run_status = "complete"
+        if isinstance(judge_eval_gate, dict) and bool(judge_eval_gate.get("flagged", False)):
+            run_status = "flagged_low_quality"
+        if isinstance(judge_eval_gate, dict) and bool(judge_eval_gate.get("blocked", False)):
+            run_status = "blocked_low_quality"
+
+        total_ms = round((time.perf_counter() - total_started) * 1000, 2)
+        trace.emit(
+            phase="run",
+            event_type="completed",
+            payload={
+                "status": run_status,
+                "timing_ms_total": total_ms,
+                "sections_total": len(section_targets),
+                "sections_completed": len(section_runs),
+                "unresolved_count": len(unresolved),
+            },
+        )
+
         response: dict[str, object] = {
             "project_id": project_id,
+            "run_id": run_id,
             "upload_batch_id": selected_batch_id,
             "requirements": requirements_payload,
             "requirements_artifact": extraction_result["artifact"],
-            "requirements_validation": extraction_result["validation"],
-            "extraction": extraction_result["extraction"],
+            "requirements_validation": extraction_validation,
+            "extraction": extraction_metadata,
             "section_runs": section_runs,
             "coverage": final_coverage_payload,
             "coverage_artifact": coverage_artifact,
@@ -388,12 +571,15 @@ def build_pipeline_router(
             },
             "unresolved_gaps": unresolved,
             "export": export_bundle,
+            "judge_eval": judge_eval_payload,
+            "judge_eval_artifact": judge_eval_artifact,
             "run_summary": {
-                "status": "complete",
+                "status": run_status,
                 "sections_total": len(section_targets),
                 "sections_completed": len(section_runs),
                 "max_revision_rounds": payload.max_revision_rounds,
                 "unresolved_count": len(unresolved),
+                "judge_quality_gate": judge_eval_gate if isinstance(judge_eval_gate, dict) else {},
                 "timings_ms": {
                     "extraction": extraction_ms,
                     "drafting": round(drafting_ms_total, 2),
@@ -405,7 +591,52 @@ def build_pipeline_router(
         }
         if deduped_run_warnings:
             response["warnings"] = deduped_run_warnings
+
+        if isinstance(judge_eval_gate, dict) and bool(judge_eval_gate.get("blocked", False)):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Run blocked by judge evaluation thresholds.",
+                    "project_id": project_id,
+                    "run_id": run_id,
+                    "gate": judge_eval_gate,
+                },
+            )
+
         return response
+
+    @router.get("/projects/{project_id}/runs/{run_id}/diagnostics")
+    def get_run_diagnostics(
+        project_id: str,
+        run_id: str,
+        document_scope: str = Query(default="latest", pattern="^(latest|all)$"),
+        upload_batch_id: str | None = Query(default=None),
+    ) -> dict[str, object]:
+        _, selected_batch_id = resolve_project_upload_batch(
+            project_id=project_id,
+            document_scope=document_scope,
+            upload_batch_id=upload_batch_id,
+        )
+        traces = list_run_trace_events(
+            project_id=project_id,
+            run_id=run_id,
+            upload_batch_id=selected_batch_id,
+        )
+        evals = list_judge_eval_artifacts(
+            project_id=project_id,
+            run_id=run_id,
+            upload_batch_id=selected_batch_id,
+        )
+        if not traces and not evals:
+            raise HTTPException(status_code=404, detail="No diagnostics found for project/run")
+
+        return {
+            "project_id": project_id,
+            "run_id": run_id,
+            "upload_batch_id": selected_batch_id,
+            "trace_events": traces,
+            "judge_evals": evals,
+        }
 
     @router.get("/projects/{project_id}/export")
     def export_project(
