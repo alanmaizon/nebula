@@ -200,7 +200,9 @@ erDiagram
 - `POST /projects/{id}/reindex`
 - `POST /projects/{id}/extract-requirements`
 - `POST /projects/{id}/generate-section`
+- `POST /projects/{id}/generate-full-draft`
 - `GET /projects/{id}/export`
+- `GET /projects/{id}/runs/{run_id}/diagnostics`
 
 Contracts for `requirements.json`, `draft.json`, and coverage matrix follow `CONTRIBUTING.md`.
 
@@ -249,6 +251,30 @@ Tradeoffs:
 - Determinism preserved by default (`false`) and bounded retry policy (single retry, bounded `top_k`).
 - Autonomy introduced only in controlled planning/refinement decisions.
 - Citation grounding requirements are unchanged: draft schema still requires explicit citation objects and validation gate remains mandatory.
+
+## 7.3) Phase Traces and Judge Evaluation (Step 8 Hardening)
+
+`POST /projects/{project_id}/generate-full-draft` now emits immutable run traces and a judge-eval artifact:
+
+- Trace persistence: `run_trace_events`
+  - deterministic order enforced by `(run_id, sequence_no)` uniqueness
+  - phases include `run`, `requirements_extraction`, `section_drafting`, `section_coverage`, `coverage_aggregate`, `export`, `judge_eval`
+  - trace payloads are sanitized through the observability redaction layer before persistence
+- Judge evaluation persistence: `judge_eval_artifacts`
+  - first-class artifact keyed by `project_id`, `upload_batch_id`, and `run_id`
+  - rubric dimensions:
+    - extraction completeness
+    - citation integrity
+    - coverage confidence
+    - missing-evidence precision
+  - gate output supports both `flagged` and optional `blocked` behavior via settings:
+    - `JUDGE_EVAL_MIN_OVERALL_SCORE`
+    - `JUDGE_EVAL_MIN_DIMENSION_SCORE`
+    - `JUDGE_EVAL_BLOCK_ON_FAIL`
+
+Diagnostics retrieval:
+- `GET /projects/{project_id}/runs/{run_id}/diagnostics`
+  - returns ordered trace events and judge-eval artifacts for run introspection and operator debugging.
 
 ## 8) Validation and Error Strategy
 - Every model response is schema-validated before persistence.

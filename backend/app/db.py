@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 from typing import Iterator
@@ -117,6 +118,42 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_template_reco_project_id
                 ON template_recommendation_artifacts(project_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS run_trace_events (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                upload_batch_id TEXT,
+                run_id TEXT NOT NULL,
+                sequence_no INTEGER NOT NULL,
+                phase TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                payload_sha256 TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id),
+                UNIQUE(run_id, sequence_no)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_run_trace_events_project_run
+                ON run_trace_events(project_id, run_id, sequence_no ASC);
+            CREATE INDEX IF NOT EXISTS idx_run_trace_events_project_batch
+                ON run_trace_events(project_id, upload_batch_id, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS judge_eval_artifacts (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                upload_batch_id TEXT,
+                run_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_judge_eval_project_run
+                ON judge_eval_artifacts(project_id, run_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_judge_eval_project_batch
+                ON judge_eval_artifacts(project_id, upload_batch_id, created_at DESC);
             """
         )
         _ensure_column(conn, "documents", "upload_batch_id", "TEXT")
@@ -628,3 +665,203 @@ def get_latest_template_recommendation_artifact(project_id: str) -> dict[str, ob
     parsed = dict(row)
     parsed["payload"] = json.loads(parsed.pop("payload_json"))
     return parsed
+
+
+def create_run_trace_event(
+    *,
+    project_id: str,
+    run_id: str,
+    sequence_no: int,
+    phase: str,
+    event_type: str,
+    payload: dict[str, object],
+    upload_batch_id: str | None = None,
+    payload_sha256: str | None = None,
+) -> dict[str, object]:
+    payload_json = json.dumps(payload, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
+    checksum = payload_sha256 or hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+    row = {
+        "id": str(uuid4()),
+        "project_id": project_id,
+        "upload_batch_id": upload_batch_id,
+        "run_id": run_id,
+        "sequence_no": sequence_no,
+        "phase": phase,
+        "event_type": event_type,
+        "payload_json": payload_json,
+        "payload_sha256": checksum,
+        "created_at": _utc_now_iso(),
+    }
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO run_trace_events (
+                id,
+                project_id,
+                upload_batch_id,
+                run_id,
+                sequence_no,
+                phase,
+                event_type,
+                payload_json,
+                payload_sha256,
+                created_at
+            )
+            VALUES (
+                :id,
+                :project_id,
+                :upload_batch_id,
+                :run_id,
+                :sequence_no,
+                :phase,
+                :event_type,
+                :payload_json,
+                :payload_sha256,
+                :created_at
+            )
+            """,
+            row,
+        )
+
+    return {
+        "id": row["id"],
+        "project_id": row["project_id"],
+        "upload_batch_id": row["upload_batch_id"],
+        "run_id": row["run_id"],
+        "sequence_no": row["sequence_no"],
+        "phase": row["phase"],
+        "event_type": row["event_type"],
+        "payload_sha256": row["payload_sha256"],
+        "created_at": row["created_at"],
+    }
+
+
+def list_run_trace_events(
+    project_id: str,
+    run_id: str,
+    *,
+    upload_batch_id: str | None = None,
+) -> list[dict[str, object]]:
+    query = """
+            SELECT
+                id,
+                project_id,
+                upload_batch_id,
+                run_id,
+                sequence_no,
+                phase,
+                event_type,
+                payload_json,
+                payload_sha256,
+                created_at
+            FROM run_trace_events
+            WHERE project_id = ? AND run_id = ?
+    """
+    params: list[object] = [project_id, run_id]
+    if upload_batch_id is not None:
+        query += " AND upload_batch_id = ?"
+        params.append(upload_batch_id)
+    query += " ORDER BY sequence_no ASC, created_at ASC"
+
+    with get_conn() as conn:
+        rows = conn.execute(query, tuple(params)).fetchall()
+
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed = dict(row)
+        parsed["payload"] = json.loads(parsed.pop("payload_json"))
+        parsed_rows.append(parsed)
+    return parsed_rows
+
+
+def get_latest_run_id(project_id: str, *, upload_batch_id: str | None = None) -> str | None:
+    query = """
+            SELECT run_id
+            FROM run_trace_events
+            WHERE project_id = ?
+    """
+    params: list[object] = [project_id]
+    if upload_batch_id is not None:
+        query += " AND upload_batch_id = ?"
+        params.append(upload_batch_id)
+    query += " ORDER BY created_at DESC LIMIT 1"
+
+    with get_conn() as conn:
+        row = conn.execute(query, tuple(params)).fetchone()
+    if row is None:
+        return None
+    value = str(row["run_id"]).strip()
+    return value or None
+
+
+def create_judge_eval_artifact(
+    *,
+    project_id: str,
+    run_id: str,
+    payload: dict[str, object],
+    source: str,
+    upload_batch_id: str | None = None,
+) -> dict[str, object]:
+    artifact = {
+        "id": str(uuid4()),
+        "project_id": project_id,
+        "upload_batch_id": upload_batch_id,
+        "run_id": run_id,
+        "payload_json": json.dumps(payload, ensure_ascii=True),
+        "source": source,
+        "created_at": _utc_now_iso(),
+    }
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO judge_eval_artifacts (id, project_id, upload_batch_id, run_id, payload_json, source, created_at)
+            VALUES (:id, :project_id, :upload_batch_id, :run_id, :payload_json, :source, :created_at)
+            """,
+            artifact,
+        )
+    return {
+        "id": artifact["id"],
+        "project_id": artifact["project_id"],
+        "upload_batch_id": artifact["upload_batch_id"],
+        "run_id": artifact["run_id"],
+        "source": artifact["source"],
+        "created_at": artifact["created_at"],
+    }
+
+
+def list_judge_eval_artifacts(
+    project_id: str,
+    *,
+    run_id: str | None = None,
+    upload_batch_id: str | None = None,
+) -> list[dict[str, object]]:
+    query = """
+            SELECT
+                id,
+                project_id,
+                upload_batch_id,
+                run_id,
+                payload_json,
+                source,
+                created_at
+            FROM judge_eval_artifacts
+            WHERE project_id = ?
+    """
+    params: list[object] = [project_id]
+    if run_id is not None:
+        query += " AND run_id = ?"
+        params.append(run_id)
+    if upload_batch_id is not None:
+        query += " AND upload_batch_id = ?"
+        params.append(upload_batch_id)
+    query += " ORDER BY created_at DESC"
+
+    with get_conn() as conn:
+        rows = conn.execute(query, tuple(params)).fetchall()
+
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed = dict(row)
+        parsed["payload"] = json.loads(parsed.pop("payload_json"))
+        parsed_rows.append(parsed)
+    return parsed_rows

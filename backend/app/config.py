@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     extraction_window_size_chunks: int = 14
     extraction_window_overlap_chunks: int = 4
     extraction_window_max_passes: int = 4
+    judge_eval_min_overall_score: float = 0.65
+    judge_eval_min_dimension_score: float = 0.55
+    judge_eval_block_on_fail: bool = False
     max_upload_files: int = 20
     max_upload_file_bytes: int = 10 * 1024 * 1024
     max_upload_batch_bytes: int = 25 * 1024 * 1024
