@@ -55,7 +55,8 @@ async def lifespan(_: FastAPI):
     if settings.bedrock_validate_model_ids_on_startup:
         validate_bedrock_model_ids(settings)
     init_db()
-    Path(settings.storage_root).mkdir(parents=True, exist_ok=True)
+    if str(settings.storage_backend or "").strip().lower() in {"", "local", "filesystem", "fs"}:
+        Path(settings.storage_root).mkdir(parents=True, exist_ok=True)
     yield
     logger.info("application_shutdown", extra={"event": "application_shutdown"})
 

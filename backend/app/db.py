@@ -12,11 +12,36 @@ from uuid import uuid4
 from app.config import settings
 
 
-def _database_path() -> Path:
+def _normalized_database_url() -> str:
+    return str(settings.database_url or "").strip()
+
+
+def _database_backend() -> str:
+    url = _normalized_database_url()
+    if url.startswith("sqlite:///"):
+        return "sqlite"
+    if url.startswith("postgresql://") or url.startswith("postgres://"):
+        return "postgres"
+    raise RuntimeError(
+        "Unsupported DATABASE_URL. Supported: sqlite:///... (dev) or postgresql://... (production RDS)."
+    )
+
+
+def _sqlite_database_path() -> Path:
+    url = _normalized_database_url()
     prefix = "sqlite:///"
-    if not settings.database_url.startswith(prefix):
-        raise RuntimeError("Only sqlite:/// DATABASE_URL is supported in the MVP baseline.")
-    return Path(settings.database_url[len(prefix) :])
+    if not url.startswith(prefix):
+        raise RuntimeError("sqlite database path requested but DATABASE_URL is not sqlite:///...")
+    return Path(url[len(prefix) :])
+
+
+def _sql(sqlite_sql: str) -> str:
+    """Translate sqlite-style SQL (qmark placeholders) to the active backend."""
+
+    if _database_backend() == "sqlite":
+        return sqlite_sql
+    # psycopg/psycopg2 use %s placeholders.
+    return sqlite_sql.replace("?", "%s")
 
 
 def _utc_now_iso() -> str:
@@ -24,13 +49,7 @@ def _utc_now_iso() -> str:
 
 
 def init_db() -> None:
-    db_path = _database_path()
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with sqlite3.connect(db_path) as conn:
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.executescript(
-            """
+    schema_sql = """
             CREATE TABLE IF NOT EXISTS projects (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -155,7 +174,63 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_judge_eval_project_batch
                 ON judge_eval_artifacts(project_id, upload_batch_id, created_at DESC);
             """
-        )
+
+    backend = _database_backend()
+    if backend == "sqlite":
+        db_path = _sqlite_database_path()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.executescript(schema_sql)
+            _ensure_column(conn, "documents", "upload_batch_id", "TEXT")
+            _ensure_column(conn, "chunks", "upload_batch_id", "TEXT")
+            _ensure_column(conn, "chunks", "embedding_provider", "TEXT")
+            _ensure_column(conn, "requirements_artifacts", "upload_batch_id", "TEXT")
+            _ensure_column(conn, "draft_artifacts", "upload_batch_id", "TEXT")
+            _ensure_column(conn, "coverage_artifacts", "upload_batch_id", "TEXT")
+
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_documents_project_batch ON documents(project_id, upload_batch_id, created_at DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_chunks_project_batch ON chunks(project_id, upload_batch_id, created_at DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_requirements_project_batch ON requirements_artifacts(project_id, upload_batch_id, created_at DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_draft_project_batch_section ON draft_artifacts(project_id, upload_batch_id, section_key, created_at DESC)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_coverage_project_batch ON coverage_artifacts(project_id, upload_batch_id, created_at DESC)"
+            )
+
+            conn.execute(
+                """
+                UPDATE documents
+                SET upload_batch_id = 'legacy'
+                WHERE upload_batch_id IS NULL OR TRIM(upload_batch_id) = ''
+                """
+            )
+            conn.execute(
+                """
+                UPDATE chunks
+                SET upload_batch_id = 'legacy'
+                WHERE upload_batch_id IS NULL OR TRIM(upload_batch_id) = ''
+                """
+            )
+            conn.execute(
+                """
+                UPDATE chunks
+                SET embedding_provider = 'hash'
+                WHERE embedding_provider IS NULL OR TRIM(embedding_provider) = ''
+                """
+            )
+        return
+
+    with get_conn() as conn:
+        conn.executescript(schema_sql)
+        # Postgres supports IF NOT EXISTS for ALTER COLUMN, so keep these idempotent.
         _ensure_column(conn, "documents", "upload_batch_id", "TEXT")
         _ensure_column(conn, "chunks", "upload_batch_id", "TEXT")
         _ensure_column(conn, "chunks", "embedding_provider", "TEXT")
@@ -202,24 +277,70 @@ def init_db() -> None:
         )
 
 
-def _ensure_column(conn: sqlite3.Connection, table_name: str, column_name: str, column_def: str) -> None:
-    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
-    existing_columns = {str(row[1]) for row in rows}
-    if column_name in existing_columns:
+def _ensure_column(conn: object, table_name: str, column_name: str, column_def: str) -> None:
+    if _database_backend() == "sqlite":
+        rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()  # type: ignore[attr-defined]
+        existing_columns = {str(row[1]) for row in rows}
+        if column_name in existing_columns:
+            return
+        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")  # type: ignore[attr-defined]
         return
-    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_def}")
+
+    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_def}")  # type: ignore[attr-defined]
+
+
+class _PostgresConn:
+    def __init__(self, raw_conn: object) -> None:
+        self._raw_conn = raw_conn
+
+    def execute(self, query: str, params: tuple[object, ...] | None = None):
+        from psycopg2.extras import RealDictCursor  # type: ignore
+
+        cursor = self._raw_conn.cursor(cursor_factory=RealDictCursor)  # type: ignore[attr-defined]
+        cursor.execute(_sql(query), params or ())
+        return cursor
+
+    def executemany(self, query: str, seq_of_params: list[tuple[object, ...]]):
+        cursor = self._raw_conn.cursor()  # type: ignore[attr-defined]
+        cursor.executemany(_sql(query), seq_of_params)
+        return cursor
+
+    def executescript(self, script: str) -> None:
+        cursor = self._raw_conn.cursor()  # type: ignore[attr-defined]
+        # Split on statement terminator; schema scripts in this repo contain no string literals with ';'.
+        for statement in script.split(";"):
+            stmt = statement.strip()
+            if not stmt:
+                continue
+            cursor.execute(stmt)
 
 
 @contextmanager
-def get_conn() -> Iterator[sqlite3.Connection]:
-    conn = sqlite3.connect(_database_path())
-    conn.row_factory = sqlite3.Row
+def get_conn() -> Iterator[sqlite3.Connection | _PostgresConn]:
+    backend = _database_backend()
+    if backend == "sqlite":
+        conn = sqlite3.connect(_sqlite_database_path())
+        conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA foreign_keys = ON")
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
+        return
+
     try:
-        conn.execute("PRAGMA foreign_keys = ON")
-        yield conn
-        conn.commit()
+        import psycopg2  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError("psycopg2-binary is required for postgresql DATABASE_URL values.") from exc
+
+    raw_conn = psycopg2.connect(_normalized_database_url())
+    wrapped = _PostgresConn(raw_conn)
+    try:
+        yield wrapped
+        raw_conn.commit()
     finally:
-        conn.close()
+        raw_conn.close()
 
 
 def create_project(name: str) -> dict[str, str]:
@@ -343,20 +464,34 @@ def create_chunks(
 ) -> list[dict[str, object]]:
     now = _utc_now_iso()
     rows: list[dict[str, object]] = []
+    param_rows: list[tuple[object, ...]] = []
     for chunk in chunks:
-        rows.append(
-            {
-                "id": str(uuid4()),
-                "project_id": project_id,
-                "document_id": document_id,
-                "chunk_index": int(chunk["chunk_index"]),
-                "page": int(chunk["page"]),
-                "text": str(chunk["text"]),
-                "embedding_json": json.dumps(chunk["embedding"]),
-                "embedding_provider": str(chunk.get("embedding_provider") or "hash"),
-                "upload_batch_id": upload_batch_id,
-                "created_at": now,
-            }
+        row = {
+            "id": str(uuid4()),
+            "project_id": project_id,
+            "document_id": document_id,
+            "chunk_index": int(chunk["chunk_index"]),
+            "page": int(chunk["page"]),
+            "text": str(chunk["text"]),
+            "embedding_json": json.dumps(chunk["embedding"]),
+            "embedding_provider": str(chunk.get("embedding_provider") or "hash"),
+            "upload_batch_id": upload_batch_id,
+            "created_at": now,
+        }
+        rows.append(row)
+        param_rows.append(
+            (
+                row["id"],
+                row["project_id"],
+                row["document_id"],
+                row["chunk_index"],
+                row["page"],
+                row["text"],
+                row["embedding_json"],
+                row["embedding_provider"],
+                row["upload_batch_id"],
+                row["created_at"],
+            )
         )
 
     if not rows:
@@ -368,11 +503,9 @@ def create_chunks(
             INSERT INTO chunks (
                 id, project_id, document_id, chunk_index, page, text, embedding_json, embedding_provider, upload_batch_id, created_at
             )
-            VALUES (
-                :id, :project_id, :document_id, :chunk_index, :page, :text, :embedding_json, :embedding_provider, :upload_batch_id, :created_at
-            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            rows,
+            param_rows,
         )
     return rows
 
@@ -441,9 +574,16 @@ def create_requirements_artifact(
         conn.execute(
             """
             INSERT INTO requirements_artifacts (id, project_id, payload_json, upload_batch_id, source, created_at)
-            VALUES (:id, :project_id, :payload_json, :upload_batch_id, :source, :created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            artifact,
+            (
+                artifact["id"],
+                artifact["project_id"],
+                artifact["payload_json"],
+                artifact["upload_batch_id"],
+                artifact["source"],
+                artifact["created_at"],
+            ),
         )
     return {
         "id": artifact["id"],
@@ -494,9 +634,17 @@ def create_draft_artifact(
         conn.execute(
             """
             INSERT INTO draft_artifacts (id, project_id, section_key, payload_json, upload_batch_id, source, created_at)
-            VALUES (:id, :project_id, :section_key, :payload_json, :upload_batch_id, :source, :created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            artifact,
+            (
+                artifact["id"],
+                artifact["project_id"],
+                artifact["section_key"],
+                artifact["payload_json"],
+                artifact["upload_batch_id"],
+                artifact["source"],
+                artifact["created_at"],
+            ),
         )
     return {
         "id": artifact["id"],
@@ -558,7 +706,7 @@ def list_latest_draft_artifacts(project_id: str, upload_batch_id: str | None = N
     if upload_batch_id is not None:
         query += " AND d.upload_batch_id = ?"
         params.append(upload_batch_id)
-    query += " ORDER BY d.section_key COLLATE NOCASE ASC"
+    query += " ORDER BY lower(d.section_key) ASC"
     with get_conn() as conn:
         rows = conn.execute(query, tuple(params)).fetchall()
     parsed_rows: list[dict[str, object]] = []
@@ -587,9 +735,16 @@ def create_coverage_artifact(
         conn.execute(
             """
             INSERT INTO coverage_artifacts (id, project_id, payload_json, upload_batch_id, source, created_at)
-            VALUES (:id, :project_id, :payload_json, :upload_batch_id, :source, :created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            artifact,
+            (
+                artifact["id"],
+                artifact["project_id"],
+                artifact["payload_json"],
+                artifact["upload_batch_id"],
+                artifact["source"],
+                artifact["created_at"],
+            ),
         )
     return {
         "id": artifact["id"],
@@ -636,9 +791,15 @@ def create_template_recommendation_artifact(
         conn.execute(
             """
             INSERT INTO template_recommendation_artifacts (id, project_id, payload_json, source, created_at)
-            VALUES (:id, :project_id, :payload_json, :source, :created_at)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            artifact,
+            (
+                artifact["id"],
+                artifact["project_id"],
+                artifact["payload_json"],
+                artifact["source"],
+                artifact["created_at"],
+            ),
         )
     return {
         "id": artifact["id"],
@@ -707,20 +868,20 @@ def create_run_trace_event(
                 payload_sha256,
                 created_at
             )
-            VALUES (
-                :id,
-                :project_id,
-                :upload_batch_id,
-                :run_id,
-                :sequence_no,
-                :phase,
-                :event_type,
-                :payload_json,
-                :payload_sha256,
-                :created_at
-            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            row,
+            (
+                row["id"],
+                row["project_id"],
+                row["upload_batch_id"],
+                row["run_id"],
+                row["sequence_no"],
+                row["phase"],
+                row["event_type"],
+                row["payload_json"],
+                row["payload_sha256"],
+                row["created_at"],
+            ),
         )
 
     return {
@@ -815,9 +976,17 @@ def create_judge_eval_artifact(
         conn.execute(
             """
             INSERT INTO judge_eval_artifacts (id, project_id, upload_batch_id, run_id, payload_json, source, created_at)
-            VALUES (:id, :project_id, :upload_batch_id, :run_id, :payload_json, :source, :created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            artifact,
+            (
+                artifact["id"],
+                artifact["project_id"],
+                artifact["upload_batch_id"],
+                artifact["run_id"],
+                artifact["payload_json"],
+                artifact["source"],
+                artifact["created_at"],
+            ),
         )
     return {
         "id": artifact["id"],

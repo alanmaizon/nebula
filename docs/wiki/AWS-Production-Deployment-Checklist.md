@@ -60,13 +60,32 @@ The backend task definition should provide these runtime keys via container `env
 - `BEDROCK_LITE_MODEL_ID`
 - `BEDROCK_EMBEDDING_MODEL_ID`
 - `DATABASE_URL`
+- `STORAGE_BACKEND` (`local` or `s3`)
+- `S3_BUCKET` (required when `STORAGE_BACKEND=s3`)
+- `S3_PREFIX` (optional; defaults to `nebula`)
 - `STORAGE_ROOT`
 - `CORS_ORIGINS`
 
 Recommendations:
-- Use RDS/Postgres for `DATABASE_URL` in production.
-- Use persistent storage for `STORAGE_ROOT` (S3 and/or durable mounted storage), not ephemeral container-local paths.
+- Use RDS/Postgres for `DATABASE_URL` in production (avoid sqlite on ECS).
+- Store uploaded documents in S3 (`STORAGE_BACKEND=s3`) to avoid filling ephemeral container storage.
 - If Bedrock returns "on-demand throughput isn't supported", set `BEDROCK_MODEL_ID`/`BEDROCK_LITE_MODEL_ID` to an inference profile ID/ARN (example EU: `eu.amazon.nova-pro-v1:0` / `eu.amazon.nova-lite-v1:0`).
+
+### RDS Postgres (Minimal Setup)
+1. Create an RDS Postgres instance (or Aurora Postgres) in the same VPC as ECS, ideally in private subnets.
+2. Security group:
+   - Allow inbound `5432` from the ECS backend task security group.
+3. Configure `DATABASE_URL` for the backend task definition (prefer ECS `secrets` from Secrets Manager).
+
+### S3 Upload Bucket (Minimal Setup)
+1. Create an S3 bucket in your deployment region (block public access on).
+2. Add lifecycle policy (optional) to expire old uploads.
+3. Task role (`nebulaTaskRole`) permissions:
+   - `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` scoped to your bucket/prefix.
+4. Set backend task definition env vars:
+   - `STORAGE_BACKEND=s3`
+   - `S3_BUCKET=<your-bucket>`
+   - `S3_PREFIX=nebula` (or your desired prefix)
 
 ## 3) IAM and OIDC Requirements for GitHub Actions Deploy
 
