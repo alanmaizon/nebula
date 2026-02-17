@@ -1,0 +1,295 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/aws/check_deploy_readiness.sh [options]
+
+Checks AWS deployment readiness for Nebula ECS/ECR pipeline.
+
+Options:
+  --region REGION                  AWS region (default: $AWS_REGION)
+  --profile PROFILE                AWS profile (optional)
+  --cluster NAME                   ECS cluster name
+  --backend-service NAME           ECS backend service name
+  --backend-container NAME         Backend container name (optional; defaults to backend service)
+  --backend-repo NAME              ECR backend repository
+  --frontend-service NAME          ECS frontend service name (optional)
+  --frontend-container NAME        Frontend container name (optional; defaults to frontend service)
+  --frontend-repo NAME             ECR frontend repository (optional)
+  --role-arn ARN                   GitHub deploy IAM role ARN (optional)
+  --required-backend-vars CSV      Required backend env/secrets names
+
+Environment fallbacks:
+  AWS_REGION, AWS_PROFILE, ECS_CLUSTER, ECS_BACKEND_SERVICE, ECS_BACKEND_CONTAINER_NAME,
+  ECR_BACKEND_REPOSITORY, ECS_FRONTEND_SERVICE, ECS_FRONTEND_CONTAINER_NAME,
+  ECR_FRONTEND_REPOSITORY, AWS_ROLE_TO_ASSUME, REQUIRED_BACKEND_VARS
+USAGE
+}
+
+REGION="${AWS_REGION:-}"
+PROFILE="${AWS_PROFILE:-}"
+CLUSTER="${ECS_CLUSTER:-}"
+BACKEND_SERVICE="${ECS_BACKEND_SERVICE:-}"
+BACKEND_CONTAINER="${ECS_BACKEND_CONTAINER_NAME:-}"
+BACKEND_REPO="${ECR_BACKEND_REPOSITORY:-}"
+FRONTEND_SERVICE="${ECS_FRONTEND_SERVICE:-}"
+FRONTEND_CONTAINER="${ECS_FRONTEND_CONTAINER_NAME:-}"
+FRONTEND_REPO="${ECR_FRONTEND_REPOSITORY:-}"
+ROLE_ARN="${AWS_ROLE_TO_ASSUME:-}"
+REQUIRED_BACKEND_VARS="${REQUIRED_BACKEND_VARS:-APP_ENV,AWS_REGION,BEDROCK_MODEL_ID,BEDROCK_LITE_MODEL_ID,BEDROCK_EMBEDDING_MODEL_ID,DATABASE_URL,STORAGE_ROOT,CORS_ORIGINS}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --region)
+      REGION="$2"
+      shift 2
+      ;;
+    --profile)
+      PROFILE="$2"
+      shift 2
+      ;;
+    --cluster)
+      CLUSTER="$2"
+      shift 2
+      ;;
+    --backend-service)
+      BACKEND_SERVICE="$2"
+      shift 2
+      ;;
+    --backend-container)
+      BACKEND_CONTAINER="$2"
+      shift 2
+      ;;
+    --backend-repo)
+      BACKEND_REPO="$2"
+      shift 2
+      ;;
+    --frontend-service)
+      FRONTEND_SERVICE="$2"
+      shift 2
+      ;;
+    --frontend-container)
+      FRONTEND_CONTAINER="$2"
+      shift 2
+      ;;
+    --frontend-repo)
+      FRONTEND_REPO="$2"
+      shift 2
+      ;;
+    --role-arn)
+      ROLE_ARN="$2"
+      shift 2
+      ;;
+    --required-backend-vars)
+      REQUIRED_BACKEND_VARS="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$REGION" ]]; then
+  echo "ERROR: --region or AWS_REGION is required." >&2
+  exit 1
+fi
+if [[ -z "$CLUSTER" || -z "$BACKEND_SERVICE" || -z "$BACKEND_REPO" ]]; then
+  echo "ERROR: cluster/backend-service/backend-repo are required." >&2
+  exit 1
+fi
+
+if [[ -z "$BACKEND_CONTAINER" ]]; then
+  BACKEND_CONTAINER="$BACKEND_SERVICE"
+fi
+if [[ -n "$FRONTEND_SERVICE" && -z "$FRONTEND_CONTAINER" ]]; then
+  FRONTEND_CONTAINER="$FRONTEND_SERVICE"
+fi
+
+AWS_CMD=(aws --region "$REGION")
+if [[ -n "$PROFILE" ]]; then
+  AWS_CMD+=(--profile "$PROFILE")
+fi
+
+failures=()
+warnings=()
+
+pass() {
+  echo "PASS: $1"
+}
+
+fail() {
+  failures+=("$1")
+  echo "FAIL: $1"
+}
+
+warn() {
+  warnings+=("$1")
+  echo "WARN: $1"
+}
+
+aws_json() {
+  "${AWS_CMD[@]}" "$@"
+}
+
+identity_json=""
+if identity_json="$(aws_json sts get-caller-identity --output json 2>/dev/null)"; then
+  account_id="$(echo "$identity_json" | jq -r '.Account')"
+  arn="$(echo "$identity_json" | jq -r '.Arn')"
+  pass "AWS identity resolved (account=$account_id, arn=$arn)"
+else
+  fail "Unable to resolve AWS identity with current credentials/profile"
+fi
+
+oidc_arns=""
+if oidc_arns="$(aws_json iam list-open-id-connect-providers --query 'OpenIDConnectProviderList[].Arn' --output text 2>/dev/null)"; then
+  if echo "$oidc_arns" | tr '\t' '\n' | grep -q 'oidc-provider/token.actions.githubusercontent.com'; then
+    pass "GitHub OIDC provider exists"
+  else
+    fail "Missing IAM OIDC provider for token.actions.githubusercontent.com"
+  fi
+else
+  fail "Unable to query IAM OIDC providers"
+fi
+
+if [[ -n "$ROLE_ARN" ]]; then
+  role_name="${ROLE_ARN##*/}"
+  role_json=""
+  if role_json="$(aws_json iam get-role --role-name "$role_name" --output json 2>/dev/null)"; then
+    if echo "$role_json" | jq -e '
+      .Role.AssumeRolePolicyDocument.Statement[]
+      | select(
+          ((.Principal.Federated // "") | tostring | test("token.actions.githubusercontent.com"))
+          and
+          ((.Action | tostring) | test("AssumeRoleWithWebIdentity"))
+        )
+    ' >/dev/null; then
+      pass "Deploy role trust policy supports GitHub OIDC (${role_name})"
+    else
+      fail "Deploy role trust policy does not allow GitHub OIDC web identity (${role_name})"
+    fi
+  else
+    fail "Deploy role not found or not readable (${role_name})"
+  fi
+else
+  warn "AWS_ROLE_TO_ASSUME/--role-arn not provided; skipping deploy role trust validation"
+fi
+
+if aws_json ecr describe-repositories --repository-names "$BACKEND_REPO" --output json >/dev/null 2>&1; then
+  pass "Backend ECR repository exists (${BACKEND_REPO})"
+else
+  fail "Backend ECR repository missing (${BACKEND_REPO})"
+fi
+
+if [[ -n "$FRONTEND_REPO" ]]; then
+  if aws_json ecr describe-repositories --repository-names "$FRONTEND_REPO" --output json >/dev/null 2>&1; then
+    pass "Frontend ECR repository exists (${FRONTEND_REPO})"
+  else
+    fail "Frontend ECR repository missing (${FRONTEND_REPO})"
+  fi
+fi
+
+cluster_status="$(aws_json ecs describe-clusters --clusters "$CLUSTER" --query 'clusters[0].status' --output text 2>/dev/null || true)"
+if [[ "$cluster_status" == "ACTIVE" ]]; then
+  pass "ECS cluster is active (${CLUSTER})"
+else
+  fail "ECS cluster not found/active (${CLUSTER})"
+fi
+
+check_service() {
+  local service_name="$1"
+  local container_name="$2"
+  local required_csv="$3"
+
+  local service_status
+  service_status="$(aws_json ecs describe-services --cluster "$CLUSTER" --services "$service_name" --query 'services[0].status' --output text 2>/dev/null || true)"
+  if [[ "$service_status" != "ACTIVE" ]]; then
+    fail "ECS service not found/active (${service_name})"
+    return
+  fi
+  pass "ECS service is active (${service_name})"
+
+  local task_def_arn
+  task_def_arn="$(aws_json ecs describe-services --cluster "$CLUSTER" --services "$service_name" --query 'services[0].taskDefinition' --output text 2>/dev/null || true)"
+  if [[ -z "$task_def_arn" || "$task_def_arn" == "None" ]]; then
+    fail "Unable to resolve task definition for service (${service_name})"
+    return
+  fi
+
+  local task_def_json
+  task_def_json="$(aws_json ecs describe-task-definition --task-definition "$task_def_arn" --output json 2>/dev/null || true)"
+  if [[ -z "$task_def_json" ]]; then
+    fail "Unable to describe task definition (${task_def_arn})"
+    return
+  fi
+
+  if ! echo "$task_def_json" | jq -e --arg NAME "$container_name" '.taskDefinition.containerDefinitions[] | select(.name == $NAME)' >/dev/null; then
+    local available
+    available="$(echo "$task_def_json" | jq -r '.taskDefinition.containerDefinitions[].name' | paste -sd ',' -)"
+    fail "Container '${container_name}' not found in task definition (${task_def_arn}); available: ${available}"
+    return
+  fi
+
+  local key_set
+  key_set="$( (echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+      [
+        (.taskDefinition.containerDefinitions[] | select(.name == $NAME) | .environment[]?.name),
+        (.taskDefinition.containerDefinitions[] | select(.name == $NAME) | .secrets[]?.name)
+      ]
+      | flatten
+      | unique
+      | .[]
+    ') || true )"
+  local missing=()
+  IFS=',' read -r -a required_keys <<< "$required_csv"
+  for key in "${required_keys[@]}"; do
+    key="${key// /}"
+    [[ -z "$key" ]] && continue
+    if ! echo "$key_set" | grep -qx "$key"; then
+      missing+=("$key")
+    fi
+  done
+
+  if [[ "${#missing[@]}" -eq 0 ]]; then
+    pass "Container ${container_name} includes required env/secrets keys"
+  else
+    fail "Container ${container_name} missing required env/secrets keys: ${missing[*]}"
+  fi
+
+  local db_url
+  db_url="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "DATABASE_URL") | .value)) // empty
+  ')"
+  if [[ -n "$db_url" && "$db_url" == sqlite:* ]]; then
+    warn "Container ${container_name} uses sqlite DATABASE_URL; use RDS/Postgres for production"
+  fi
+}
+
+check_service "$BACKEND_SERVICE" "$BACKEND_CONTAINER" "$REQUIRED_BACKEND_VARS"
+
+if [[ -n "$FRONTEND_SERVICE" ]]; then
+  check_service "$FRONTEND_SERVICE" "$FRONTEND_CONTAINER" "NEXT_PUBLIC_API_BASE"
+fi
+
+echo ""
+echo "Summary:"
+echo "- failures: ${#failures[@]}"
+echo "- warnings: ${#warnings[@]}"
+
+if [[ "${#warnings[@]}" -gt 0 ]]; then
+  printf '  WARN: %s\n' "${warnings[@]}"
+fi
+
+if [[ "${#failures[@]}" -gt 0 ]]; then
+  printf '  FAIL: %s\n' "${failures[@]}"
+  exit 1
+fi

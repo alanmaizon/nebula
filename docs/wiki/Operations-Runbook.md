@@ -9,6 +9,8 @@
 - Update `docs/status.yml`.
 - Run `python scripts/sync_docs.py`.
 - Triage dependency and CodeQL findings.
+- Run AWS deployment readiness check before planned production releases:
+  - `bash scripts/aws/check_deploy_readiness.sh ...`
 - Verify parser dependencies remain pinned and installed in runtime image:
   - `pypdf`
   - `python-docx`
