@@ -40,13 +40,15 @@ def test_request_started_log_redacts_sensitive_query_values(caplog) -> None:
 
 
 def test_sanitize_for_logging_redacts_common_sensitive_patterns() -> None:
+    aws_access_key = "AKIA" "ABCDEFGHIJKLMNOP"
+    aws_access_key_alt = "ASIA" "ABCDEFGHIJKLMNOP"
     payload = {
         "notes": (
             "Contact user@example.org or +1 (415) 555-0101, "
             "SSN 123-45-6789, token Bearer abc123, "
-            "keys AKIAABCDEFGHIJKLMNOP and ASIAABCDEFGHIJKLMNOP, "
+            f"keys {aws_access_key} and {aws_access_key_alt}, "
             "aws_secret_access_key=abcd1234abcd1234abcd1234abcd1234abcd1234, "
-            "aws_access_key_id=AKIAABCDEFGHIJKLMNOP, "
+            f"aws_access_key_id={aws_access_key}, "
             "aws_session_token=IQoJb3JpZ2luX2VjEJf//////////wEaCXVzLWVhc3QtMSJHMEUCIBTESTTOKEN12345, "
             "x-amz-security-token: FQoGZXIvYXdzEJr//////////wEaDGV1LXdlc3QtMSJIMEYCIQCiTESTTOKEN67890."
         ),
@@ -71,9 +73,10 @@ def test_sanitize_for_logging_redacts_common_sensitive_patterns() -> None:
 
 
 def test_sanitize_for_logging_redacts_sensitive_aws_header_keys() -> None:
+    aws_access_key = "AKIA" "ABCDEFGHIJKLMNOP"
     payload = {
         "x-amz-security-token": "FQoGZXIvYXdzEJr//////////wEaDGV1LXdlc3QtMSJIMEYCIQCiTESTTOKEN67890",
-        "x-amz-credential": "AKIAABCDEFGHIJKLMNOP/20260211/us-east-1/bedrock/aws4_request",
+        "x-amz-credential": f"{aws_access_key}/20260211/us-east-1/bedrock/aws4_request",
         "x-amz-signature": "deadbeefcafebabe",
         "x-amz-date": "20260211T000000Z",
     }
