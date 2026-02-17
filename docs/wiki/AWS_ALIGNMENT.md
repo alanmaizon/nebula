@@ -15,8 +15,10 @@ Reference docs:
 - Target state: production deployment on AWS for multi-tenant compliance workloads.
 
 ## Submission Model Baseline (Nova)
-- Primary generation model ID: `amazon.nova-pro-v1:0` (`BEDROCK_MODEL_ID`)
-- Supporting model ID: `amazon.nova-lite-v1:0` (`BEDROCK_LITE_MODEL_ID`)
+- Primary generation model identifier: `amazon.nova-pro-v1:0` (`BEDROCK_MODEL_ID`)
+  - If Bedrock returns "on-demand throughput isn't supported", use an inference profile ID/ARN instead (example EU: `eu.amazon.nova-pro-v1:0`).
+- Supporting model identifier: `amazon.nova-lite-v1:0` (`BEDROCK_LITE_MODEL_ID`)
+  - If Bedrock returns "on-demand throughput isn't supported", use an inference profile ID/ARN instead (example EU: `eu.amazon.nova-lite-v1:0`).
 - Runtime path implementation: `backend/app/nova_runtime.py` and `backend/app/main.py`
 - Evidence note: `docs/wiki/Nova-Evidence-Run-2026-02-08.md`
 

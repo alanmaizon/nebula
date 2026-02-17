@@ -278,6 +278,51 @@ check_service() {
   if [[ -n "$db_url" && "$db_url" == sqlite:* ]]; then
     warn "Container ${container_name} uses sqlite DATABASE_URL; use RDS/Postgres for production"
   fi
+
+  local app_aws_region
+  app_aws_region="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "AWS_REGION") | .value)) // empty
+  ')"
+  local bedrock_model_id
+  bedrock_model_id="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "BEDROCK_MODEL_ID") | .value)) // empty
+  ')"
+  local bedrock_lite_model_id
+  bedrock_lite_model_id="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "BEDROCK_LITE_MODEL_ID") | .value)) // empty
+  ')"
+
+  if [[ -n "$app_aws_region" ]]; then
+    for id in "$bedrock_model_id" "$bedrock_lite_model_id"; do
+      [[ -z "$id" ]] && continue
+
+      # If the identifier looks like a region-scoped inference profile (e.g. "<scope>.amazon.nova-..."),
+      # ensure scope aligns with AWS_REGION to avoid "model identifier is invalid" failures.
+      if [[ "$id" =~ ^([a-z]+)\.amazon\.nova- ]]; then
+        local scope="${BASH_REMATCH[1]}"
+        if [[ "$app_aws_region" == eu-* && "$scope" != "eu" && "$scope" != "global" ]]; then
+          fail "Bedrock Nova identifier scope '${scope}.' does not match AWS_REGION='${app_aws_region}' for ${container_name}; use 'eu.' (or a foundation ID) for EU regions"
+        fi
+        if [[ "$app_aws_region" == us-* && "$scope" != "us" && "$scope" != "global" ]]; then
+          fail "Bedrock Nova identifier scope '${scope}.' does not match AWS_REGION='${app_aws_region}' for ${container_name}; use 'us.' (or a foundation ID) for US regions"
+        fi
+      fi
+    done
+
+    # Bedrock may require inference profiles for Nova invocation in some regions/accounts even when
+    # the foundation model identifier is valid.
+    if [[ "$app_aws_region" == eu-* ]]; then
+      if [[ "$bedrock_model_id" == amazon.nova-* || "$bedrock_lite_model_id" == amazon.nova-* ]]; then
+        warn "Container ${container_name} uses Nova foundation IDs with AWS_REGION='${app_aws_region}'; if you hit 'on-demand throughput isn't supported', switch to EU inference profiles (eu.amazon.nova-pro-v1:0 / eu.amazon.nova-lite-v1:0)"
+      fi
+    fi
+  fi
 }
 
 check_service "$BACKEND_SERVICE" "$BACKEND_CONTAINER" "$REQUIRED_BACKEND_VARS"

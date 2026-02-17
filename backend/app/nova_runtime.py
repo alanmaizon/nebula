@@ -194,6 +194,11 @@ class BedrockNovaOrchestrator:
         except Exception as exc:  # pragma: no cover - exercised via runtime integration
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
             error_text = str(exc)
+            normalized_error = (
+                error_text.lower()
+                .replace("\u2019", "'")
+                .replace("\u2018", "'")
+            )
             logger.warning(
                 "nova_invoke_failed",
                 extra={
@@ -204,9 +209,31 @@ class BedrockNovaOrchestrator:
                 },
             )
 
+            # Some Bedrock models are not invocable via on-demand throughput in all regions/accounts.
+            # In those cases Bedrock requires using an inference profile ID/ARN for the model.
+            if "on-demand throughput" in normalized_error and "inference profile" in normalized_error:
+                region = self._settings.aws_region
+                example = ""
+                if region.startswith("eu-"):
+                    example = (
+                        "\nExample (EU):\n"
+                        "- BEDROCK_MODEL_ID=eu.amazon.nova-pro-v1:0\n"
+                        "- BEDROCK_LITE_MODEL_ID=eu.amazon.nova-lite-v1:0"
+                    )
+
+                raise NovaRuntimeError(
+                    "Bedrock invocation failed: on-demand throughput isn't supported for the configured model "
+                    "identifier. Use an inference profile ID/ARN that contains this model.\n"
+                    f"AWS_REGION={region}\n"
+                    f"BEDROCK_MODEL_ID={self._settings.bedrock_model_id}\n"
+                    f"BEDROCK_LITE_MODEL_ID={self._settings.bedrock_lite_model_id}"
+                    f"{example}\n"
+                    "Verify via: aws bedrock list-inference-profiles --region <region>"
+                ) from exc
+
             # Bedrock is strict about which identifiers are valid in a given region. A common failure mode is
             # accidentally using a region-prefixed identifier (e.g. `us.amazon...`) in a non-US region.
-            if "model identifier is invalid" in error_text.lower():
+            if "model identifier is invalid" in normalized_error:
                 raise NovaRuntimeError(
                     "Bedrock invocation failed: the configured model identifier is invalid.\n"
                     f"AWS_REGION={self._settings.aws_region}\n"
@@ -444,10 +471,14 @@ class BedrockNovaOrchestrator:
 
 
 def validate_bedrock_model_ids(settings: Settings) -> None:
-    """Optionally validate configured Bedrock model IDs on startup.
+    """Optionally validate configured Bedrock model identifiers on startup.
 
-    This preflight intentionally validates *foundation model IDs* (e.g. `amazon.nova-pro-v1:0`).
-    If you are using inference profiles or other identifiers, leave this disabled.
+    Supports:
+    - Foundation model IDs/ARNs (e.g. `amazon.nova-pro-v1:0`)
+    - Inference profile IDs/ARNs (e.g. `eu.amazon.nova-pro-v1:0`)
+
+    Note: This does not validate whether on-demand invocation is supported. Some models/regions require
+    using an inference profile for runtime invocation even when the foundation model identifier is valid.
     """
 
     if not settings.bedrock_validate_model_ids_on_startup:
@@ -468,10 +499,29 @@ def validate_bedrock_model_ids(settings: Settings) -> None:
     for env_name, model_id in checks:
         if not model_id:
             raise NovaRuntimeError(f"{env_name} is not configured (AWS_REGION={aws_region}).")
+
+        foundation_exc: Exception | None = None
+        inference_exc: Exception | None = None
+
         try:
             client.get_foundation_model(modelIdentifier=model_id)
+            continue
         except Exception as exc:
-            raise NovaRuntimeError(
-                f"Bedrock model ID validation failed for {env_name}='{model_id}' (AWS_REGION={aws_region}): {exc}. "
-                "Recommended: use 'amazon.nova-pro-v1:0' and 'amazon.nova-lite-v1:0' and enable model access in Bedrock."
-            ) from exc
+            foundation_exc = exc
+
+        if hasattr(client, "get_inference_profile"):
+            try:
+                client.get_inference_profile(inferenceProfileIdentifier=model_id)
+                continue
+            except Exception as exc:
+                inference_exc = exc
+        else:
+            inference_exc = RuntimeError("boto3 Bedrock client does not support inference profiles.")
+
+        raise NovaRuntimeError(
+            f"Bedrock model identifier validation failed for {env_name}='{model_id}' (AWS_REGION={aws_region}). "
+            f"get_foundation_model error: {foundation_exc}. get_inference_profile error: {inference_exc}. "
+            "Recommended: enable model access in Bedrock and use either foundation IDs "
+            "('amazon.nova-pro-v1:0'/'amazon.nova-lite-v1:0') or region inference profiles "
+            "(e.g. 'eu.amazon.nova-pro-v1:0'/'eu.amazon.nova-lite-v1:0')."
+        ) from inference_exc

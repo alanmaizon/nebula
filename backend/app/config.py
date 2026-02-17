@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     request_id_header: str = "X-Request-ID"
 
     aws_region: str = "us-east-1"
-    # Use region-agnostic foundation model IDs by default. Region-prefixed IDs (e.g. `us.*`)
-    # are not valid in all regions and can cause production failures.
+    # Default to region-agnostic foundation model IDs. In some regions/accounts, on-demand Bedrock
+    # invocation may require an inference profile ID/ARN (e.g. `eu.amazon.nova-pro-v1:0`).
     bedrock_model_id: str = "amazon.nova-pro-v1:0"
     bedrock_lite_model_id: str = "amazon.nova-lite-v1:0"
     bedrock_validate_model_ids_on_startup: bool = False

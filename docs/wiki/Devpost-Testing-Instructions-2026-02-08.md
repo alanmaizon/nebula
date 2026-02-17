@@ -23,6 +23,7 @@ To run Nebula locally for judging, use Docker and valid AWS Bedrock credentials.
    - `export BEDROCK_MODEL_ID=amazon.nova-pro-v1:0`
    - `export BEDROCK_LITE_MODEL_ID=amazon.nova-lite-v1:0`
    - Ensure your selected model IDs are available in the region set in `AWS_REGION`.
+   - If Bedrock returns "on-demand throughput isn't supported", use an inference profile ID/ARN instead (example EU: `eu.amazon.nova-pro-v1:0` / `eu.amazon.nova-lite-v1:0`).
 4. Start the stack:
    - `scripts/run_docker_env.sh restart`
 5. Access the app:
