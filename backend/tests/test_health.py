@@ -139,6 +139,47 @@ def test_create_project_and_upload(tmp_path: Path) -> None:
         assert "storage_path" not in list_response.json()["documents"][0]
 
 
+def test_api_prefix_routes_match_root_routes_for_project_and_pipeline(tmp_path: Path) -> None:
+    settings.database_url = f"sqlite:///{tmp_path}/test.db"
+    settings.storage_root = str(tmp_path / "uploads")
+    settings.chunk_size_chars = 200
+    settings.chunk_overlap_chars = 40
+    settings.embedding_dim = 64
+
+    rfp_text = b"""
+Question 1: Need Statement (300 words max): Describe the local need.
+Question 2: Program Design (400 words max): Explain activities and timeline.
+"""
+    evidence_text = b"""
+Need Statement evidence: 1240 households served in 2024.
+Program Design evidence: monthly coaching, employer partnerships, quarterly milestones.
+"""
+
+    with TestClient(app) as client:
+        project_response = client.post("/api/projects", json={"name": "API Prefix Routing"})
+        assert project_response.status_code == 200
+        project_id = project_response.json()["id"]
+
+        upload_response = client.post(
+            f"/api/projects/{project_id}/upload",
+            files=[
+                ("files", ("rfp.txt", rfp_text, "text/plain")),
+                ("files", ("evidence.txt", evidence_text, "text/plain")),
+            ],
+        )
+        assert upload_response.status_code == 200
+        assert upload_response.json()["project_id"] == project_id
+
+        run_response = client.post(
+            f"/api/projects/{project_id}/generate-full-draft?profile=submission",
+            json={"top_k": 4, "max_revision_rounds": 1},
+        )
+        assert run_response.status_code == 200
+        payload = run_response.json()
+        assert payload["project_id"] == project_id
+        assert payload["run_summary"]["status"] == "complete"
+
+
 def test_upload_parse_report_marks_unsupported_file_types(tmp_path: Path) -> None:
     settings.database_url = f"sqlite:///{tmp_path}/test.db"
     settings.storage_root = str(tmp_path / "uploads")

@@ -17,13 +17,14 @@ Options:
   --frontend-service NAME          ECS frontend service name (optional)
   --frontend-container NAME        Frontend container name (optional; defaults to frontend service)
   --frontend-repo NAME             ECR frontend repository (optional)
+  --frontend-api-base VALUE        Frontend API base (default: $NEXT_PUBLIC_API_BASE)
   --role-arn ARN                   GitHub deploy IAM role ARN (optional)
   --required-backend-vars CSV      Required backend env/secrets names
 
 Environment fallbacks:
   AWS_REGION, AWS_PROFILE, ECS_CLUSTER, ECS_BACKEND_SERVICE, ECS_BACKEND_CONTAINER_NAME,
   ECR_BACKEND_REPOSITORY, ECS_FRONTEND_SERVICE, ECS_FRONTEND_CONTAINER_NAME,
-  ECR_FRONTEND_REPOSITORY, AWS_ROLE_TO_ASSUME, REQUIRED_BACKEND_VARS
+  ECR_FRONTEND_REPOSITORY, NEXT_PUBLIC_API_BASE, AWS_ROLE_TO_ASSUME, REQUIRED_BACKEND_VARS
 USAGE
 }
 
@@ -36,6 +37,7 @@ BACKEND_REPO="${ECR_BACKEND_REPOSITORY:-}"
 FRONTEND_SERVICE="${ECS_FRONTEND_SERVICE:-}"
 FRONTEND_CONTAINER="${ECS_FRONTEND_CONTAINER_NAME:-}"
 FRONTEND_REPO="${ECR_FRONTEND_REPOSITORY:-}"
+FRONTEND_API_BASE="${NEXT_PUBLIC_API_BASE:-}"
 ROLE_ARN="${AWS_ROLE_TO_ASSUME:-}"
 REQUIRED_BACKEND_VARS="${REQUIRED_BACKEND_VARS:-APP_ENV,AWS_REGION,BEDROCK_MODEL_ID,BEDROCK_LITE_MODEL_ID,BEDROCK_EMBEDDING_MODEL_ID,DATABASE_URL,STORAGE_ROOT,CORS_ORIGINS}"
 
@@ -75,6 +77,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --frontend-repo)
       FRONTEND_REPO="$2"
+      shift 2
+      ;;
+    --frontend-api-base)
+      FRONTEND_API_BASE="$2"
       shift 2
       ;;
     --role-arn)
@@ -276,8 +282,37 @@ check_service() {
 
 check_service "$BACKEND_SERVICE" "$BACKEND_CONTAINER" "$REQUIRED_BACKEND_VARS"
 
+validate_frontend_api_base() {
+  local raw="$1"
+  local normalized="${raw%"${raw##*[![:space:]]}"}"
+  normalized="${normalized#"${normalized%%[![:space:]]*}"}"
+
+  if [[ -z "$normalized" ]]; then
+    fail "NEXT_PUBLIC_API_BASE is required when frontend deployment is enabled"
+    return
+  fi
+
+  if [[ "$normalized" == "/api" || "$normalized" == "/api/" ]]; then
+    pass "NEXT_PUBLIC_API_BASE is configured for same-origin API routing (${normalized})"
+    return
+  fi
+
+  if [[ "$normalized" == http://* ]]; then
+    fail "NEXT_PUBLIC_API_BASE uses insecure http:// (${normalized}); use '/api' or an https:// URL"
+    return
+  fi
+
+  if [[ "$normalized" == https://* ]]; then
+    pass "NEXT_PUBLIC_API_BASE uses HTTPS origin (${normalized})"
+    return
+  fi
+
+  fail "NEXT_PUBLIC_API_BASE has unsupported value '${normalized}'; use '/api' or an https:// URL"
+}
+
 if [[ -n "$FRONTEND_SERVICE" ]]; then
   check_service "$FRONTEND_SERVICE" "$FRONTEND_CONTAINER" "NEXT_PUBLIC_API_BASE"
+  validate_frontend_api_base "$FRONTEND_API_BASE"
 fi
 
 echo ""

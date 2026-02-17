@@ -123,14 +123,23 @@ def create_app() -> FastAPI:
         finally:
             reset_request_id(token)
 
-    app.include_router(system_router)
-    app.include_router(build_projects_router(get_embedding_service=lambda: get_embedding_service()))
-    app.include_router(
-        build_pipeline_router(
-            get_nova_orchestrator=lambda: get_nova_orchestrator(),
-            get_embedding_service=lambda: get_embedding_service(),
-        )
+    projects_router = build_projects_router(get_embedding_service=lambda: get_embedding_service())
+    pipeline_router = build_pipeline_router(
+        get_nova_orchestrator=lambda: get_nova_orchestrator(),
+        get_embedding_service=lambda: get_embedding_service(),
     )
+    api_projects_router = build_projects_router(get_embedding_service=lambda: get_embedding_service())
+    api_pipeline_router = build_pipeline_router(
+        get_nova_orchestrator=lambda: get_nova_orchestrator(),
+        get_embedding_service=lambda: get_embedding_service(),
+    )
+
+    app.include_router(system_router)
+    app.include_router(projects_router)
+    app.include_router(pipeline_router)
+    # Keep root routes for compatibility and expose /api/* aliases for same-origin frontend routing.
+    app.include_router(api_projects_router, prefix="/api")
+    app.include_router(api_pipeline_router, prefix="/api")
 
     return app
 

@@ -16,7 +16,10 @@ Required (backend deploy):
 Required only when deploying frontend via the same workflow:
 - `ECR_FRONTEND_REPOSITORY`: frontend ECR repo name.
 - `ECS_FRONTEND_SERVICE`: ECS frontend service name.
-- `NEXT_PUBLIC_API_BASE`: API base URL baked into frontend build.
+- `NEXT_PUBLIC_API_BASE`: API base baked into frontend build.
+  - recommended value: `/api` (same-origin routing through CloudFront).
+  - fallback value: absolute `https://...` API origin.
+  - anti-pattern: absolute `http://...` API origin (blocked on HTTPS pages).
 
 Optional:
 - `ECS_BACKEND_CONTAINER_NAME`: backend container name in task definition.
@@ -39,6 +42,12 @@ Frontend secrets (only if frontend is deployed by this workflow):
 ```bash
 gh secret set ECR_FRONTEND_REPOSITORY --repo alanmaizon/nebula --body "nebula-frontend"
 gh secret set ECS_FRONTEND_SERVICE --repo alanmaizon/nebula --body "nebula-frontend"
+gh secret set NEXT_PUBLIC_API_BASE --repo alanmaizon/nebula --body "/api"
+```
+
+Optional fallback (if you must call a separate API origin directly):
+
+```bash
 gh secret set NEXT_PUBLIC_API_BASE --repo alanmaizon/nebula --body "https://api.example.com"
 ```
 
@@ -115,7 +124,8 @@ If frontend is deployed separately, add:
 
 ```bash
   --frontend-service nebula-frontend \
-  --frontend-repo nebula-frontend
+  --frontend-repo nebula-frontend \
+  --frontend-api-base /api
 ```
 
 ## 5) Deployment Behavior in Updated Workflow
@@ -126,3 +136,21 @@ If frontend is deployed separately, add:
 - validates AWS readiness before image build/push
 - pins images by commit SHA in ECS task definition revisions
 - updates ECS services to the new task definition revision (no `:latest` force-redeploy dependency)
+
+## 6) CloudFront and ALB Routing Pattern (Recommended)
+
+Use one CloudFront distribution and route API traffic by path:
+- CloudFront behavior `Path pattern = /api/*`
+  - Origin: ALB
+  - Allowed methods: include API methods needed by backend
+  - Cache policy: disabled for API behavior
+- CloudFront default behavior (`/*`)
+  - Origin: frontend service
+- ALB listener rules
+  - `/api/*` -> backend target group
+  - `/*` -> frontend target group
+- Viewer protocol policy: HTTPS-only
+
+After deploying a new frontend image, invalidate CloudFront paths:
+- `/`
+- `/_next/static/*`

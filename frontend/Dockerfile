@@ -12,7 +12,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules /app/node_modules
 COPY . /app
 
-ARG NEXT_PUBLIC_API_BASE=http://localhost:8000
+ARG NEXT_PUBLIC_API_BASE=/api
 ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
 RUN npm run build
 
