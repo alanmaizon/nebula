@@ -3,7 +3,16 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import MissingEvidencePanel from "./components/MissingEvidencePanel";
+import QualitySignalsPanel from "./components/QualitySignalsPanel";
 import TraceabilityPanel from "./components/TraceabilityPanel";
+import UnresolvedGapsPanel from "./components/UnresolvedGapsPanel";
+import {
+  buildQualitySignals,
+  createUnavailableParseDiagnostics,
+  parseUploadDiagnostics,
+  type ParseDiagnostics,
+  type QualitySignals,
+} from "./lib/qualitySignals";
 import {
   extractTraceabilityData,
   type JsonValue,
@@ -16,6 +25,7 @@ type RunStatus = "idle" | "loading" | "success" | "error";
 type PipelineRunResult = {
   projectId: string;
   documentsIndexed: number;
+  qualitySignals: QualitySignals;
   requirements: JsonValue | null;
   extraction: JsonValue | null;
   sectionRuns: JsonValue[];
@@ -23,6 +33,11 @@ type PipelineRunResult = {
   unresolvedGaps: JsonValue[];
   exportJson: JsonValue;
   exportMarkdown: string;
+};
+
+type IndexedDocumentsResult = {
+  documentsIndexed: number;
+  parseDiagnostics: ParseDiagnostics;
 };
 
 const outputCards = [
@@ -490,7 +505,7 @@ export default function HomePage() {
     return created;
   }
 
-  async function ensureIndexedDocuments(currentProjectId: string): Promise<number> {
+  async function ensureIndexedDocuments(currentProjectId: string): Promise<IndexedDocumentsResult> {
     if (files.length > 0) {
       appendLog("Uploading selected documents...");
       const formData = new FormData();
@@ -505,8 +520,9 @@ export default function HomePage() {
       const uploadedDocs = Array.isArray(payload.documents)
         ? payload.documents.filter((item) => !!item && typeof item === "object")
         : [];
+      const parseDiagnostics = parseUploadDiagnostics(payload, uploadedDocs.length);
       appendLog(`Indexed ${uploadedDocs.length} uploaded file(s).`);
-      return uploadedDocs.length;
+      return { documentsIndexed: uploadedDocs.length, parseDiagnostics };
     }
 
     appendLog("Checking existing indexed documents...");
@@ -521,7 +537,10 @@ export default function HomePage() {
       throw new Error("Select files to upload, or reuse a project that already has indexed documents.");
     }
     appendLog(`Using ${docs.length} previously indexed document(s).`);
-    return docs.length;
+    return {
+      documentsIndexed: docs.length,
+      parseDiagnostics: createUnavailableParseDiagnostics(docs.length),
+    };
   }
 
   async function runWorkspacePipeline() {
@@ -535,7 +554,7 @@ export default function HomePage() {
       const currentProjectId = await ensureProject();
       appendLog(`Project ready: ${currentProjectId}`);
 
-      const documentsIndexed = await ensureIndexedDocuments(currentProjectId);
+      const indexedDocuments = await ensureIndexedDocuments(currentProjectId);
       appendLog("Running complete Nova workflow...");
       const requestPayload: Record<string, unknown> = { top_k: 6, max_revision_rounds: 1 };
       const trimmedContext = contextBrief.trim();
@@ -561,12 +580,19 @@ export default function HomePage() {
       const unresolvedGaps = Array.isArray(runPayload.unresolved_gaps)
         ? (runPayload.unresolved_gaps as JsonValue[])
         : [];
+      const extractionPayload = (runPayload.extraction as JsonValue) ?? null;
+      const qualitySignals = buildQualitySignals({
+        parseDiagnostics: indexedDocuments.parseDiagnostics,
+        extractionPayload,
+        unresolvedGapsPayload: unresolvedGaps,
+      });
 
       setResult({
         projectId: currentProjectId,
-        documentsIndexed,
+        documentsIndexed: indexedDocuments.documentsIndexed,
+        qualitySignals,
         requirements: (runPayload.requirements as JsonValue) ?? null,
-        extraction: (runPayload.extraction as JsonValue) ?? null,
+        extraction: extractionPayload,
         sectionRuns,
         coverage: (runPayload.coverage as JsonValue) ?? null,
         unresolvedGaps,
@@ -576,6 +602,9 @@ export default function HomePage() {
 
       setFiles([]);
       appendLog(`Completed ${sectionRuns.length} section(s).`);
+      if (qualitySignals.extraction.rfpSelection.ambiguous) {
+        appendLog("RFP source ambiguity warning detected. Review the Quality Signals panel.");
+      }
       if (unresolvedGaps.length > 0) {
         appendLog(`${unresolvedGaps.length} unresolved gap(s) flagged.`);
       }
@@ -948,6 +977,10 @@ export default function HomePage() {
                     </span>
                   </section>
                 ) : null}
+
+                <QualitySignalsPanel signals={result.qualitySignals} status={runStatus} />
+
+                <UnresolvedGapsPanel gaps={result.qualitySignals.unresolvedGaps} status={runStatus} />
 
                 <TraceabilityPanel sections={traceability.sections} />
 

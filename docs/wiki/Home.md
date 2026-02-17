@@ -7,6 +7,7 @@ Welcome to the Nebula engineering wiki. This space tracks delivery execution, ar
 - [Architecture](Architecture)
 - [Submission Materials](SUBMISSION)
 - [Nova Submission Checklist](Nova-Submission-Checklist)
+- [Quality Signals Guide](Quality-Signals-Guide)
 - [Nova Evidence Run 2026-02-08](Nova-Evidence-Run-2026-02-08)
 - [CI Reliability 2026-02-08](CI-Reliability-2026-02-08)
 - [Impact Metrics Baseline 2026-02-08](Impact-Metrics-Baseline-2026-02-08)
