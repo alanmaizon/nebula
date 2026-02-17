@@ -56,6 +56,7 @@ from app.nova_runtime import BedrockNovaOrchestrator, NovaRuntimeError
 from app.export_bundle import EXPORT_VERSION, build_export_bundle, combine_markdown_files
 from app.requirements import validate_with_repair as validate_requirements_with_repair
 from app.requirements import extract_requirements_payload, merge_requirements_payload
+from app.version import APP_VERSION
 from app.retrieval import (
     EmbeddingProviderError,
     EmbeddingService,
@@ -138,7 +139,7 @@ def create_app() -> FastAPI:
     if settings.cors_allow_credentials and any(origin == "*" for origin in cors_origins):
         raise RuntimeError("Invalid CORS_ORIGINS: wildcard '*' is not allowed when credentials are enabled.")
 
-    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title=settings.app_name, version=APP_VERSION, lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
