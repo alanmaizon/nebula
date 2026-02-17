@@ -66,6 +66,7 @@ The backend task definition should provide these runtime keys via container `env
 Recommendations:
 - Use RDS/Postgres for `DATABASE_URL` in production.
 - Use persistent storage for `STORAGE_ROOT` (S3 and/or durable mounted storage), not ephemeral container-local paths.
+- If Bedrock returns "on-demand throughput isn't supported", set `BEDROCK_MODEL_ID`/`BEDROCK_LITE_MODEL_ID` to an inference profile ID/ARN (example EU: `eu.amazon.nova-pro-v1:0` / `eu.amazon.nova-lite-v1:0`).
 
 ## 3) IAM and OIDC Requirements for GitHub Actions Deploy
 

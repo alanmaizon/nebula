@@ -6,7 +6,7 @@ Use this checklist before final Devpost submission to verify Nova compliance, de
 | ID | Requirement | Verification evidence | Status (dry run) | Follow-up issue |
 |---|---|---|---|---|
 | NOVA-C01 | Production path calls Amazon Nova on AWS (not docs-only claims). | Architecture call path + backend invocation references + run evidence (`docs/wiki/Nova-Evidence-Run-2026-02-08.md`) with explicit user-supplied credential policy. | PASS | N/A |
-| NOVA-C02 | Submission model IDs are explicit. | `BEDROCK_MODEL_ID=amazon.nova-pro-v1:0`, `BEDROCK_LITE_MODEL_ID=amazon.nova-lite-v1:0` in docs/config guidance. | PASS | N/A |
+| NOVA-C02 | Submission model IDs are explicit. | `BEDROCK_MODEL_ID=amazon.nova-pro-v1:0`, `BEDROCK_LITE_MODEL_ID=amazon.nova-lite-v1:0` (or inference profile IDs such as `eu.amazon.nova-pro-v1:0`/`eu.amazon.nova-lite-v1:0` if on-demand isn't supported) in docs/config guidance. | PASS | N/A |
 | NOVA-C03 | Deploy/run consistency is proven. | Full-workflow demo freeze run evidence in `docs/wiki/Demo-Freeze-2026-02-11.md`. | PASS | N/A |
 | NOVA-C04 | Judges have working test access path. | Public test URL or repo-based test instructions with credentials path if private. | PASS | N/A |
 | NOVA-C05 | Demo video is approximately 3 minutes and shows real functionality. | Published Vimeo demo link in `docs/wiki/Demo-Video-2026-02-11.md`. | PASS | N/A |

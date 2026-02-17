@@ -93,6 +93,28 @@ def test_nova_orchestrator_wraps_malformed_json_parse_errors() -> None:
         )
 
 
+def test_nova_orchestrator_wraps_on_demand_throughput_errors_with_inference_profile_hint() -> None:
+    class ThroughputClient:
+        def converse(self, **kwargs):
+            raise Exception(
+                "An error occurred (ValidationException) when calling the Converse operation: "
+                "Invocation of model ID amazon.nova-pro-v1:0 with on-demand throughput isn\u2019t supported. "
+                "Retry your request with the ID or ARN of an inference profile that contains this model."
+            )
+
+    orchestrator = BedrockNovaOrchestrator(settings=settings, client=ThroughputClient())
+    with pytest.raises(NovaRuntimeError, match="on-demand throughput.*inference profile"):
+        orchestrator.extract_requirements(
+            [
+                {
+                    "file_name": "rfp.txt",
+                    "page": 1,
+                    "text": "Question 1: Describe outcomes. Limit 250 words.",
+                }
+            ]
+        )
+
+
 def test_nova_orchestrator_adaptive_extraction_merges_windows_and_reports_diagnostics() -> None:
     class MultiWindowClient:
         def __init__(self) -> None:
