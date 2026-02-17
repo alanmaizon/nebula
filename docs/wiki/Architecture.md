@@ -217,17 +217,17 @@ Current backend runtime path (Nova on Bedrock):
     - single-pass extraction for small RFPs
     - multi-pass overlapping chunk windows for long RFPs with deterministic merge/dedupe across windows
     - extraction diagnostics emitted in API metadata (`window_count`, `dedupe_ratio`, dropped candidate counts)
-  - model ID: `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
+  - model ID: `BEDROCK_MODEL_ID=amazon.nova-pro-v1:0`
   - artifact source tag: `nova-agents-v1`
 - `POST /projects/{project_id}/generate-section`
   - endpoint: `backend/app/main.py` (`generate_section`)
   - orchestrator: `backend/app/nova_runtime.py` (`BedrockNovaOrchestrator.generate_section`)
-  - model ID: `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
+  - model ID: `BEDROCK_MODEL_ID=amazon.nova-pro-v1:0`
   - artifact source tag: `nova-agents-v1`
 - `POST /projects/{project_id}/coverage`
   - endpoint: `backend/app/main.py` (`compute_coverage`)
   - orchestrator: `backend/app/nova_runtime.py` (`BedrockNovaOrchestrator.compute_coverage`)
-  - model ID: `BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0`
+  - model ID: `BEDROCK_LITE_MODEL_ID=amazon.nova-lite-v1:0`
   - artifact source tag: `nova-agents-v1`
 
 Execution flow:

@@ -12,7 +12,7 @@ from app.api.routers.projects import build_projects_router
 from app.api.routers.system import router as system_router
 from app.config import settings
 from app.db import init_db
-from app.nova_runtime import BedrockNovaOrchestrator
+from app.nova_runtime import BedrockNovaOrchestrator, validate_bedrock_model_ids
 from app.observability import (
     configure_logging,
     normalize_request_id,
@@ -52,6 +52,8 @@ def get_embedding_service() -> EmbeddingService:
 async def lifespan(_: FastAPI):
     configure_logging(settings.log_level)
     logger.info("application_startup", extra={"event": "application_startup", "environment": settings.app_env})
+    if settings.bedrock_validate_model_ids_on_startup:
+        validate_bedrock_model_ids(settings)
     init_db()
     Path(settings.storage_root).mkdir(parents=True, exist_ok=True)
     yield

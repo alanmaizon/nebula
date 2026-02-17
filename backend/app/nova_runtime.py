@@ -193,15 +193,31 @@ class BedrockNovaOrchestrator:
             )
         except Exception as exc:  # pragma: no cover - exercised via runtime integration
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            error_text = str(exc)
             logger.warning(
                 "nova_invoke_failed",
                 extra={
                     "event": "nova_invoke_failed",
                     "model_id": model_id,
                     "duration_ms": duration_ms,
-                    "error": str(exc),
+                    "error": error_text,
                 },
             )
+
+            # Bedrock is strict about which identifiers are valid in a given region. A common failure mode is
+            # accidentally using a region-prefixed identifier (e.g. `us.amazon...`) in a non-US region.
+            if "model identifier is invalid" in error_text.lower():
+                raise NovaRuntimeError(
+                    "Bedrock invocation failed: the configured model identifier is invalid.\n"
+                    f"AWS_REGION={self._settings.aws_region}\n"
+                    f"BEDROCK_MODEL_ID={self._settings.bedrock_model_id}\n"
+                    f"BEDROCK_LITE_MODEL_ID={self._settings.bedrock_lite_model_id}\n"
+                    "Recommended (foundation IDs):\n"
+                    "- BEDROCK_MODEL_ID=amazon.nova-pro-v1:0\n"
+                    "- BEDROCK_LITE_MODEL_ID=amazon.nova-lite-v1:0\n"
+                    "Verify via: aws bedrock list-foundation-models --region <region>"
+                ) from exc
+
             raise NovaRuntimeError(f"Bedrock invocation failed for model '{model_id}': {exc}") from exc
 
         text = self._extract_text(response)
@@ -425,3 +441,37 @@ class BedrockNovaOrchestrator:
         if len(clean) <= max_chars:
             return clean
         return clean[: max_chars - 3] + "..."
+
+
+def validate_bedrock_model_ids(settings: Settings) -> None:
+    """Optionally validate configured Bedrock model IDs on startup.
+
+    This preflight intentionally validates *foundation model IDs* (e.g. `amazon.nova-pro-v1:0`).
+    If you are using inference profiles or other identifiers, leave this disabled.
+    """
+
+    if not settings.bedrock_validate_model_ids_on_startup:
+        return
+
+    try:
+        import boto3  # type: ignore
+    except ImportError as exc:
+        raise NovaRuntimeError("boto3 is required to validate Bedrock model IDs on startup.") from exc
+
+    aws_region = settings.aws_region
+    client = boto3.client("bedrock", region_name=aws_region)
+    checks = (
+        ("BEDROCK_MODEL_ID", settings.bedrock_model_id),
+        ("BEDROCK_LITE_MODEL_ID", settings.bedrock_lite_model_id),
+    )
+
+    for env_name, model_id in checks:
+        if not model_id:
+            raise NovaRuntimeError(f"{env_name} is not configured (AWS_REGION={aws_region}).")
+        try:
+            client.get_foundation_model(modelIdentifier=model_id)
+        except Exception as exc:
+            raise NovaRuntimeError(
+                f"Bedrock model ID validation failed for {env_name}='{model_id}' (AWS_REGION={aws_region}): {exc}. "
+                "Recommended: use 'amazon.nova-pro-v1:0' and 'amazon.nova-lite-v1:0' and enable model access in Bedrock."
+            ) from exc

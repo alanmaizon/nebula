@@ -20,8 +20,8 @@ To run Nebula locally for judging, use Docker and valid AWS Bedrock credentials.
    - `export AWS_SESSION_TOKEN=<your_session_token>` (if using temporary credentials)
 3. Set Bedrock region/model environment variables:
    - `export AWS_REGION=<bedrock_enabled_region>` (example: `us-east-1`)
-   - `export BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
-   - `export BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0`
+   - `export BEDROCK_MODEL_ID=amazon.nova-pro-v1:0`
+   - `export BEDROCK_LITE_MODEL_ID=amazon.nova-lite-v1:0`
    - Ensure your selected model IDs are available in the region set in `AWS_REGION`.
 4. Start the stack:
    - `scripts/run_docker_env.sh restart`
