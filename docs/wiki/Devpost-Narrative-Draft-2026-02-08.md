@@ -22,8 +22,8 @@ Nebula provides a trust-first workflow:
 
 ## Nova and AWS Architecture
 - Runtime models:
-  - `BEDROCK_MODEL_ID=us.amazon.nova-pro-v1:0`
-  - `BEDROCK_LITE_MODEL_ID=us.amazon.nova-lite-v1:0`
+  - `BEDROCK_MODEL_ID=amazon.nova-pro-v1:0`
+  - `BEDROCK_LITE_MODEL_ID=amazon.nova-lite-v1:0`
 - Core call path:
   - FastAPI endpoint -> `BedrockNovaOrchestrator` -> Bedrock `converse` -> schema validation/repair -> artifact persistence
 - References:

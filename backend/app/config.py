@@ -12,8 +12,11 @@ class Settings(BaseSettings):
     request_id_header: str = "X-Request-ID"
 
     aws_region: str = "us-east-1"
-    bedrock_model_id: str = "us.amazon.nova-pro-v1:0"
-    bedrock_lite_model_id: str = "us.amazon.nova-lite-v1:0"
+    # Use region-agnostic foundation model IDs by default. Region-prefixed IDs (e.g. `us.*`)
+    # are not valid in all regions and can cause production failures.
+    bedrock_model_id: str = "amazon.nova-pro-v1:0"
+    bedrock_lite_model_id: str = "amazon.nova-lite-v1:0"
+    bedrock_validate_model_ids_on_startup: bool = False
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
     embedding_mode: str = "hash"
     agent_temperature: float = 0.1

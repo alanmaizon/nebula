@@ -80,7 +80,7 @@ def _base_input() -> dict[str, object]:
         "validations": {"requirements": {"present": True}},
         "missing_evidence": [],
         "run_metadata": {
-            "model_ids": {"primary": "us.amazon.nova-pro-v1:0"},
+            "model_ids": {"primary": "amazon.nova-pro-v1:0"},
             "temperatures": {"agent_temperature": 0.1},
         },
         "artifacts_used": [

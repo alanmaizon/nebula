@@ -15,8 +15,8 @@ Reference docs:
 - Target state: production deployment on AWS for multi-tenant compliance workloads.
 
 ## Submission Model Baseline (Nova)
-- Primary generation model ID: `us.amazon.nova-pro-v1:0` (`BEDROCK_MODEL_ID`)
-- Supporting model ID: `us.amazon.nova-lite-v1:0` (`BEDROCK_LITE_MODEL_ID`)
+- Primary generation model ID: `amazon.nova-pro-v1:0` (`BEDROCK_MODEL_ID`)
+- Supporting model ID: `amazon.nova-lite-v1:0` (`BEDROCK_LITE_MODEL_ID`)
 - Runtime path implementation: `backend/app/nova_runtime.py` and `backend/app/main.py`
 - Evidence note: `docs/wiki/Nova-Evidence-Run-2026-02-08.md`
 
