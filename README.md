@@ -14,26 +14,34 @@ It turns source documents into cited draft sections, requirement coverage, and e
 ## Stack
 - Frontend: Next.js
 - Backend: FastAPI
-- Storage: SQLite + local filesystem
-- Models: Amazon Nova via Bedrock
+- Storage (local dev): SQLite + local filesystem
+- Storage (prod): RDS Postgres + S3
+- Models: Amazon Nova + Titan Embeddings via Bedrock
 
-## Execution Status
-<!-- AUTO-GEN:README_STATUS:START -->
-- Last updated: `2026-02-11`
-- Overall completion: `100%`
-- Current phase: `Feedback Bonus and Judging Readiness (Done)`
+## Deployed AWS Architecture
+```mermaid
+flowchart TB
+  U[User Browser] -->|HTTPS| CF[CloudFront Distribution]
+  CF -->|Origin| ALB[Application Load Balancer]
 
-### Done Recently
-- Prepared judge-readiness response playbook and support posture
-- Confirmed ongoing demo/repository access guidance with user-supplied credential policy
-- Closed roadmap execution tracking at 100%
+  subgraph ECS["ECS Fargate (nebula-cluster)"]
+    FE[nebula-frontend<br/>Next.js]
+    BE[nebula-backend<br/>FastAPI]
+  end
 
-### Next Up
-- No open actions
+  ALB -->|/*| FE
+  ALB -->|/api/*| BE
 
-### Current Blockers
-- No blockers recorded.
-<!-- AUTO-GEN:README_STATUS:END -->
+  FE -->|fetch /api/* (same origin)| CF
+
+  BE -->|SQL (TLS)| RDS[(RDS Postgres)]
+  BE -->|Objects| S3[(S3 Uploads Bucket)]
+  BE -->|Secrets injection| SM[Secrets Manager<br/>DATABASE_URL]
+  BE -->|LLM + Embeddings| BR[Amazon Bedrock<br/>Nova + Titan]
+
+  FE --> CW[CloudWatch Logs]
+  BE --> CW
+```
 
 ## Quick Start
 1. Copy env files:
