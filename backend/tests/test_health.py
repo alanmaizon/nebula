@@ -104,7 +104,10 @@ def test_ready_endpoint() -> None:
     with TestClient(app) as client:
         response = client.get("/ready")
         assert response.status_code == 200
-        assert response.json()["status"] == "ready"
+        payload = response.json()
+        assert payload["status"] == "ready"
+        assert payload["checks"]["db"]["ok"] is True
+        assert payload["checks"]["storage"]["ok"] is True
 
 
 def test_create_project_and_upload(tmp_path: Path) -> None:
