@@ -66,21 +66,20 @@ def create_app() -> FastAPI:
     if settings.cors_allow_credentials and any(origin == "*" for origin in cors_origins):
         raise RuntimeError("Invalid CORS_ORIGINS: wildcard '*' is not allowed when credentials are enabled.")
     if settings.app_env == "production":
-        insecure = [origin for origin in cors_origins if origin.strip().lower().startswith("http://")]
+        # Allow insecure http:// origins only for loopback so local "production-like" docker stacks
+        # can run without TLS. For real production deployments, require https:// origins.
+        insecure = []
+        for origin in cors_origins:
+            normalized = origin.strip().lower()
+            if normalized.startswith("http://") and not (
+                normalized.startswith("http://localhost")
+                or normalized.startswith("http://127.0.0.1")
+            ):
+                insecure.append(origin)
         if insecure:
             raise RuntimeError(
                 "Invalid CORS_ORIGINS for production: use https:// origins (or empty to disable CORS). "
                 f"Found: {insecure}"
-            )
-        local = [
-            origin
-            for origin in cors_origins
-            if ("localhost" in origin.lower() or "127.0.0.1" in origin.lower())
-        ]
-        if local:
-            raise RuntimeError(
-                "Invalid CORS_ORIGINS for production: localhost origins are not allowed. "
-                f"Found: {local}"
             )
 
     app = FastAPI(title=settings.app_name, version=APP_VERSION, lifespan=lifespan)
