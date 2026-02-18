@@ -32,9 +32,9 @@ flowchart TB
   ALB -->|/*| FE
   ALB -->|/api/*| BE
 
-  FE -->|fetch /api/* (same-origin)| CF
+  FE -->|fetch /api same origin| CF
 
-  BE -->|SQL (TLS)| RDS[(RDS Postgres)]
+  BE -->|SQL over TLS| RDS[(RDS Postgres)]
   BE -->|Objects| S3[S3 Uploads Bucket]
   BE -->|Secrets injection| SM[Secrets Manager<br/>DATABASE_URL]
   BE -->|LLM + Embeddings| BR[Amazon Bedrock<br/>Nova + Titan]
