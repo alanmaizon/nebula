@@ -79,15 +79,12 @@ def _seed_temp_repo(tmp_path: Path, module: ModuleType, *, stale: bool) -> tuple
     status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
 
     if stale:
-        readme_body = "- stale readme"
         plan_body = "- stale plan"
         aws_body = "- stale aws"
     else:
-        readme_body = module.render_readme_status(status)
         plan_body = module.render_development_status(status)
         aws_body = module.render_aws_status(status)
 
-    _write_target(repo_root / "README.md", "README_STATUS", readme_body)
     _write_target(wiki_dir / "DEVELOPMENT_PLAN.md", "DEVELOPMENT_PLAN_STATUS", plan_body)
     _write_target(wiki_dir / "AWS_ALIGNMENT.md", "AWS_STATUS", aws_body)
 
@@ -150,7 +147,8 @@ def test_main_check_fails_when_docs_are_stale(
 
     assert exit_code == 1
     assert "Documentation is out of date" in captured
-    assert "- README.md" in captured
+    assert "- docs/wiki/DEVELOPMENT_PLAN.md" in captured
+    assert "- docs/wiki/AWS_ALIGNMENT.md" in captured
 
 
 def test_main_write_mode_is_deterministic(
