@@ -7,6 +7,15 @@ import QualitySignalsPanel from "./components/QualitySignalsPanel";
 import TraceabilityPanel from "./components/TraceabilityPanel";
 import UnresolvedGapsPanel from "./components/UnresolvedGapsPanel";
 import {
+  beginCognitoLogin,
+  clearStoredCognitoSession,
+  completeCognitoLoginIfPresent,
+  getStoredAccessToken,
+  readCognitoClientConfig,
+  signOutFromCognito,
+  type CognitoClientConfig,
+} from "./lib/cognitoAuth";
+import {
   buildQualitySignals,
   createUnavailableParseDiagnostics,
   parseUploadDiagnostics,
@@ -432,10 +441,60 @@ export default function HomePage() {
   const [runLog, setRunLog] = useState<string[]>([]);
   const [result, setResult] = useState<PipelineRunResult | null>(null);
   const [copyState, setCopyState] = useState<"copy" | "copied" | "failed">("copy");
+  const [authConfig, setAuthConfig] = useState<CognitoClientConfig | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const isRunning = runStatus === "loading";
+  const authEnabled = authConfig !== null;
+  const isAuthenticated = !!accessToken;
   const storyCardRefs = useRef<Array<HTMLElement | null>>([]);
   const [visibleStoryCards, setVisibleStoryCards] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initializeAuth() {
+      try {
+        const config = readCognitoClientConfig();
+        if (cancelled) {
+          return;
+        }
+        if (!config) {
+          setAuthConfig(null);
+          setAccessToken(null);
+          setAuthError(null);
+          setAuthReady(true);
+          return;
+        }
+
+        setAuthConfig(config);
+        await completeCognitoLoginIfPresent(config);
+        if (cancelled) {
+          return;
+        }
+        setAccessToken(getStoredAccessToken());
+        setAuthError(null);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : "Authentication initialization failed.";
+        setAuthError(message);
+        setAccessToken(null);
+      } finally {
+        if (!cancelled) {
+          setAuthReady(true);
+        }
+      }
+    }
+
+    initializeAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (showWorkspace) {
@@ -474,8 +533,18 @@ export default function HomePage() {
   }
 
   async function parseJsonResponse(response: Response): Promise<Record<string, unknown>> {
-    const payload = (await response.json()) as Record<string, unknown>;
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = (await response.json()) as Record<string, unknown>;
+    } catch {
+      payload = {};
+    }
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(
+          "Authentication failed. Sign in again and verify backend AUTH/Cognito settings."
+        );
+      }
       const detail = payload.detail;
       if (typeof detail === "string") {
         throw new Error(detail);
@@ -488,6 +557,31 @@ export default function HomePage() {
     return payload;
   }
 
+  function buildAuthHeaders(baseHeaders?: HeadersInit): Headers {
+    const headers = new Headers(baseHeaders ?? {});
+    if (accessToken) {
+      headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+    return headers;
+  }
+
+  async function handleSignIn() {
+    if (!authConfig) {
+      return;
+    }
+    setAuthError(null);
+    await beginCognitoLogin(authConfig);
+  }
+
+  function handleSignOut() {
+    if (authConfig) {
+      signOutFromCognito(authConfig);
+      return;
+    }
+    clearStoredCognitoSession();
+    setAccessToken(null);
+  }
+
   async function ensureProject(apiBase: string): Promise<string> {
     if (projectId.trim()) {
       return projectId;
@@ -495,7 +589,7 @@ export default function HomePage() {
 
     const response = await fetch(buildApiUrl(apiBase, "/projects"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ name: projectName || "Nebula Project" }),
     });
     const payload = await parseJsonResponse(response);
@@ -516,6 +610,7 @@ export default function HomePage() {
       }
       const response = await fetch(buildApiUrl(apiBase, `/projects/${currentProjectId}/upload`), {
         method: "POST",
+        headers: buildAuthHeaders(),
         body: formData,
       });
       const payload = await parseJsonResponse(response);
@@ -529,7 +624,8 @@ export default function HomePage() {
 
     appendLog("Checking existing indexed documents...");
     const docsResponse = await fetch(
-      buildApiUrl(apiBase, `/projects/${currentProjectId}/documents?document_scope=latest`)
+      buildApiUrl(apiBase, `/projects/${currentProjectId}/documents?document_scope=latest`),
+      { headers: buildAuthHeaders() }
     );
     const docsPayload = await parseJsonResponse(docsResponse);
     const docs = Array.isArray(docsPayload.documents)
@@ -553,6 +649,9 @@ export default function HomePage() {
     setRunLog([]);
 
     try {
+      if (authEnabled && !isAuthenticated) {
+        throw new Error("Sign in is required before running the pipeline.");
+      }
       const apiBase = resolveApiBase(
         process.env.NEXT_PUBLIC_API_BASE,
         typeof window !== "undefined" ? window.location.protocol : undefined
@@ -574,7 +673,7 @@ export default function HomePage() {
         buildApiUrl(apiBase, `/projects/${currentProjectId}/generate-full-draft?profile=submission`),
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: buildAuthHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(requestPayload),
         }
       );
@@ -906,7 +1005,31 @@ export default function HomePage() {
               <p className="hint">No new files selected. Nebula will reuse indexed files in this project.</p>
             )}
 
-            <button type="button" className="primary-button" onClick={runWorkspacePipeline} disabled={isRunning}>
+            {authEnabled ? (
+              <div className="meta-row">
+                <span>Auth:</span>
+                <code>{authReady ? (isAuthenticated ? "signed in" : "signed out") : "checking..."}</code>
+              </div>
+            ) : null}
+            {authError ? <p className="hint">{authError}</p> : null}
+
+            {authEnabled && !isAuthenticated ? (
+              <button type="button" className="chip-button" onClick={handleSignIn} disabled={!authReady || isRunning}>
+                Sign in with Google
+              </button>
+            ) : null}
+            {authEnabled && isAuthenticated ? (
+              <button type="button" className="chip-button" onClick={handleSignOut} disabled={isRunning}>
+                Sign out
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              className="primary-button"
+              onClick={runWorkspacePipeline}
+              disabled={isRunning || (authEnabled && !isAuthenticated)}
+            >
               {isRunning ? "Generating..." : "Generate"}
             </button>
 

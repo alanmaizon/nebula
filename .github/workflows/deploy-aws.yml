@@ -21,6 +21,12 @@ env:
   ECS_BACKEND_CONTAINER_NAME: ${{ secrets.ECS_BACKEND_CONTAINER_NAME }}
   ECS_FRONTEND_CONTAINER_NAME: ${{ secrets.ECS_FRONTEND_CONTAINER_NAME }}
   NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE }}
+  NEXT_PUBLIC_AUTH_ENABLED: ${{ secrets.NEXT_PUBLIC_AUTH_ENABLED }}
+  NEXT_PUBLIC_COGNITO_DOMAIN: ${{ secrets.NEXT_PUBLIC_COGNITO_DOMAIN }}
+  NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
+  NEXT_PUBLIC_COGNITO_REDIRECT_URI: ${{ secrets.NEXT_PUBLIC_COGNITO_REDIRECT_URI }}
+  NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI: ${{ secrets.NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI }}
+  NEXT_PUBLIC_COGNITO_SCOPE: ${{ secrets.NEXT_PUBLIC_COGNITO_SCOPE }}
 
 jobs:
   deploy:
@@ -60,6 +66,19 @@ jobs:
             fi
             if [[ -z "${NEXT_PUBLIC_API_BASE:-}" ]]; then
               missing+=("NEXT_PUBLIC_API_BASE")
+            fi
+
+            auth_enabled="$(echo "${NEXT_PUBLIC_AUTH_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')"
+            if [[ "${auth_enabled}" == "true" ]]; then
+              if [[ -z "${NEXT_PUBLIC_COGNITO_DOMAIN:-}" ]]; then
+                missing+=("NEXT_PUBLIC_COGNITO_DOMAIN")
+              fi
+              if [[ -z "${NEXT_PUBLIC_COGNITO_CLIENT_ID:-}" ]]; then
+                missing+=("NEXT_PUBLIC_COGNITO_CLIENT_ID")
+              fi
+              if [[ -z "${NEXT_PUBLIC_COGNITO_REDIRECT_URI:-}" ]]; then
+                missing+=("NEXT_PUBLIC_COGNITO_REDIRECT_URI")
+              fi
             fi
           fi
 
@@ -135,6 +154,12 @@ jobs:
           set -euo pipefail
           docker build \
             --build-arg NEXT_PUBLIC_API_BASE="${NEXT_PUBLIC_API_BASE}" \
+            --build-arg NEXT_PUBLIC_AUTH_ENABLED="${NEXT_PUBLIC_AUTH_ENABLED:-false}" \
+            --build-arg NEXT_PUBLIC_COGNITO_DOMAIN="${NEXT_PUBLIC_COGNITO_DOMAIN:-}" \
+            --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID="${NEXT_PUBLIC_COGNITO_CLIENT_ID:-}" \
+            --build-arg NEXT_PUBLIC_COGNITO_REDIRECT_URI="${NEXT_PUBLIC_COGNITO_REDIRECT_URI:-}" \
+            --build-arg NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI="${NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI:-}" \
+            --build-arg NEXT_PUBLIC_COGNITO_SCOPE="${NEXT_PUBLIC_COGNITO_SCOPE:-openid email profile}" \
             -t "${FRONTEND_IMAGE}" \
             frontend
           docker push "${FRONTEND_IMAGE}"

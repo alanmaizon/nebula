@@ -299,6 +299,36 @@ check_service() {
      | select(.name == $NAME)
      | (.environment[]? | select(.name == "CORS_ORIGINS") | .value)) // empty
   ')"
+  local auth_enabled
+  auth_enabled="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "AUTH_ENABLED") | .value)) // empty
+  ')"
+  local cognito_region
+  cognito_region="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "COGNITO_REGION") | .value)) // empty
+  ')"
+  local cognito_user_pool_id
+  cognito_user_pool_id="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "COGNITO_USER_POOL_ID") | .value)) // empty
+  ')"
+  local cognito_app_client_id
+  cognito_app_client_id="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "COGNITO_APP_CLIENT_ID") | .value)) // empty
+  ')"
+  local cognito_issuer
+  cognito_issuer="$(echo "$task_def_json" | jq -r --arg NAME "$container_name" '
+    (.taskDefinition.containerDefinitions[]
+     | select(.name == $NAME)
+     | (.environment[]? | select(.name == "COGNITO_ISSUER") | .value)) // empty
+  ')"
 
   if [[ -n "$db_url" && "$db_url" == sqlite:* ]]; then
     if [[ "${app_env}" == "production" ]]; then
@@ -321,6 +351,19 @@ check_service() {
       fi
       if echo "${cors_origins}" | grep -Eqi "localhost|127\\.0\\.0\\.1"; then
         fail "Container ${container_name} has localhost CORS_ORIGINS in production: ${cors_origins}"
+      fi
+    fi
+
+    local auth_enabled_lower
+    auth_enabled_lower="$(echo "${auth_enabled:-}" | tr '[:upper:]' '[:lower:]')"
+    if [[ "${auth_enabled_lower}" == "true" ]]; then
+      if [[ -z "${cognito_app_client_id}" ]]; then
+        fail "Container ${container_name} has AUTH_ENABLED=true in production but COGNITO_APP_CLIENT_ID is not set"
+      fi
+      if [[ -z "${cognito_issuer}" ]]; then
+        if [[ -z "${cognito_region}" || -z "${cognito_user_pool_id}" ]]; then
+          fail "Container ${container_name} has AUTH_ENABLED=true in production but Cognito issuer cannot be derived (set COGNITO_ISSUER or both COGNITO_REGION and COGNITO_USER_POOL_ID)"
+        fi
       fi
     fi
   fi

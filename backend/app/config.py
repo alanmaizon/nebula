@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = True
     log_level: str = "INFO"
     request_id_header: str = "X-Request-ID"
+    auth_enabled: bool = False
+    cognito_region: str = ""
+    cognito_user_pool_id: str = ""
+    cognito_app_client_id: str = ""
+    cognito_issuer: str = ""
 
     aws_region: str = "us-east-1"
     # Default to region-agnostic foundation model IDs. In some regions/accounts, on-demand Bedrock

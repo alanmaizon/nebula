@@ -21,6 +21,15 @@ Required only when deploying frontend via the same workflow:
   - fallback value: absolute `https://...` API origin.
   - anti-pattern: absolute `http://...` API origin (blocked on HTTPS pages).
 
+Required only when frontend auth is enabled (`NEXT_PUBLIC_AUTH_ENABLED=true`):
+- `NEXT_PUBLIC_COGNITO_DOMAIN`: Cognito hosted UI domain (no scheme required, scheme allowed).
+- `NEXT_PUBLIC_COGNITO_CLIENT_ID`: Cognito app client ID used by the frontend.
+- `NEXT_PUBLIC_COGNITO_REDIRECT_URI`: frontend callback URI registered in Cognito.
+
+Optional when frontend auth is enabled:
+- `NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI`: post-logout redirect URI.
+- `NEXT_PUBLIC_COGNITO_SCOPE`: OAuth scopes (default `openid email profile`).
+
 Optional:
 - `ECS_BACKEND_CONTAINER_NAME`: backend container name in task definition.
   - default if omitted: `ECS_BACKEND_SERVICE` value.
@@ -45,6 +54,17 @@ gh secret set ECS_FRONTEND_SERVICE --repo alanmaizon/nebula --body "nebula-front
 gh secret set NEXT_PUBLIC_API_BASE --repo alanmaizon/nebula --body "/api"
 ```
 
+Frontend auth secrets (only if Cognito auth is enabled):
+
+```bash
+gh secret set NEXT_PUBLIC_AUTH_ENABLED --repo alanmaizon/nebula --body "true"
+gh secret set NEXT_PUBLIC_COGNITO_DOMAIN --repo alanmaizon/nebula --body "your-domain.auth.eu-central-1.amazoncognito.com"
+gh secret set NEXT_PUBLIC_COGNITO_CLIENT_ID --repo alanmaizon/nebula --body "<cognito-app-client-id>"
+gh secret set NEXT_PUBLIC_COGNITO_REDIRECT_URI --repo alanmaizon/nebula --body "https://<frontend-host>/"
+gh secret set NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI --repo alanmaizon/nebula --body "https://<frontend-host>/"
+gh secret set NEXT_PUBLIC_COGNITO_SCOPE --repo alanmaizon/nebula --body "openid email profile"
+```
+
 Optional fallback (if you must call a separate API origin directly):
 
 ```bash
@@ -65,11 +85,15 @@ The backend task definition should provide these runtime keys via container `env
 - `S3_PREFIX` (optional; defaults to `nebula`)
 - `STORAGE_ROOT`
 - `CORS_ORIGINS`
+- `AUTH_ENABLED` (`true` or `false`)
+- `COGNITO_APP_CLIENT_ID` (required when `AUTH_ENABLED=true`)
+- `COGNITO_ISSUER` or both `COGNITO_REGION` + `COGNITO_USER_POOL_ID` (required when `AUTH_ENABLED=true`)
 
 Recommendations:
 - Use RDS/Postgres for `DATABASE_URL` in production (avoid sqlite on ECS).
 - Store uploaded documents in S3 (`STORAGE_BACKEND=s3`) to avoid filling ephemeral container storage.
 - If Bedrock returns "on-demand throughput isn't supported", set `BEDROCK_MODEL_ID`/`BEDROCK_LITE_MODEL_ID` to an inference profile ID/ARN (example EU: `eu.amazon.nova-pro-v1:0` / `eu.amazon.nova-lite-v1:0`).
+- Keep `AUTH_ENABLED=false` unless frontend Cognito settings are configured and tested end-to-end.
 
 ### RDS Postgres (Minimal Setup)
 1. Create an RDS Postgres instance (or Aurora Postgres) in the same VPC as ECS, ideally in private subnets.

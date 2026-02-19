@@ -4,12 +4,13 @@ import logging
 from pathlib import Path
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routers.pipeline import build_pipeline_router
 from app.api.routers.projects import build_projects_router
 from app.api.routers.system import router as system_router
+from app.auth import require_authenticated_user
 from app.config import settings
 from app.db import init_db
 from app.nova_runtime import BedrockNovaOrchestrator, validate_bedrock_model_ids
@@ -153,12 +154,14 @@ def create_app() -> FastAPI:
         get_embedding_service=lambda: get_embedding_service(),
     )
 
+    auth_dependencies = [Depends(require_authenticated_user)]
+
     app.include_router(system_router)
-    app.include_router(projects_router)
-    app.include_router(pipeline_router)
+    app.include_router(projects_router, dependencies=auth_dependencies)
+    app.include_router(pipeline_router, dependencies=auth_dependencies)
     # Keep root routes for compatibility and expose /api/* aliases for same-origin frontend routing.
-    app.include_router(api_projects_router, prefix="/api")
-    app.include_router(api_pipeline_router, prefix="/api")
+    app.include_router(api_projects_router, prefix="/api", dependencies=auth_dependencies)
+    app.include_router(api_pipeline_router, prefix="/api", dependencies=auth_dependencies)
 
     return app
 
