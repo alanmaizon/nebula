@@ -457,6 +457,11 @@ export default function HomePage() {
 
     async function initializeAuth() {
       try {
+        const callbackParams = new URLSearchParams(window.location.search);
+        if (callbackParams.has("code") || callbackParams.has("error")) {
+          setShowWorkspace(true);
+        }
+
         const config = readCognitoClientConfig();
         if (cancelled) {
           return;
