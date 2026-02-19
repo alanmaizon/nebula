@@ -300,15 +300,69 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          services=("${ECS_BACKEND_SERVICE}")
           if [[ "${{ steps.config.outputs.deploy_frontend }}" == "true" ]]; then
-            aws ecs wait services-stable \
-              --cluster "${ECS_CLUSTER}" \
-              --services "${ECS_BACKEND_SERVICE}" "${ECS_FRONTEND_SERVICE}"
-          else
-            aws ecs wait services-stable \
-              --cluster "${ECS_CLUSTER}" \
-              --services "${ECS_BACKEND_SERVICE}"
+            services+=("${ECS_FRONTEND_SERVICE}")
           fi
+
+          timeout_seconds=1800
+          sleep_seconds=15
+          deadline="$(( $(date +%s) + timeout_seconds ))"
+
+          while true; do
+            describe_json="$(aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${services[@]}" \
+              --output json)"
+
+            echo "Current ECS rollout status:"
+            echo "${describe_json}" | jq -r '
+              .services[]
+              | "\(.serviceName): desired=\(.desiredCount) running=\(.runningCount) pending=\(.pendingCount) deployments=\([.deployments[] | "\(.status):\(.rolloutState // "n/a"):\(.runningCount)"] | join(","))"
+            '
+
+            all_stable=true
+            for svc in "${services[@]}"; do
+              stable="$(echo "${describe_json}" | jq -r --arg svc "${svc}" '
+                .services[]
+                | select(.serviceName == $svc)
+                | (
+                    .runningCount == .desiredCount
+                    and .pendingCount == 0
+                    and (.deployments | length) == 1
+                    and (.deployments[0].status == "PRIMARY")
+                    and ((.deployments[0].rolloutState // "COMPLETED") == "COMPLETED")
+                  )
+              ')"
+              if [[ "${stable}" != "true" ]]; then
+                all_stable=false
+              fi
+            done
+
+            if [[ "${all_stable}" == "true" ]]; then
+              break
+            fi
+
+            if (( "$(date +%s)" >= deadline )); then
+              echo "Timed out waiting for ECS services to stabilize after ${timeout_seconds}s."
+              echo "Recent service diagnostics:"
+              echo "${describe_json}" | jq '
+                .services[]
+                | {
+                    serviceName,
+                    desiredCount,
+                    runningCount,
+                    pendingCount,
+                    deployments: [.deployments[] | {status, rolloutState, runningCount, pendingCount, taskDefinition}],
+                    events: [.events[0:10][] | {createdAt, message}]
+                  }
+              '
+              exit 1
+            fi
+
+            sleep "${sleep_seconds}"
+          done
 
           echo "Deployment completed for ECS services:"
           echo "- ${ECS_BACKEND_SERVICE}"
