@@ -63,6 +63,27 @@ docker compose up --build
 - Prerequisites and secrets: `docs/wiki/AWS-Production-Deployment-Checklist.md`
 - Readiness check script: `scripts/aws/check_deploy_readiness.sh`
 
+## Authentication
+- Frontend auth uses Cognito Hosted UI with Google and OAuth 2.0 authorization code + PKCE.
+- Backend enforces bearer token validation when `AUTH_ENABLED=true`.
+- Keep frontend and backend client IDs aligned:
+  - Frontend: `NEXT_PUBLIC_COGNITO_CLIENT_ID`
+  - Backend: `COGNITO_APP_CLIENT_ID`
+- Required frontend secrets when auth is enabled:
+  - `NEXT_PUBLIC_AUTH_ENABLED=true`
+  - `NEXT_PUBLIC_COGNITO_DOMAIN`
+  - `NEXT_PUBLIC_COGNITO_CLIENT_ID`
+  - `NEXT_PUBLIC_COGNITO_REDIRECT_URI`
+  - `NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI`
+  - `NEXT_PUBLIC_COGNITO_SCOPE` (recommended: `openid email`)
+
+## Deploy Notes
+- After frontend deploy, invalidate CloudFront paths:
+  - `/`
+  - `/_next/static/*`
+- If login fails with `invalid_client_secret`, the Cognito app client is secret-based.
+  Create a public app client (`--no-generate-secret`) and update both frontend and backend client IDs.
+
 ## Core API
 - `POST /projects`
 - `POST /projects/{id}/upload`
