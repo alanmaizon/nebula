@@ -249,9 +249,57 @@ find_db_instance_by_host() {
     | head -n1
 }
 
+find_db_cluster_by_host() {
+  local host="$1"
+  aws_json rds describe-db-clusters --output json \
+    | jq -r --arg HOST "$host" '
+        .DBClusters[]
+        | select(.Endpoint == $HOST or .ReaderEndpoint == $HOST)
+        | .DBClusterIdentifier
+      ' \
+    | head -n1
+}
+
+normalize_db_identifier_input() {
+  local value="$1"
+  if [[ "$value" == arn:aws:rds:* ]]; then
+    IFS=':' read -r -a parts <<< "$value"
+    if [[ ${#parts[@]} -ge 7 ]]; then
+      echo "${parts[6]}"
+      return 0
+    fi
+  fi
+  echo "$value"
+}
+
+resolve_identifier_from_host() {
+  local host="$1"
+  local instance_id
+  instance_id="$(find_db_instance_by_host "$host")"
+  if [[ -n "$instance_id" ]]; then
+    echo "$instance_id"
+    return 0
+  fi
+
+  local cluster_id
+  cluster_id="$(find_db_cluster_by_host "$host")"
+  if [[ -n "$cluster_id" ]]; then
+    echo "$cluster_id"
+    return 0
+  fi
+
+  return 1
+}
+
 resolve_db_identifier() {
   if [[ -n "$DB_INSTANCE" ]]; then
-    echo "$DB_INSTANCE"
+    local normalized
+    normalized="$(normalize_db_identifier_input "$DB_INSTANCE")"
+    if [[ "$normalized" == *.* ]]; then
+      resolve_identifier_from_host "$normalized"
+      return
+    fi
+    echo "$normalized"
     return 0
   fi
 
@@ -267,7 +315,7 @@ resolve_db_identifier() {
     return 1
   fi
 
-  find_db_instance_by_host "$db_host"
+  resolve_identifier_from_host "$db_host"
 }
 
 detect_db_kind() {
