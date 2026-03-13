@@ -13,7 +13,7 @@ Options:
   --cluster NAME               ECS cluster name (default: $ECS_CLUSTER or nebula-cluster)
   --backend-service NAME       Backend ECS service name (default: $ECS_BACKEND_SERVICE or nebula-backend)
   --frontend-service NAME      Frontend ECS service name (default: $ECS_FRONTEND_SERVICE or nebula-frontend)
-  --db-instance NAME           RDS DB instance identifier (default: $DB_INSTANCE_ID or nebula-postgres)
+  --db-instance NAME           RDS DB identifier (instance or cluster; default: $DB_INSTANCE_ID)
   --skip-db                    Skip RDS stop step
   -h, --help                   Show help
 USAGE
@@ -24,7 +24,7 @@ REGION="${AWS_REGION:-eu-central-1}"
 CLUSTER="${ECS_CLUSTER:-nebula-cluster}"
 BACKEND_SERVICE="${ECS_BACKEND_SERVICE:-nebula-backend}"
 FRONTEND_SERVICE="${ECS_FRONTEND_SERVICE:-nebula-frontend}"
-DB_INSTANCE="${DB_INSTANCE_ID:-nebula-postgres}"
+DB_INSTANCE="${DB_INSTANCE_ID:-}"
 SKIP_DB=0
 
 while [[ $# -gt 0 ]]; do
@@ -77,10 +77,14 @@ fi
 echo "Checking AWS identity..."
 "${AWS_CMD[@]}" sts get-caller-identity >/dev/null
 
+aws_json() {
+  "${AWS_CMD[@]}" "$@"
+}
+
 service_is_active() {
   local service_name="$1"
   local status
-  status="$("${AWS_CMD[@]}" ecs describe-services \
+  status="$(aws_json ecs describe-services \
     --cluster "$CLUSTER" \
     --services "$service_name" \
     --query 'services[0].status' \
@@ -88,11 +92,24 @@ service_is_active() {
   [[ "$status" == "ACTIVE" ]]
 }
 
+detect_db_kind() {
+  local identifier="$1"
+  if aws_json rds describe-db-instances --db-instance-identifier "$identifier" >/dev/null 2>&1; then
+    echo "instance"
+    return 0
+  fi
+  if aws_json rds describe-db-clusters --db-cluster-identifier "$identifier" >/dev/null 2>&1; then
+    echo "cluster"
+    return 0
+  fi
+  return 1
+}
+
 UPDATED_SERVICES=()
 
 if service_is_active "$BACKEND_SERVICE"; then
   echo "Scaling ECS service '$BACKEND_SERVICE' to 0..."
-  "${AWS_CMD[@]}" ecs update-service \
+  aws_json ecs update-service \
     --cluster "$CLUSTER" \
     --service "$BACKEND_SERVICE" \
     --desired-count 0 >/dev/null
@@ -103,7 +120,7 @@ fi
 
 if [[ -n "$FRONTEND_SERVICE" ]] && service_is_active "$FRONTEND_SERVICE"; then
   echo "Scaling ECS service '$FRONTEND_SERVICE' to 0..."
-  "${AWS_CMD[@]}" ecs update-service \
+  aws_json ecs update-service \
     --cluster "$CLUSTER" \
     --service "$FRONTEND_SERVICE" \
     --desired-count 0 >/dev/null
@@ -116,35 +133,63 @@ fi
 
 if [[ ${#UPDATED_SERVICES[@]} -gt 0 ]]; then
   echo "Waiting for ECS services to stabilize..."
-  "${AWS_CMD[@]}" ecs wait services-stable \
+  aws_json ecs wait services-stable \
     --cluster "$CLUSTER" \
     --services "${UPDATED_SERVICES[@]}"
 fi
 
 if [[ "$SKIP_DB" -eq 0 ]]; then
-  db_status="$("${AWS_CMD[@]}" rds describe-db-instances \
-    --db-instance-identifier "$DB_INSTANCE" \
-    --query 'DBInstances[0].DBInstanceStatus' \
-    --output text 2>/dev/null || true)"
-  case "$db_status" in
-    available)
-      echo "Stopping RDS instance '$DB_INSTANCE'..."
-      "${AWS_CMD[@]}" rds stop-db-instance \
-        --db-instance-identifier "$DB_INSTANCE" >/dev/null
-      ;;
-    stopping|stopped)
-      echo "RDS instance '$DB_INSTANCE' already $db_status."
-      ;;
-    "")
-      echo "Skipping RDS stop: instance '$DB_INSTANCE' not found."
-      ;;
-    *)
-      echo "Skipping RDS stop: instance '$DB_INSTANCE' is in status '$db_status'."
-      ;;
-  esac
+  if [[ -z "$DB_INSTANCE" ]]; then
+    echo "Skipping RDS stop: DB_INSTANCE_ID was not provided."
+  else
+    DB_KIND="$(detect_db_kind "$DB_INSTANCE" || true)"
+    case "$DB_KIND" in
+      instance)
+        db_status="$(aws_json rds describe-db-instances \
+          --db-instance-identifier "$DB_INSTANCE" \
+          --query 'DBInstances[0].DBInstanceStatus' \
+          --output text 2>/dev/null || true)"
+        case "$db_status" in
+          available)
+            echo "Stopping RDS instance '$DB_INSTANCE'..."
+            aws_json rds stop-db-instance \
+              --db-instance-identifier "$DB_INSTANCE" >/dev/null
+            ;;
+          stopping|stopped)
+            echo "RDS instance '$DB_INSTANCE' already $db_status."
+            ;;
+          *)
+            echo "Skipping RDS instance '$DB_INSTANCE': status '$db_status'."
+            ;;
+        esac
+        ;;
+      cluster)
+        db_status="$(aws_json rds describe-db-clusters \
+          --db-cluster-identifier "$DB_INSTANCE" \
+          --query 'DBClusters[0].Status' \
+          --output text 2>/dev/null || true)"
+        case "$db_status" in
+          available)
+            echo "Stopping RDS cluster '$DB_INSTANCE'..."
+            aws_json rds stop-db-cluster \
+              --db-cluster-identifier "$DB_INSTANCE" >/dev/null
+            ;;
+          stopping|stopped)
+            echo "RDS cluster '$DB_INSTANCE' already $db_status."
+            ;;
+          *)
+            echo "Skipping RDS cluster '$DB_INSTANCE': status '$db_status'."
+            ;;
+        esac
+        ;;
+      *)
+        echo "Skipping RDS stop: '$DB_INSTANCE' was not found as an instance or cluster in region '$REGION'."
+        ;;
+    esac
+  fi
 fi
 
 echo
 echo "Pause complete."
 echo "Note: ALB/CloudFront still incur low baseline cost."
-echo "Resume with: scripts/aws/resume_stack.sh --profile $PROFILE --region $REGION"
+echo "Resume with: scripts/aws/resume_stack.sh --region $REGION"

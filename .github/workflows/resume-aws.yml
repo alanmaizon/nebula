@@ -36,6 +36,7 @@ env:
   AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
   ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
   ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
+  ECS_BACKEND_CONTAINER_NAME: ${{ secrets.ECS_BACKEND_CONTAINER_NAME }}
   ECS_FRONTEND_SERVICE: ${{ secrets.ECS_FRONTEND_SERVICE }}
   DB_INSTANCE_ID: ${{ inputs.db_instance_id || secrets.DB_INSTANCE_ID }}
 
@@ -87,6 +88,7 @@ jobs:
             --region "${AWS_REGION}"
             --cluster "${ECS_CLUSTER}"
             --backend-service "${ECS_BACKEND_SERVICE}"
+            --backend-container "${ECS_BACKEND_CONTAINER_NAME:-${ECS_BACKEND_SERVICE}}"
             --backend-count "${{ inputs.backend_count }}"
           )
 
