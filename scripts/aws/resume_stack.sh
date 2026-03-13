@@ -8,7 +8,7 @@ Usage: scripts/aws/resume_stack.sh [options]
 Resume Nebula AWS runtime by starting RDS and scaling ECS services back up.
 
 Options:
-  --profile PROFILE            AWS profile (default: $AWS_PROFILE or nebula)
+  --profile PROFILE            AWS profile (optional)
   --region REGION              AWS region (default: $AWS_REGION or eu-central-1)
   --cluster NAME               ECS cluster name (default: $ECS_CLUSTER or nebula-cluster)
   --backend-service NAME       Backend ECS service name (default: $ECS_BACKEND_SERVICE or nebula-backend)
@@ -21,7 +21,7 @@ Options:
 USAGE
 }
 
-PROFILE="${AWS_PROFILE:-nebula}"
+PROFILE="${AWS_PROFILE:-}"
 REGION="${AWS_REGION:-eu-central-1}"
 CLUSTER="${ECS_CLUSTER:-nebula-cluster}"
 BACKEND_SERVICE="${ECS_BACKEND_SERVICE:-nebula-backend}"
@@ -81,7 +81,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-AWS_CMD=(aws --profile "$PROFILE" --region "$REGION")
+AWS_CMD=(aws --region "$REGION")
+if [[ -n "$PROFILE" ]]; then
+  AWS_CMD+=(--profile "$PROFILE")
+fi
 
 echo "Checking AWS identity..."
 "${AWS_CMD[@]}" sts get-caller-identity >/dev/null
