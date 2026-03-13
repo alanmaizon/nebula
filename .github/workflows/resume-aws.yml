@@ -38,7 +38,7 @@ env:
   ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
   ECS_BACKEND_CONTAINER_NAME: ${{ secrets.ECS_BACKEND_CONTAINER_NAME }}
   ECS_FRONTEND_SERVICE: ${{ secrets.ECS_FRONTEND_SERVICE }}
-  DB_INSTANCE_ID: ${{ inputs.db_instance_id || secrets.DB_INSTANCE_ID }}
+  DB_INSTANCE_ID: ${{ inputs.db_instance_id || secrets.DB_INSTANCE_ID || vars.DB_INSTANCE_ID }}
 
 jobs:
   resume:

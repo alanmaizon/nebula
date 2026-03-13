@@ -43,10 +43,10 @@ env:
   ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
   ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
   ECS_BACKEND_CONTAINER_NAME: ${{ secrets.ECS_BACKEND_CONTAINER_NAME }}
-  DB_INSTANCE_ID: ${{ inputs.db_instance_id || secrets.DB_INSTANCE_ID }}
-  BACKUP_S3_BUCKET: ${{ inputs.backup_s3_bucket || secrets.BACKUP_S3_BUCKET }}
-  BACKUP_S3_PREFIX: ${{ inputs.backup_s3_prefix || secrets.BACKUP_S3_PREFIX }}
-  RDS_BACKUP_RETENTION_DAYS: ${{ inputs.retention_days || secrets.RDS_BACKUP_RETENTION_DAYS }}
+  DB_INSTANCE_ID: ${{ inputs.db_instance_id || secrets.DB_INSTANCE_ID || vars.DB_INSTANCE_ID }}
+  BACKUP_S3_BUCKET: ${{ inputs.backup_s3_bucket || secrets.BACKUP_S3_BUCKET || vars.BACKUP_S3_BUCKET }}
+  BACKUP_S3_PREFIX: ${{ inputs.backup_s3_prefix || secrets.BACKUP_S3_PREFIX || vars.BACKUP_S3_PREFIX }}
+  RDS_BACKUP_RETENTION_DAYS: ${{ inputs.retention_days || secrets.RDS_BACKUP_RETENTION_DAYS || vars.RDS_BACKUP_RETENTION_DAYS }}
   STOP_DB_AFTER_BACKUP: ${{ inputs.stop_db_after_backup }}
 
 jobs:
