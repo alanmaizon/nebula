@@ -122,6 +122,49 @@ The account must contain:
   - ECS service/task updates (`DescribeServices`, `DescribeTaskDefinition`, `RegisterTaskDefinition`, `UpdateService`, `DescribeClusters`)
   - IAM pass role for ECS task execution/task roles (`iam:PassRole`) when needed by task definition registration
 
+## 4) Backup Workflow Requirements
+
+Workflow file: `.github/workflows/backup-aws.yml`
+
+Required GitHub secrets:
+- Reuses deploy secrets:
+  - `AWS_REGION`
+  - `AWS_ROLE_TO_ASSUME`
+  - `ECS_CLUSTER`
+  - `ECS_BACKEND_SERVICE`
+- Optional:
+  - `ECS_BACKEND_CONTAINER_NAME`
+  - `DB_INSTANCE_ID`
+  - `BACKUP_S3_BUCKET`
+  - `BACKUP_S3_PREFIX`
+  - `RDS_BACKUP_RETENTION_DAYS`
+
+Recommended IAM permissions for the GitHub OIDC role used by backups:
+- ECS read:
+  - `ecs:DescribeServices`
+  - `ecs:DescribeTaskDefinition`
+- RDS backup management:
+  - `rds:DescribeDBInstances`
+  - `rds:DescribeDBSnapshots`
+  - `rds:CreateDBSnapshot`
+  - `rds:ModifyDBInstance`
+  - `rds:StartDBInstance`
+  - `rds:StopDBInstance`
+- S3 upload backup:
+  - `s3:GetBucketVersioning`
+  - `s3:PutBucketVersioning`
+  - `s3:ListBucket`
+  - `s3:GetObject`
+  - `s3:PutObject`
+- Secret resolution when runtime config is injected indirectly:
+  - `secretsmanager:GetSecretValue`
+  - `ssm:GetParameter`
+
+Notes:
+- If `DB_INSTANCE_ID` is not set, the backup script attempts to resolve the RDS instance from `DATABASE_URL`.
+- When `STORAGE_BACKEND=s3`, the workflow enables S3 versioning and copies the uploads prefix into a dated backup prefix.
+- The scheduled workflow runs daily at `04:17 UTC` and can also be triggered manually with overrides.
+
 Minimal trust policy template:
 
 ```json

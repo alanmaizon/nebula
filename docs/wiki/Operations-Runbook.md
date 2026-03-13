@@ -62,3 +62,35 @@
 
 ### Restore Drill Evidence
 - `docs/wiki/Restore-Drill-2026-02-07.md`
+
+## AWS Backup Automation
+### Workflow
+- GitHub Actions workflow: `.github/workflows/backup-aws.yml`
+- Runtime script: `scripts/aws/run_backup.sh`
+
+### What It Does
+1. Reads the deployed backend task definition from ECS.
+2. Resolves the active storage settings and database target.
+3. Ensures RDS automated backups are retained for at least `7` days by default.
+4. Creates a manual RDS snapshot for the current run.
+5. Enables S3 versioning for the uploads bucket when `STORAGE_BACKEND=s3`.
+6. Copies the uploads prefix to a dated backup prefix (default: `nebula-backups/uploads/<timestamp>`).
+7. If the DB was stopped before the run, starts it for backup and stops it again afterward by default.
+
+### Required GitHub Secrets
+- Reuses deploy secrets:
+  - `AWS_REGION`
+  - `AWS_ROLE_TO_ASSUME`
+  - `ECS_CLUSTER`
+  - `ECS_BACKEND_SERVICE`
+- Optional overrides:
+  - `ECS_BACKEND_CONTAINER_NAME`
+  - `DB_INSTANCE_ID`
+  - `BACKUP_S3_BUCKET`
+  - `BACKUP_S3_PREFIX`
+  - `RDS_BACKUP_RETENTION_DAYS`
+
+### Restore Notes
+- Restore the RDS database from the selected manual snapshot.
+- Restore uploads from the dated S3 backup prefix or earlier object versions if versioning is enabled.
+- If `DATABASE_URL` is injected through Secrets Manager or SSM Parameter Store, the GitHub OIDC role also needs read access to that source.

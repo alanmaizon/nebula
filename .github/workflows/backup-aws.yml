@@ -1,0 +1,116 @@
+name: Backup AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_instance_id:
+        description: Optional RDS instance identifier override
+        required: false
+        type: string
+      backup_s3_bucket:
+        description: Optional bucket for upload snapshots
+        required: false
+        type: string
+      backup_s3_prefix:
+        description: Prefix for upload snapshots
+        required: false
+        default: nebula-backups
+        type: string
+      retention_days:
+        description: Minimum automated RDS backup retention in days
+        required: false
+        default: "7"
+        type: string
+      stop_db_after_backup:
+        description: Stop the DB again if this workflow had to start it
+        required: false
+        default: true
+        type: boolean
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-backup
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
+  ECS_BACKEND_CONTAINER_NAME: ${{ secrets.ECS_BACKEND_CONTAINER_NAME }}
+  DB_INSTANCE_ID: ${{ inputs.db_instance_id || secrets.DB_INSTANCE_ID }}
+  BACKUP_S3_BUCKET: ${{ inputs.backup_s3_bucket || secrets.BACKUP_S3_BUCKET }}
+  BACKUP_S3_PREFIX: ${{ inputs.backup_s3_prefix || secrets.BACKUP_S3_PREFIX }}
+  RDS_BACKUP_RETENTION_DAYS: ${{ inputs.retention_days || secrets.RDS_BACKUP_RETENTION_DAYS }}
+  STOP_DB_AFTER_BACKUP: ${{ inputs.stop_db_after_backup }}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate backup configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=()
+          required=(
+            AWS_REGION
+            AWS_ROLE_TO_ASSUME
+            ECS_CLUSTER
+            ECS_BACKEND_SERVICE
+          )
+
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            echo "Missing required backup configuration values:" >&2
+            printf ' - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+
+      - name: Run AWS backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --region "${AWS_REGION}"
+            --cluster "${ECS_CLUSTER}"
+            --backend-service "${ECS_BACKEND_SERVICE}"
+            --backend-container "${ECS_BACKEND_CONTAINER_NAME:-${ECS_BACKEND_SERVICE}}"
+            --stop-db-after-backup "${STOP_DB_AFTER_BACKUP:-true}"
+          )
+
+          if [[ -n "${DB_INSTANCE_ID:-}" ]]; then
+            args+=(--db-instance "${DB_INSTANCE_ID}")
+          fi
+          if [[ -n "${BACKUP_S3_BUCKET:-}" ]]; then
+            args+=(--backup-bucket "${BACKUP_S3_BUCKET}")
+          fi
+          if [[ -n "${BACKUP_S3_PREFIX:-}" ]]; then
+            args+=(--backup-prefix "${BACKUP_S3_PREFIX}")
+          fi
+          if [[ -n "${RDS_BACKUP_RETENTION_DAYS:-}" ]]; then
+            args+=(--retention-days "${RDS_BACKUP_RETENTION_DAYS}")
+          fi
+
+          bash scripts/aws/run_backup.sh "${args[@]}"
