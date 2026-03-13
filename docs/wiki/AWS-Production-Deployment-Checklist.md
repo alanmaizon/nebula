@@ -165,6 +165,27 @@ Notes:
 - When `STORAGE_BACKEND=s3`, the workflow enables S3 versioning and copies the uploads prefix into a dated backup prefix.
 - The scheduled workflow runs daily at `04:17 UTC` and can also be triggered manually with overrides.
 
+## 5) Pause and Resume Workflows
+
+Workflow files:
+- `.github/workflows/resume-aws.yml`
+- `.github/workflows/pause-aws.yml`
+
+Purpose:
+- `Resume AWS` starts the RDS instance and scales ECS services back up using the same OIDC role as deploy.
+- `Pause AWS` scales ECS services to `0` and optionally stops RDS to reduce cost.
+
+Important behavior:
+- `.github/workflows/deploy-aws.yml` updates task definitions and ECS services, but it does not change desired counts.
+- A deploy can therefore pass while the backend service remains paused at desired count `0`.
+- In that state the frontend can still load while `/api/*` returns `503 Service Temporarily Unavailable` through CloudFront/ALB.
+
+Recommended recovery when the UI loads but API requests fail with `503`:
+1. Run `Resume AWS` from GitHub Actions.
+2. Wait for the backend service and RDS instance to become available.
+3. Retry `GET /api/health` and `GET /api/ready`.
+4. Retry the workflow in the UI once the API endpoints return `200`.
+
 Minimal trust policy template:
 
 ```json

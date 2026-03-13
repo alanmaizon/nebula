@@ -1,0 +1,111 @@
+name: Pause AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      db_instance_id:
+        description: Optional RDS instance identifier override
+        required: false
+        type: string
+      skip_db:
+        description: Skip the RDS stop step
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-pause
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
+  ECS_FRONTEND_SERVICE: ${{ secrets.ECS_FRONTEND_SERVICE }}
+  DB_INSTANCE_ID: ${{ inputs.db_instance_id || secrets.DB_INSTANCE_ID }}
+
+jobs:
+  pause:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate pause configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=()
+          required=(
+            AWS_REGION
+            AWS_ROLE_TO_ASSUME
+            ECS_CLUSTER
+            ECS_BACKEND_SERVICE
+          )
+
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            echo "Missing required pause configuration values:" >&2
+            printf ' - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+
+      - name: Pause stack
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          args=(
+            --region "${AWS_REGION}"
+            --cluster "${ECS_CLUSTER}"
+            --backend-service "${ECS_BACKEND_SERVICE}"
+          )
+
+          if [[ -n "${ECS_FRONTEND_SERVICE:-}" ]]; then
+            args+=(--frontend-service "${ECS_FRONTEND_SERVICE}")
+          fi
+          if [[ -n "${DB_INSTANCE_ID:-}" ]]; then
+            args+=(--db-instance "${DB_INSTANCE_ID}")
+          fi
+          if [[ "${{ inputs.skip_db }}" == "true" ]]; then
+            args+=(--skip-db)
+          fi
+
+          bash scripts/aws/pause_stack.sh "${args[@]}"
+
+      - name: Summarize
+        shell: bash
+        run: |
+          {
+            echo "## Pause AWS"
+            echo "- Cluster: \`${ECS_CLUSTER}\`"
+            echo "- Backend service: \`${ECS_BACKEND_SERVICE}\` -> desired \`0\`"
+            if [[ -n "${ECS_FRONTEND_SERVICE:-}" ]]; then
+              echo "- Frontend service: \`${ECS_FRONTEND_SERVICE}\` -> desired \`0\`"
+            fi
+            if [[ "${{ inputs.skip_db }}" == "true" ]]; then
+              echo "- Database: skipped"
+            elif [[ -n "${DB_INSTANCE_ID:-}" ]]; then
+              echo "- Database: \`${DB_INSTANCE_ID}\`"
+            else
+              echo "- Database: default from script/environment"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
