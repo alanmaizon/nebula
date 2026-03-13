@@ -2,6 +2,8 @@
 
 This checklist covers the production gaps between local MVP behavior and AWS ECS deployment.
 
+If you want to provision the baseline AWS infrastructure from scratch instead of wiring it up manually, start with `infra/terraform/aws/README.md`.
+
 ## 1) Configure GitHub Secrets for Deploy Workflow
 
 Workflow file: `.github/workflows/deploy-aws.yml`

@@ -59,6 +59,7 @@ docker compose up --build
 - Backend docs: `http://localhost:8000/docs`
 
 ## AWS Deploy Checklist
+- Terraform baseline stack: `infra/terraform/aws`
 - Workflow: `.github/workflows/deploy-aws.yml`
 - Prerequisites and secrets: `docs/wiki/AWS-Production-Deployment-Checklist.md`
 - Readiness check script: `scripts/aws/check_deploy_readiness.sh`

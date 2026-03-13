@@ -1,0 +1,27 @@
+aws_region    = "eu-central-1"
+project_name  = "nebula"
+environment   = "prod"
+
+# Push initial images to ECR with the same tags before your first apply,
+# or set desired counts to 0 for the bootstrap pass and let GitHub Actions deploy afterward.
+backend_image_tag    = "latest"
+frontend_image_tag   = "latest"
+backend_desired_count  = 1
+frontend_desired_count = 1
+
+# Cost-conscious baseline: ECS tasks run in public subnets so the stack does not need NAT gateways.
+assign_public_ip = true
+
+# Bedrock defaults target EU inference profiles.
+bedrock_model_id          = "eu.amazon.nova-pro-v1:0"
+bedrock_lite_model_id     = "eu.amazon.nova-lite-v1:0"
+bedrock_embedding_model_id = "amazon.titan-embed-text-v2:0"
+embedding_mode            = "bedrock"
+
+# Leave auth disabled until you have a Cognito user pool and app client configured.
+backend_auth_enabled = false
+
+# Optional tags.
+tags = {
+  Owner = "nebula"
+}
