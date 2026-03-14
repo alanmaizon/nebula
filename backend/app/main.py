@@ -157,6 +157,7 @@ def create_app() -> FastAPI:
     auth_dependencies = [Depends(require_authenticated_user)]
 
     app.include_router(system_router)
+    app.include_router(system_router, prefix="/api")
     app.include_router(projects_router, dependencies=auth_dependencies)
     app.include_router(pipeline_router, dependencies=auth_dependencies)
     # Keep root routes for compatibility and expose /api/* aliases for same-origin frontend routing.
