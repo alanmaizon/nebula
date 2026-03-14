@@ -75,6 +75,8 @@ Load the `github_actions_secrets` map into repository secrets and the `github_ac
 - `.github/workflows/pause-aws.yml`
 - `.github/workflows/backup-aws.yml`
 
+If you prefer a guided GitHub Actions path for provisioning a fresh stack, run `.github/workflows/provision-aws.yml`. After a successful `apply`, it prints the exact `gh secret set` / `gh variable set` commands you need for the repo.
+
 The most important values are:
 
 - `AWS_ROLE_TO_ASSUME`
@@ -85,6 +87,13 @@ The most important values are:
 - `ECR_FRONTEND_REPOSITORY`
 - `DB_INSTANCE_ID`
 - `BACKUP_S3_BUCKET`
+
+You can also generate the GitHub wiring commands locally:
+
+```bash
+terraform output -json > tf-output.json
+scripts/aws/render_github_actions_settings_from_tf.sh tf-output.json alanmaizon/nebula
+```
 
 ## Operational Notes
 

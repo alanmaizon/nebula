@@ -38,3 +38,11 @@ output/playwright/
 # Ignore folder
 
 ignore/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log

@@ -1,0 +1,166 @@
+name: Provision AWS Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Terraform action to run
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
+      project_name:
+        description: Base name for the new stack
+        required: false
+        default: nebula
+        type: string
+      environment:
+        description: Environment label for the new stack
+        required: false
+        default: prod
+        type: string
+      backend_desired_count:
+        description: Initial backend desired count
+        required: false
+        default: "0"
+        type: string
+      frontend_desired_count:
+        description: Initial frontend desired count
+        required: false
+        default: "0"
+        type: string
+      backend_image_tag:
+        description: Initial backend image tag
+        required: false
+        default: latest
+        type: string
+      frontend_image_tag:
+        description: Initial frontend image tag
+        required: false
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-infrastructure-stack
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'eu-central-1' }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME || vars.AWS_ROLE_TO_ASSUME }}
+  TF_IN_AUTOMATION: true
+  TF_VAR_aws_region: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'eu-central-1' }}
+  TF_VAR_project_name: ${{ inputs.project_name }}
+  TF_VAR_environment: ${{ inputs.environment }}
+  TF_VAR_backend_desired_count: ${{ inputs.backend_desired_count }}
+  TF_VAR_frontend_desired_count: ${{ inputs.frontend_desired_count }}
+  TF_VAR_backend_image_tag: ${{ inputs.backend_image_tag }}
+  TF_VAR_frontend_image_tag: ${{ inputs.frontend_image_tag }}
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production
+    defaults:
+      run:
+        working-directory: infra/terraform/aws
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate provision configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${AWS_ROLE_TO_ASSUME:-}" ]]; then
+            echo "Missing AWS_ROLE_TO_ASSUME. Set it in repository secrets or vars." >&2
+            exit 1
+          fi
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+
+      - name: Terraform format check
+        shell: bash
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        shell: bash
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        shell: bash
+        run: terraform validate
+
+      - name: Terraform plan
+        shell: bash
+        run: terraform plan -input=false -no-color -out=tfplan
+
+      - name: Terraform apply
+        if: ${{ inputs.action == 'apply' }}
+        shell: bash
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Capture Terraform outputs
+        if: ${{ inputs.action == 'apply' }}
+        shell: bash
+        run: terraform output -json > tf-output.json
+
+      - name: Summarize plan
+        if: ${{ inputs.action != 'apply' }}
+        shell: bash
+        run: |
+          {
+            echo "## Provision AWS Stack"
+            echo "- Action: \`plan\`"
+            echo "- Region: \`${AWS_REGION}\`"
+            echo "- Project name: \`${{ inputs.project_name }}\`"
+            echo "- Environment: \`${{ inputs.environment }}\`"
+            echo "- Initial backend desired count: \`${{ inputs.backend_desired_count }}\`"
+            echo "- Initial frontend desired count: \`${{ inputs.frontend_desired_count }}\`"
+            echo "- Next step: rerun with \`action=apply\` once the plan looks right."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Summarize applied stack
+        if: ${{ inputs.action == 'apply' }}
+        shell: bash
+        run: |
+          {
+            echo "## Provision AWS Stack"
+            echo "- Action: \`apply\`"
+            echo "- Region: \`${AWS_REGION}\`"
+            echo "- Project name: \`${{ inputs.project_name }}\`"
+            echo "- Environment: \`${{ inputs.environment }}\`"
+            echo ""
+            echo "### Key Outputs"
+            echo "- CloudFront domain: \`$(terraform output -raw cloudfront_domain_name)\`"
+            echo "- ECS cluster: \`$(terraform output -raw ecs_cluster_name)\`"
+            echo "- Backend service: \`$(terraform output -raw backend_service_name)\`"
+            echo "- Frontend service: \`$(terraform output -raw frontend_service_name)\`"
+            echo "- DB identifier: \`$(terraform output -raw database_identifier)\`"
+            echo "- DB secret: \`$(terraform output -raw database_url_secret_name)\`"
+            echo ""
+            echo "### GitHub Wiring Commands"
+            echo "Run these locally after apply:"
+            echo '```bash'
+            "${GITHUB_WORKSPACE}/scripts/aws/render_github_actions_settings_from_tf.sh" tf-output.json "${GITHUB_REPOSITORY}"
+            echo '```'
+            echo ""
+            echo "### Next Step"
+            echo "After loading the GitHub secrets and vars above, run \`Deploy AWS\` to push fresh application images into the new stack."
+          } >> "${GITHUB_STEP_SUMMARY}"

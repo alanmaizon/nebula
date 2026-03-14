@@ -4,6 +4,8 @@ This checklist covers the production gaps between local MVP behavior and AWS ECS
 
 If you want to provision the baseline AWS infrastructure from scratch instead of wiring it up manually, start with `infra/terraform/aws/README.md`.
 
+There is also a manual GitHub Actions workflow for fresh infrastructure: `.github/workflows/provision-aws.yml`.
+
 ## 1) Configure GitHub Secrets for Deploy Workflow
 
 Workflow file: `.github/workflows/deploy-aws.yml`
@@ -12,6 +14,7 @@ Pipeline behavior:
 - `CI` runs on pull requests and on `main`, with deterministic dependency installs, frontend lint/typecheck/tests, backend tests, and docker smoke coverage.
 - `Deploy AWS` now runs automatically only after a successful `CI` run on `main`, or manually via `workflow_dispatch`.
 - `Deploy AWS`, `Resume AWS`, `Pause AWS`, and `Backup AWS` share one GitHub Actions concurrency group so only one stack-mutating workflow touches production at a time.
+- `Provision AWS Stack` is a separate manual Terraform workflow for building a fresh Nebula stack without relying on the legacy hand-created resources.
 
 Required (backend deploy):
 - `AWS_REGION`: AWS region where ECS/ECR are deployed.
