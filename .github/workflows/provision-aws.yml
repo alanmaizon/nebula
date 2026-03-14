@@ -66,7 +66,6 @@ jobs:
   provision:
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    environment: production
     defaults:
       run:
         working-directory: infra/terraform/aws

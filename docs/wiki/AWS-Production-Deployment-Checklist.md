@@ -15,6 +15,7 @@ Pipeline behavior:
 - `Deploy AWS` now runs automatically only after a successful `CI` run on `main`, or manually via `workflow_dispatch`.
 - `Deploy AWS`, `Resume AWS`, `Pause AWS`, and `Backup AWS` share one GitHub Actions concurrency group so only one stack-mutating workflow touches production at a time.
 - `Provision AWS Stack` is a separate manual Terraform workflow for building a fresh Nebula stack without relying on the legacy hand-created resources.
+- The current GitHub OIDC trust is still branch-based, so the AWS workflows should be run from `main` unless you also update IAM trust conditions.
 
 Required (backend deploy):
 - `AWS_REGION`: AWS region where ECS/ECR are deployed.
