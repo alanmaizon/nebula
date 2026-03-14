@@ -2,13 +2,21 @@ name: Deploy AWS
 
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
 
 permissions:
   contents: read
   id-token: write
+
+concurrency:
+  group: aws-production-stack
+  cancel-in-progress: false
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -30,10 +38,28 @@ env:
 
 jobs:
   deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: production
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve deployment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_run" ]]; then
+            echo "DEPLOY_SHA=${{ github.event.workflow_run.head_sha }}" >> "${GITHUB_ENV}"
+            echo "DEPLOY_SOURCE=ci:${{ github.event.workflow_run.name }}" >> "${GITHUB_ENV}"
+          else
+            echo "DEPLOY_SHA=${GITHUB_SHA}" >> "${GITHUB_ENV}"
+            echo "DEPLOY_SOURCE=manual" >> "${GITHUB_ENV}"
+          fi
 
       - name: Validate deploy configuration
         id: config
@@ -105,8 +131,8 @@ jobs:
         run: |
           set -euo pipefail
           REGISTRY="${{ steps.ecr.outputs.registry }}"
-          BACKEND_IMAGE="${REGISTRY}/${ECR_BACKEND_REPOSITORY}:${GITHUB_SHA}"
-          FRONTEND_IMAGE="${REGISTRY}/${ECR_FRONTEND_REPOSITORY}:${GITHUB_SHA}"
+          BACKEND_IMAGE="${REGISTRY}/${ECR_BACKEND_REPOSITORY}:${DEPLOY_SHA}"
+          FRONTEND_IMAGE="${REGISTRY}/${ECR_FRONTEND_REPOSITORY}:${DEPLOY_SHA}"
 
           BACKEND_CONTAINER_NAME="${ECS_BACKEND_CONTAINER_NAME:-$ECS_BACKEND_SERVICE}"
           FRONTEND_CONTAINER_NAME="${ECS_FRONTEND_CONTAINER_NAME:-$ECS_FRONTEND_SERVICE}"
@@ -369,3 +395,20 @@ jobs:
           if [[ "${{ steps.config.outputs.deploy_frontend }}" == "true" ]]; then
             echo "- ${ECS_FRONTEND_SERVICE}"
           fi
+
+      - name: Summarize deployment
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Deploy AWS"
+            echo "- Source: \`${DEPLOY_SOURCE:-unknown}\`"
+            echo "- Commit: \`${DEPLOY_SHA:-unknown}\`"
+            echo "- Cluster: \`${ECS_CLUSTER}\`"
+            echo "- Backend service: \`${ECS_BACKEND_SERVICE}\`"
+            if [[ "${{ steps.config.outputs.deploy_frontend }}" == "true" ]]; then
+              echo "- Frontend service: \`${ECS_FRONTEND_SERVICE}\`"
+            else
+              echo "- Frontend service: skipped"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"

@@ -8,6 +8,11 @@ If you want to provision the baseline AWS infrastructure from scratch instead of
 
 Workflow file: `.github/workflows/deploy-aws.yml`
 
+Pipeline behavior:
+- `CI` runs on pull requests and on `main`, with deterministic dependency installs, frontend lint/typecheck/tests, backend tests, and docker smoke coverage.
+- `Deploy AWS` now runs automatically only after a successful `CI` run on `main`, or manually via `workflow_dispatch`.
+- `Deploy AWS`, `Resume AWS`, `Pause AWS`, and `Backup AWS` share one GitHub Actions concurrency group so only one stack-mutating workflow touches production at a time.
+
 Required (backend deploy):
 - `AWS_REGION`: AWS region where ECS/ECR are deployed.
 - `AWS_ROLE_TO_ASSUME`: IAM role ARN assumed by GitHub Actions (OIDC).

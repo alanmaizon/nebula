@@ -28,7 +28,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: aws-resume
+  group: aws-production-stack
   cancel-in-progress: false
 
 env:
