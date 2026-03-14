@@ -355,65 +355,19 @@ wait_for_cluster_available() {
 }
 
 wait_for_services() {
-  local timeout_seconds=600
-  local sleep_seconds=15
-  local deadline="$(( $(date +%s) + timeout_seconds ))"
+  local args=(
+    --region "$REGION"
+    --cluster "$CLUSTER"
+    --timeout 600
+    --sleep 15
+  )
 
-  while true; do
-    local describe_json
-    describe_json="$(aws_json ecs describe-services \
-      --cluster "$CLUSTER" \
-      --services "${UPDATED_SERVICES[@]}" \
-      --output json)"
-
-    echo "Current ECS rollout status:"
-    echo "${describe_json}" | jq -r '
-      .services[]
-      | "\(.serviceName): desired=\(.desiredCount) running=\(.runningCount) pending=\(.pendingCount) deployments=\([.deployments[] | "\(.status):\(.rolloutState // "n/a"):\(.runningCount)"] | join(","))"
-    '
-
-    local all_stable=true
-    for svc in "${UPDATED_SERVICES[@]}"; do
-      local stable
-      stable="$(echo "${describe_json}" | jq -r --arg svc "${svc}" '
-        .services[]
-        | select(.serviceName == $svc)
-        | (
-            .runningCount == .desiredCount
-            and .pendingCount == 0
-            and (.deployments | length) == 1
-            and (.deployments[0].status == "PRIMARY")
-            and ((.deployments[0].rolloutState // "COMPLETED") == "COMPLETED")
-          )
-      ')"
-      if [[ "${stable}" != "true" ]]; then
-        all_stable=false
-      fi
-    done
-
-    if [[ "${all_stable}" == "true" ]]; then
-      return 0
-    fi
-
-    if (( "$(date +%s)" >= deadline )); then
-      echo "Timed out waiting for ECS services to stabilize after ${timeout_seconds}s."
-      echo "Recent service diagnostics:"
-      echo "${describe_json}" | jq '
-        .services[]
-        | {
-            serviceName,
-            desiredCount,
-            runningCount,
-            pendingCount,
-            deployments: [.deployments[] | {status, rolloutState, runningCount, pendingCount, taskDefinition}],
-            events: [.events[0:10][] | {createdAt, message}]
-          }
-      '
-      return 1
-    fi
-
-    sleep "${sleep_seconds}"
+  local svc
+  for svc in "${UPDATED_SERVICES[@]}"; do
+    args+=(--service "$svc")
   done
+
+  bash "$(dirname "${BASH_SOURCE[0]}")/wait_for_ecs_services.sh" "${args[@]}"
 }
 
 if [[ "$SKIP_DB" -eq 0 ]]; then

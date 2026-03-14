@@ -133,9 +133,16 @@ fi
 
 if [[ ${#UPDATED_SERVICES[@]} -gt 0 ]]; then
   echo "Waiting for ECS services to stabilize..."
-  aws_json ecs wait services-stable \
-    --cluster "$CLUSTER" \
-    --services "${UPDATED_SERVICES[@]}"
+  wait_args=(
+    --region "$REGION"
+    --cluster "$CLUSTER"
+    --timeout 600
+    --sleep 15
+  )
+  for svc in "${UPDATED_SERVICES[@]}"; do
+    wait_args+=(--service "$svc")
+  done
+  bash "$(dirname "${BASH_SOURCE[0]}")/wait_for_ecs_services.sh" "${wait_args[@]}"
 fi
 
 if [[ "$SKIP_DB" -eq 0 ]]; then
