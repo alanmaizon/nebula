@@ -84,7 +84,56 @@ export function clearStoredCognitoSession(): void {
   localStorage.removeItem(STORAGE_SESSION_KEY);
 }
 
-export function getStoredAccessToken(): string | null {
+function decodeBase64Url(value: string): string {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return atob(padded);
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split(".");
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(decodeBase64Url(parts[1])) as unknown;
+    return payload && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function tokenMatchesClientId(token: string, expectedClientId: string | null | undefined): boolean {
+  const clientId = expectedClientId?.trim();
+  if (!clientId) {
+    return true;
+  }
+
+  const payload = decodeJwtPayload(token);
+  if (!payload) {
+    return false;
+  }
+
+  const tokenUse = typeof payload.token_use === "string" ? payload.token_use : null;
+  if (tokenUse === "access") {
+    return payload.client_id === clientId;
+  }
+  if (tokenUse === "id") {
+    const audience = payload.aud;
+    if (typeof audience === "string") {
+      return audience === clientId;
+    }
+    if (Array.isArray(audience)) {
+      return audience.includes(clientId);
+    }
+    return false;
+  }
+  return false;
+}
+
+export function getStoredAccessToken(expectedClientId?: string): string | null {
   const raw = localStorage.getItem(STORAGE_SESSION_KEY);
   if (!raw) {
     return null;
@@ -92,6 +141,10 @@ export function getStoredAccessToken(): string | null {
   try {
     const parsed = JSON.parse(raw) as StoredCognitoSession;
     if (!parsed.accessToken || !parsed.expiresAtEpochMs || Date.now() >= parsed.expiresAtEpochMs) {
+      clearStoredCognitoSession();
+      return null;
+    }
+    if (!tokenMatchesClientId(parsed.accessToken, expectedClientId)) {
       clearStoredCognitoSession();
       return null;
     }

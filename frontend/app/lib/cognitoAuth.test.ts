@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { readCognitoClientConfig } from "./cognitoAuth";
+import { getStoredAccessToken, readCognitoClientConfig } from "./cognitoAuth";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -10,7 +10,19 @@ function resetEnv(): void {
 
 afterEach(() => {
   resetEnv();
+  localStorage.clear();
+  sessionStorage.clear();
 });
+
+function toBase64Url(value: string): string {
+  return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function buildJwt(payload: Record<string, unknown>): string {
+  const header = toBase64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const body = toBase64Url(JSON.stringify(payload));
+  return `${header}.${body}.signature`;
+}
 
 describe("readCognitoClientConfig", () => {
   it("returns null when auth is disabled", () => {
@@ -43,5 +55,54 @@ describe("readCognitoClientConfig", () => {
       logoutRedirectUri: "https://app.example.com/callback",
       scope: "openid email profile",
     });
+  });
+});
+
+describe("getStoredAccessToken", () => {
+  it("returns the stored access token when the client id matches", () => {
+    const token = buildJwt({ token_use: "access", client_id: "client-1" });
+    localStorage.setItem(
+      "nebula.cognito.session",
+      JSON.stringify({
+        accessToken: token,
+        idToken: null,
+        refreshToken: null,
+        expiresAtEpochMs: Date.now() + 60_000,
+      })
+    );
+
+    expect(getStoredAccessToken("client-1")).toBe(token);
+  });
+
+  it("clears the stored session when the access token client id no longer matches", () => {
+    const token = buildJwt({ token_use: "access", client_id: "old-client" });
+    localStorage.setItem(
+      "nebula.cognito.session",
+      JSON.stringify({
+        accessToken: token,
+        idToken: null,
+        refreshToken: null,
+        expiresAtEpochMs: Date.now() + 60_000,
+      })
+    );
+
+    expect(getStoredAccessToken("new-client")).toBeNull();
+    expect(localStorage.getItem("nebula.cognito.session")).toBeNull();
+  });
+
+  it("clears the stored session when the ID token audience no longer matches", () => {
+    const token = buildJwt({ token_use: "id", aud: "old-client" });
+    localStorage.setItem(
+      "nebula.cognito.session",
+      JSON.stringify({
+        accessToken: token,
+        idToken: null,
+        refreshToken: null,
+        expiresAtEpochMs: Date.now() + 60_000,
+      })
+    );
+
+    expect(getStoredAccessToken("new-client")).toBeNull();
+    expect(localStorage.getItem("nebula.cognito.session")).toBeNull();
   });
 });

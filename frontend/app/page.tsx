@@ -479,7 +479,7 @@ export default function HomePage() {
         if (cancelled) {
           return;
         }
-        setAccessToken(getStoredAccessToken());
+        setAccessToken(getStoredAccessToken(config.clientId));
         setAuthError(null);
       } catch (error) {
         if (cancelled) {
@@ -545,12 +545,21 @@ export default function HomePage() {
       payload = {};
     }
     if (!response.ok) {
+      const detail = payload.detail;
       if (response.status === 401 || response.status === 403) {
+        if (
+          typeof detail === "string" &&
+          detail.includes("does not match configured app client")
+        ) {
+          clearStoredCognitoSession();
+          setAccessToken(null);
+          setAuthError("Your session is out of date. Sign in again to refresh Cognito access.");
+          throw new Error("Authentication configuration changed. Sign in again.");
+        }
         throw new Error(
           "Authentication failed. Sign in again and verify backend AUTH/Cognito settings."
         );
       }
-      const detail = payload.detail;
       if (typeof detail === "string") {
         throw new Error(detail);
       }
