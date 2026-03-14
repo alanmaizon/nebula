@@ -5,10 +5,10 @@
 [![CodeQL](https://github.com/alanmaizon/nebula/actions/workflows/codeql.yml/badge.svg)](https://github.com/alanmaizon/nebula/actions/workflows/codeql.yml)
 [![Secret Scan](https://github.com/alanmaizon/nebula/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/alanmaizon/nebula/actions/workflows/secret-scan.yml)
 
+![](frontend/public/logo.png)
+
 Nebula is an Amazon Nova-powered grant drafting workspace.  
 It turns source documents into cited draft sections, requirement coverage, and exportable submission artifacts.
-
-> GitHub README rendering does not honor the `markdown-it-iframe` plugin or Vimeo iframe embeds. Use a linked preview image here, and reserve true iframe embeds for a docs site or GitHub Pages setup that you control.
 
 [![Watch the Nebula demo on Vimeo](frontend/public/LANDING.png)](https://vimeo.com/1163998408)
 
