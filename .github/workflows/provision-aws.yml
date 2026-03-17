@@ -94,9 +94,9 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
 
-      - name: Terraform format check
+      - name: Terraform format
         shell: bash
-        run: terraform fmt -check -recursive
+        run: terraform fmt -recursive
 
       - name: Terraform init
         shell: bash

@@ -17,25 +17,25 @@ resource "random_id" "final_snapshot" {
 }
 
 locals {
-  azs                     = slice(data.aws_availability_zones.available.names, 0, var.availability_zone_count)
+  azs = slice(data.aws_availability_zones.available.names, 0, var.availability_zone_count)
 
-  name_prefix             = var.project_name
-  cluster_name            = "${local.name_prefix}-cluster"
-  backend_service_name    = "${local.name_prefix}-backend"
-  frontend_service_name   = "${local.name_prefix}-frontend"
-  database_identifier     = "${local.name_prefix}-postgres"
-  database_secret_name    = trimspace(var.database_secret_name) != "" ? var.database_secret_name : "${local.name_prefix}/database_url"
-  uploads_bucket_name     = lower("${local.name_prefix}-${var.environment}-${data.aws_caller_identity.current.account_id}-${var.aws_region}-uploads")
-  github_oidc_provider    = var.github_oidc_provider_arn != null ? var.github_oidc_provider_arn : aws_iam_openid_connect_provider.github[0].arn
-  s3_prefix_trimmed       = trim(var.s3_prefix, "/")
-  backup_s3_prefix        = local.s3_prefix_trimmed != "" ? "${local.s3_prefix_trimmed}/backups" : "backups"
-  uploads_object_arn      = local.s3_prefix_trimmed != "" ? "${aws_s3_bucket.uploads.arn}/${local.s3_prefix_trimmed}/*" : "${aws_s3_bucket.uploads.arn}/*"
-  database_url            = format("postgresql://%s:%s@%s:%d/%s?sslmode=require", var.db_username, urlencode(random_password.database.result), aws_db_instance.postgres.address, var.db_port, var.db_name)
-  backend_image_uri       = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
-  frontend_image_uri      = "${aws_ecr_repository.frontend.repository_url}:${var.frontend_image_tag}"
-  backend_secret_arns     = concat([aws_secretsmanager_secret.database_url.arn], [for key in sort(keys(var.backend_additional_secret_arns)) : var.backend_additional_secret_arns[key]])
-  backend_cors_origins    = length(var.backend_cors_origins) > 0 ? var.backend_cors_origins : ["https://${aws_cloudfront_distribution.app.domain_name}"]
-  common_tags             = merge(
+  name_prefix            = var.project_name
+  cluster_name           = "${local.name_prefix}-cluster"
+  backend_service_name   = "${local.name_prefix}-backend"
+  frontend_service_name  = "${local.name_prefix}-frontend"
+  database_identifier    = "${local.name_prefix}-postgres"
+  database_secret_name   = trimspace(var.database_secret_name) != "" ? var.database_secret_name : "${local.name_prefix}/database_url"
+  uploads_bucket_name    = lower("${local.name_prefix}-${var.environment}-${data.aws_caller_identity.current.account_id}-${var.aws_region}-uploads")
+  github_oidc_provider   = var.github_oidc_provider_arn != null ? var.github_oidc_provider_arn : aws_iam_openid_connect_provider.github[0].arn
+  s3_prefix_trimmed      = trim(var.s3_prefix, "/")
+  backup_s3_prefix       = local.s3_prefix_trimmed != "" ? "${local.s3_prefix_trimmed}/backups" : "backups"
+  uploads_object_arn     = local.s3_prefix_trimmed != "" ? "${aws_s3_bucket.uploads.arn}/${local.s3_prefix_trimmed}/*" : "${aws_s3_bucket.uploads.arn}/*"
+  database_url           = format("postgresql://%s:%s@%s:%d/%s?sslmode=require", var.db_username, urlencode(random_password.database.result), aws_db_instance.postgres.address, var.db_port, var.db_name)
+  backend_image_uri      = "${aws_ecr_repository.backend.repository_url}:${var.backend_image_tag}"
+  frontend_image_uri     = "${aws_ecr_repository.frontend.repository_url}:${var.frontend_image_tag}"
+  backend_secret_arns    = concat([aws_secretsmanager_secret.database_url.arn], [for key in sort(keys(var.backend_additional_secret_arns)) : var.backend_additional_secret_arns[key]])
+  backend_cors_origins   = length(var.backend_cors_origins) > 0 ? var.backend_cors_origins : ["https://${aws_cloudfront_distribution.app.domain_name}"]
+  common_tags = merge(
     {
       Project     = var.project_name
       Environment = var.environment
@@ -47,36 +47,36 @@ locals {
 
   backend_environment_map = merge(
     {
-      APP_ENV                               = "production"
-      AWS_REGION                            = var.aws_region
-      LOG_LEVEL                             = var.backend_log_level
-      BEDROCK_MODEL_ID                      = var.bedrock_model_id
-      BEDROCK_LITE_MODEL_ID                 = var.bedrock_lite_model_id
-      BEDROCK_EMBEDDING_MODEL_ID            = var.bedrock_embedding_model_id
+      APP_ENV                              = "production"
+      AWS_REGION                           = var.aws_region
+      LOG_LEVEL                            = var.backend_log_level
+      BEDROCK_MODEL_ID                     = var.bedrock_model_id
+      BEDROCK_LITE_MODEL_ID                = var.bedrock_lite_model_id
+      BEDROCK_EMBEDDING_MODEL_ID           = var.bedrock_embedding_model_id
       BEDROCK_VALIDATE_MODEL_IDS_ON_STARTUP = var.bedrock_validate_model_ids_on_startup ? "true" : "false"
-      EMBEDDING_MODE                        = var.embedding_mode
-      STORAGE_BACKEND                       = "s3"
-      S3_BUCKET                             = aws_s3_bucket.uploads.id
-      S3_PREFIX                             = var.s3_prefix
-      STORAGE_ROOT                          = "data/uploads"
-      CORS_ORIGINS                          = join(",", local.backend_cors_origins)
-      AUTH_ENABLED                          = var.backend_auth_enabled ? "true" : "false"
-      COGNITO_APP_CLIENT_ID                 = var.backend_auth_enabled ? var.cognito_app_client_id : ""
-      COGNITO_ISSUER                        = var.backend_auth_enabled ? var.cognito_issuer : ""
-      COGNITO_REGION                        = var.backend_auth_enabled ? var.cognito_region : ""
-      COGNITO_USER_POOL_ID                  = var.backend_auth_enabled ? var.cognito_user_pool_id : ""
+      EMBEDDING_MODE                       = var.embedding_mode
+      STORAGE_BACKEND                      = "s3"
+      S3_BUCKET                            = aws_s3_bucket.uploads.id
+      S3_PREFIX                            = var.s3_prefix
+      STORAGE_ROOT                         = "data/uploads"
+      CORS_ORIGINS                         = join(",", local.backend_cors_origins)
+      AUTH_ENABLED                         = var.backend_auth_enabled ? "true" : "false"
+      COGNITO_APP_CLIENT_ID                = var.backend_auth_enabled ? var.cognito_app_client_id : ""
+      COGNITO_ISSUER                       = var.backend_auth_enabled ? var.cognito_issuer : ""
+      COGNITO_REGION                       = var.backend_auth_enabled ? var.cognito_region : ""
+      COGNITO_USER_POOL_ID                 = var.backend_auth_enabled ? var.cognito_user_pool_id : ""
     },
     var.backend_additional_environment,
   )
 
-  backend_environment     = [
+  backend_environment = [
     for key in sort(keys(local.backend_environment_map)) : {
       name  = key
       value = tostring(local.backend_environment_map[key])
     }
   ]
 
-  backend_secrets         = concat(
+  backend_secrets = concat(
     [
       {
         name      = "DATABASE_URL"
