@@ -65,33 +65,33 @@ output "database_url_secret_arn" {
 
 output "github_actions_secrets" {
   description = "Values to load into GitHub Actions secrets for the existing deploy workflow."
-  value = {
-    AWS_REGION                        = var.aws_region
-    AWS_ROLE_TO_ASSUME                = aws_iam_role.github_deploy.arn
-    ECR_BACKEND_REPOSITORY            = aws_ecr_repository.backend.name
-    ECR_FRONTEND_REPOSITORY           = aws_ecr_repository.frontend.name
-    ECS_CLUSTER                       = aws_ecs_cluster.main.name
-    ECS_BACKEND_SERVICE               = aws_ecs_service.backend.name
-    ECS_FRONTEND_SERVICE              = aws_ecs_service.frontend.name
-    ECS_BACKEND_CONTAINER_NAME        = aws_ecs_service.backend.name
-    ECS_FRONTEND_CONTAINER_NAME       = aws_ecs_service.frontend.name
-    NEXT_PUBLIC_API_BASE              = "/api"
-    NEXT_PUBLIC_AUTH_ENABLED          = var.backend_auth_enabled ? "true" : "false"
-    NEXT_PUBLIC_COGNITO_DOMAIN        = ""
-    NEXT_PUBLIC_COGNITO_CLIENT_ID     = var.cognito_app_client_id
-    NEXT_PUBLIC_COGNITO_REDIRECT_URI  = ""
+  value       = {
+    AWS_REGION                              = var.aws_region
+    AWS_ROLE_TO_ASSUME                      = aws_iam_role.github_deploy.arn
+    ECR_BACKEND_REPOSITORY                  = aws_ecr_repository.backend.name
+    ECR_FRONTEND_REPOSITORY                 = aws_ecr_repository.frontend.name
+    ECS_CLUSTER                             = aws_ecs_cluster.main.name
+    ECS_BACKEND_SERVICE                     = aws_ecs_service.backend.name
+    ECS_FRONTEND_SERVICE                    = aws_ecs_service.frontend.name
+    ECS_BACKEND_CONTAINER_NAME              = aws_ecs_service.backend.name
+    ECS_FRONTEND_CONTAINER_NAME             = aws_ecs_service.frontend.name
+    NEXT_PUBLIC_API_BASE                    = "/api"
+    NEXT_PUBLIC_AUTH_ENABLED                = var.backend_auth_enabled ? "true" : "false"
+    NEXT_PUBLIC_COGNITO_DOMAIN              = ""
+    NEXT_PUBLIC_COGNITO_CLIENT_ID           = var.cognito_app_client_id
+    NEXT_PUBLIC_COGNITO_REDIRECT_URI        = ""
     NEXT_PUBLIC_COGNITO_LOGOUT_REDIRECT_URI = ""
-    NEXT_PUBLIC_COGNITO_SCOPE         = "openid email profile"
+    NEXT_PUBLIC_COGNITO_SCOPE               = "openid email profile"
   }
 }
 
 output "github_actions_vars" {
   description = "Values to load into GitHub Actions repository variables for ops workflows."
-  value = {
-    DB_INSTANCE_ID             = aws_db_instance.postgres.identifier
-    BACKUP_S3_BUCKET           = aws_s3_bucket.uploads.id
-    BACKUP_S3_PREFIX           = local.backup_s3_prefix
-    RDS_BACKUP_RETENTION_DAYS  = tostring(var.rds_backup_retention_period)
+  value       = {
+    DB_INSTANCE_ID            = aws_db_instance.postgres.identifier
+    BACKUP_S3_BUCKET          = aws_s3_bucket.uploads.id
+    BACKUP_S3_PREFIX          = local.backup_s3_prefix
+    RDS_BACKUP_RETENTION_DAYS = tostring(var.rds_backup_retention_period)
   }
 }
 
