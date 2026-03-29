@@ -1,5 +1,5 @@
 boto3==1.42.49
-fastapi==0.129.0
+fastapi==0.129.2
 httpx==0.28.1
 psycopg2-binary==2.9.9
 pypdf==6.7.1
