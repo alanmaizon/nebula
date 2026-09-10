@@ -71,7 +71,7 @@ jobs:
         working-directory: infra/terraform/aws
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate provision configuration
         shell: bash
