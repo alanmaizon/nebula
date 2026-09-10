@@ -1,0 +1,138 @@
+name: Inspect AWS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-inspect
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_BACKEND_SERVICE: ${{ secrets.ECS_BACKEND_SERVICE }}
+  ECS_FRONTEND_SERVICE: ${{ secrets.ECS_FRONTEND_SERVICE }}
+  DB_INSTANCE_ID: ${{ secrets.DB_INSTANCE_ID || vars.DB_INSTANCE_ID }}
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=()
+          required=(
+            AWS_REGION
+            AWS_ROLE_TO_ASSUME
+          )
+
+          for key in "${required[@]}"; do
+            if [[ -z "${!key:-}" ]]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            echo "Missing required inspect configuration values:" >&2
+            printf ' - %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+
+      - name: Summarize identity and region
+        shell: bash
+        run: |
+          set -euo pipefail
+          caller="$(aws sts get-caller-identity --output json)"
+
+          {
+            echo "## AWS Inspect"
+            echo "- Region: \`${AWS_REGION}\`"
+            echo "- Account: \`$(echo "${caller}" | jq -r '.Account')\`"
+            echo "- Caller ARN: \`$(echo "${caller}" | jq -r '.Arn')\`"
+            if [[ -n "${DB_INSTANCE_ID:-}" ]]; then
+              echo "- Configured DB identifier input exists"
+            else
+              echo "- Configured DB identifier input is empty"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: List RDS instances
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "### RDS Instances" >> "${GITHUB_STEP_SUMMARY}"
+          result="$(aws rds describe-db-instances --output json)"
+          if [[ "$(echo "${result}" | jq '.DBInstances | length')" -eq 0 ]]; then
+            echo "- None found" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "${result}" | jq -r '
+              .DBInstances[]
+              | "- id: \(.DBInstanceIdentifier) | engine: \(.Engine) | status: \(.DBInstanceStatus) | endpoint: \(.Endpoint.Address)"
+            ' >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: List RDS clusters
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "### RDS Clusters" >> "${GITHUB_STEP_SUMMARY}"
+          result="$(aws rds describe-db-clusters --output json)"
+          if [[ "$(echo "${result}" | jq '.DBClusters | length')" -eq 0 ]]; then
+            echo "- None found" >> "${GITHUB_STEP_SUMMARY}"
+          else
+            echo "${result}" | jq -r '
+              .DBClusters[]
+              | "- id: \(.DBClusterIdentifier) | engine: \(.Engine) | status: \(.Status) | endpoint: \(.Endpoint // "-") | reader: \(.ReaderEndpoint // "-")"
+            ' >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Describe ECS services
+        shell: bash
+        run: |
+          set -euo pipefail
+          services=()
+          if [[ -n "${ECS_BACKEND_SERVICE:-}" ]]; then
+            services+=("${ECS_BACKEND_SERVICE}")
+          fi
+          if [[ -n "${ECS_FRONTEND_SERVICE:-}" ]]; then
+            services+=("${ECS_FRONTEND_SERVICE}")
+          fi
+
+          echo "### ECS Services" >> "${GITHUB_STEP_SUMMARY}"
+          if [[ "${#services[@]}" -eq 0 ]]; then
+            echo "- No ECS services configured" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+
+          describe_json="$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${services[@]}" \
+            --output json)"
+
+          echo "${describe_json}" | jq -r '
+            .services[]
+            | "- service: \(.serviceName) | desired: \(.desiredCount) | running: \(.runningCount) | pending: \(.pendingCount)"
+          ' >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "### Recent ECS Events" >> "${GITHUB_STEP_SUMMARY}"
+          echo "${describe_json}" | jq -r '
+            .services[]
+            | "#### \(.serviceName)",
+              ([.events[0:5][] | "- \(.createdAt): \(.message)"] | .[])
+          ' >> "${GITHUB_STEP_SUMMARY}"

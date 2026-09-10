@@ -1,7 +1,18 @@
 # Nebula
 
+[![CI](https://github.com/alanmaizon/nebula/actions/workflows/ci.yml/badge.svg)](https://github.com/alanmaizon/nebula/actions/workflows/ci.yml)
+[![Deploy AWS](https://github.com/alanmaizon/nebula/actions/workflows/deploy-aws.yml/badge.svg)](https://github.com/alanmaizon/nebula/actions/workflows/deploy-aws.yml)
+[![CodeQL](https://github.com/alanmaizon/nebula/actions/workflows/codeql.yml/badge.svg)](https://github.com/alanmaizon/nebula/actions/workflows/codeql.yml)
+[![Secret Scan](https://github.com/alanmaizon/nebula/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/alanmaizon/nebula/actions/workflows/secret-scan.yml)
+
+![](frontend/public/logo.png)
+
 Nebula is an Amazon Nova-powered grant drafting workspace.  
 It turns source documents into cited draft sections, requirement coverage, and exportable submission artifacts.
+
+[![Watch the Nebula demo on Vimeo](frontend/public/LANDING.png)](https://vimeo.com/1163998408)
+
+Watch the demo on Vimeo: https://vimeo.com/1163998408
 
 ## What It Does
 - Extracts requirements from RFP-like documents
@@ -59,6 +70,7 @@ docker compose up --build
 - Backend docs: `http://localhost:8000/docs`
 
 ## AWS Deploy Checklist
+- Terraform baseline stack: `infra/terraform/aws`
 - Workflow: `.github/workflows/deploy-aws.yml`
 - Prerequisites and secrets: `docs/wiki/AWS-Production-Deployment-Checklist.md`
 - Readiness check script: `scripts/aws/check_deploy_readiness.sh`

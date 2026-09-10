@@ -57,5 +57,9 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
+    @property
+    def cognito_app_client_ids_list(self) -> list[str]:
+        return [client_id.strip() for client_id in self.cognito_app_client_id.split(",") if client_id.strip()]
+
 
 settings = Settings()

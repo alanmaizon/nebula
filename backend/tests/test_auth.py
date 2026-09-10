@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 
 import app.auth as auth_module
 from app.config import settings
@@ -75,3 +76,46 @@ def test_protected_routes_accept_valid_bearer_token_when_auth_enabled(
             )
             assert response.status_code == 200
             assert "id" in response.json()
+
+
+def test_decode_and_validate_cognito_token_accepts_any_configured_client_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    restore_auth_settings: None,
+) -> None:
+    _configure_auth(tmp_path)
+    settings.cognito_app_client_id = "client-a, client-b"
+
+    monkeypatch.setattr(auth_module.jwt, "get_unverified_header", lambda token: {"kid": "kid-1"})
+    monkeypatch.setattr(auth_module, "_get_jwks_keys_by_kid", lambda issuer: {"kid-1": {"kid": "kid-1"}})
+    monkeypatch.setattr(
+        auth_module.jwt,
+        "decode",
+        lambda *args, **kwargs: {"sub": "user-123", "token_use": "access", "client_id": "client-b"},
+    )
+
+    claims = auth_module.decode_and_validate_cognito_token("test-token")
+    assert claims["client_id"] == "client-b"
+
+
+def test_decode_and_validate_cognito_token_rejects_unknown_client_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    restore_auth_settings: None,
+) -> None:
+    _configure_auth(tmp_path)
+    settings.cognito_app_client_id = "client-a, client-b"
+
+    monkeypatch.setattr(auth_module.jwt, "get_unverified_header", lambda token: {"kid": "kid-1"})
+    monkeypatch.setattr(auth_module, "_get_jwks_keys_by_kid", lambda issuer: {"kid-1": {"kid": "kid-1"}})
+    monkeypatch.setattr(
+        auth_module.jwt,
+        "decode",
+        lambda *args, **kwargs: {"sub": "user-123", "token_use": "access", "client_id": "client-c"},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        auth_module.decode_and_validate_cognito_token("test-token")
+
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.detail == "Cognito access token client_id does not match configured app client."

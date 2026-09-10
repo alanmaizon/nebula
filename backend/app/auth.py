@@ -89,8 +89,8 @@ def _get_jwks_keys_by_kid(issuer: str) -> dict[str, dict[str, Any]]:
 
 
 def decode_and_validate_cognito_token(token: str) -> dict[str, Any]:
-    app_client_id = str(settings.cognito_app_client_id or "").strip()
-    if not app_client_id:
+    app_client_ids = settings.cognito_app_client_ids_list
+    if not app_client_ids:
         raise _auth_misconfigured("Cognito is enabled but COGNITO_APP_CLIENT_ID is not configured.")
 
     issuer = _cognito_issuer()
@@ -121,14 +121,14 @@ def decode_and_validate_cognito_token(token: str) -> dict[str, Any]:
 
     token_use = claims.get("token_use")
     if token_use == "access":
-        if claims.get("client_id") != app_client_id:
+        if claims.get("client_id") not in app_client_ids:
             raise _auth_unauthorized("Cognito access token client_id does not match configured app client.")
     elif token_use == "id":
         audience = claims.get("aud")
         if isinstance(audience, str):
-            aud_ok = audience == app_client_id
+            aud_ok = audience in app_client_ids
         elif isinstance(audience, list):
-            aud_ok = app_client_id in audience
+            aud_ok = any(client_id in audience for client_id in app_client_ids)
         else:
             aud_ok = False
         if not aud_ok:

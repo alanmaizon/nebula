@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } 
 
 import MissingEvidencePanel from "./components/MissingEvidencePanel";
 import QualitySignalsPanel from "./components/QualitySignalsPanel";
+import SegmentedToggle from "./components/SegmentedToggle";
 import TraceabilityPanel from "./components/TraceabilityPanel";
 import UnresolvedGapsPanel from "./components/UnresolvedGapsPanel";
 import {
@@ -47,6 +48,8 @@ type IndexedDocumentsResult = {
   documentsIndexed: number;
   parseDiagnostics: ParseDiagnostics;
 };
+
+type ResultTab = "draft" | "quality" | "coverage" | "traceability" | "missing";
 
 const outputCards = [
   "Clear Requirements",
@@ -445,6 +448,7 @@ export default function HomePage() {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [activeResultTab, setActiveResultTab] = useState<ResultTab>("draft");
 
   const isRunning = runStatus === "loading";
   const authEnabled = authConfig !== null;
@@ -479,7 +483,7 @@ export default function HomePage() {
         if (cancelled) {
           return;
         }
-        setAccessToken(getStoredAccessToken());
+        setAccessToken(getStoredAccessToken(config.clientId));
         setAuthError(null);
       } catch (error) {
         if (cancelled) {
@@ -545,12 +549,21 @@ export default function HomePage() {
       payload = {};
     }
     if (!response.ok) {
+      const detail = payload.detail;
       if (response.status === 401 || response.status === 403) {
+        if (
+          typeof detail === "string" &&
+          detail.includes("does not match configured app client")
+        ) {
+          clearStoredCognitoSession();
+          setAccessToken(null);
+          setAuthError("Your session is out of date. Sign in again to refresh Cognito access.");
+          throw new Error("Authentication configuration changed. Sign in again.");
+        }
         throw new Error(
           "Authentication failed. Sign in again and verify backend AUTH/Cognito settings."
         );
       }
-      const detail = payload.detail;
       if (typeof detail === "string") {
         throw new Error(detail);
       }
@@ -840,6 +853,23 @@ export default function HomePage() {
     return extractTraceabilityData(result.exportJson);
   }, [result]);
 
+  const resultTabOptions = useMemo(
+    () => [
+      { value: "draft", label: "Draft" },
+      { value: "quality", label: "Quality" },
+      { value: "coverage", label: "Coverage" },
+      { value: "traceability", label: "Citations" },
+      { value: "missing", label: "Missing" },
+    ],
+    []
+  );
+
+  useEffect(() => {
+    if (result) {
+      setActiveResultTab("draft");
+    }
+  }, [result]);
+
   if (!showWorkspace) {
     return (
       <main className="nebula-landing">
@@ -1111,27 +1141,57 @@ export default function HomePage() {
                     <span>
                       <strong>Citations:</strong> {traceability.citationCount}
                     </span>
+                    <span>
+                      <strong>Missing evidence groups:</strong> {traceability.missingEvidenceGroups.length}
+                    </span>
                   </section>
                 ) : null}
 
-                <QualitySignalsPanel signals={result.qualitySignals} status={runStatus} />
+                <section className="result-tabs-shell">
+                  <div className="result-tabs-header">
+                    <div className="result-tabs-copy">
+                      <span>Results workspace</span>
+                      <p>Switch between the final draft, diagnostics, coverage, citations, and missing evidence.</p>
+                    </div>
+                    <SegmentedToggle
+                      label="Result views"
+                      value={activeResultTab}
+                      options={resultTabOptions}
+                      onChange={(nextValue) => setActiveResultTab(nextValue as ResultTab)}
+                    />
+                  </div>
 
-                <UnresolvedGapsPanel gaps={result.qualitySignals.unresolvedGaps} status={runStatus} />
+                  <div className="result-tab-panel" role="tabpanel" aria-label={`${activeResultTab} results`}>
+                    {activeResultTab === "draft" ? (
+                      <MarkdownViewer
+                        content={result.exportMarkdown}
+                        emptyMessage="No markdown export available."
+                      />
+                    ) : null}
 
-                <TraceabilityPanel sections={traceability.sections} />
+                    {activeResultTab === "quality" ? (
+                      <QualitySignalsPanel signals={result.qualitySignals} status={runStatus} />
+                    ) : null}
 
-                <MarkdownViewer
-                  content={result.exportMarkdown}
-                  emptyMessage="No markdown export available."
-                />
+                    {activeResultTab === "coverage" ? (
+                      <UnresolvedGapsPanel gaps={result.qualitySignals.unresolvedGaps} status={runStatus} />
+                    ) : null}
+
+                    {activeResultTab === "traceability" ? (
+                      <TraceabilityPanel sections={traceability.sections} />
+                    ) : null}
+
+                    {activeResultTab === "missing" ? (
+                      <MissingEvidencePanel
+                        groups={traceability.missingEvidenceGroups}
+                        status={runStatus}
+                        errorMessage={runError}
+                      />
+                    ) : null}
+                  </div>
+                </section>
               </div>
             ) : null}
-
-            <MissingEvidencePanel
-              groups={traceability.missingEvidenceGroups}
-              status={runStatus}
-              errorMessage={runError}
-            />
 
             {runStatus === "error" ? <p className="error-text">{runError ?? "Pipeline failed."}</p> : null}
           </section>

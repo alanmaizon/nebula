@@ -2,9 +2,20 @@
 
 This checklist covers the production gaps between local MVP behavior and AWS ECS deployment.
 
+If you want to provision the baseline AWS infrastructure from scratch instead of wiring it up manually, start with `infra/terraform/aws/README.md`.
+
+There is also a manual GitHub Actions workflow for fresh infrastructure: `.github/workflows/provision-aws.yml`.
+
 ## 1) Configure GitHub Secrets for Deploy Workflow
 
 Workflow file: `.github/workflows/deploy-aws.yml`
+
+Pipeline behavior:
+- `CI` runs on pull requests and on `main`, with deterministic dependency installs, frontend lint/typecheck/tests, backend tests, and docker smoke coverage.
+- `Deploy AWS` now runs automatically only after a successful `CI` run on `main`, or manually via `workflow_dispatch`.
+- `Deploy AWS`, `Resume AWS`, `Pause AWS`, and `Backup AWS` share one GitHub Actions concurrency group so only one stack-mutating workflow touches production at a time.
+- `Provision AWS Stack` is a separate manual Terraform workflow for building a fresh Nebula stack without relying on the legacy hand-created resources.
+- The current GitHub OIDC trust is still branch-based, so the AWS workflows should be run from `main` unless you also update IAM trust conditions.
 
 Required (backend deploy):
 - `AWS_REGION`: AWS region where ECS/ECR are deployed.
@@ -121,6 +132,70 @@ The account must contain:
   - ECR push (`GetAuthorizationToken`, `BatchCheckLayerAvailability`, `PutImage`, etc.)
   - ECS service/task updates (`DescribeServices`, `DescribeTaskDefinition`, `RegisterTaskDefinition`, `UpdateService`, `DescribeClusters`)
   - IAM pass role for ECS task execution/task roles (`iam:PassRole`) when needed by task definition registration
+
+## 4) Backup Workflow Requirements
+
+Workflow file: `.github/workflows/backup-aws.yml`
+
+Required GitHub secrets:
+- Reuses deploy secrets:
+  - `AWS_REGION`
+  - `AWS_ROLE_TO_ASSUME`
+  - `ECS_CLUSTER`
+  - `ECS_BACKEND_SERVICE`
+- Optional:
+  - `ECS_BACKEND_CONTAINER_NAME`
+  - `DB_INSTANCE_ID`
+  - `BACKUP_S3_BUCKET`
+  - `BACKUP_S3_PREFIX`
+  - `RDS_BACKUP_RETENTION_DAYS`
+
+Recommended IAM permissions for the GitHub OIDC role used by backups:
+- ECS read:
+  - `ecs:DescribeServices`
+  - `ecs:DescribeTaskDefinition`
+- RDS backup management:
+  - `rds:DescribeDBInstances`
+  - `rds:DescribeDBSnapshots`
+  - `rds:CreateDBSnapshot`
+  - `rds:ModifyDBInstance`
+  - `rds:StartDBInstance`
+  - `rds:StopDBInstance`
+- S3 upload backup:
+  - `s3:GetBucketVersioning`
+  - `s3:PutBucketVersioning`
+  - `s3:ListBucket`
+  - `s3:GetObject`
+  - `s3:PutObject`
+- Secret resolution when runtime config is injected indirectly:
+  - `secretsmanager:GetSecretValue`
+  - `ssm:GetParameter`
+
+Notes:
+- If `DB_INSTANCE_ID` is not set, the backup script attempts to resolve the RDS instance from `DATABASE_URL`.
+- When `STORAGE_BACKEND=s3`, the workflow enables S3 versioning and copies the uploads prefix into a dated backup prefix.
+- The scheduled workflow runs daily at `04:17 UTC` and can also be triggered manually with overrides.
+
+## 5) Pause and Resume Workflows
+
+Workflow files:
+- `.github/workflows/resume-aws.yml`
+- `.github/workflows/pause-aws.yml`
+
+Purpose:
+- `Resume AWS` starts the RDS instance and scales ECS services back up using the same OIDC role as deploy.
+- `Pause AWS` scales ECS services to `0` and optionally stops RDS to reduce cost.
+
+Important behavior:
+- `.github/workflows/deploy-aws.yml` updates task definitions and ECS services, but it does not change desired counts.
+- A deploy can therefore pass while the backend service remains paused at desired count `0`.
+- In that state the frontend can still load while `/api/*` returns `503 Service Temporarily Unavailable` through CloudFront/ALB.
+
+Recommended recovery when the UI loads but API requests fail with `503`:
+1. Run `Resume AWS` from GitHub Actions.
+2. Wait for the backend service and RDS instance to become available.
+3. Retry `GET /api/health` and `GET /api/ready`.
+4. Retry the workflow in the UI once the API endpoints return `200`.
 
 Minimal trust policy template:
 
